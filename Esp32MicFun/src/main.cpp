@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
+#include <memory>
 #include "SharedUtils\Utils.h"
 
 #define PIN_I2C_SDA 21
@@ -68,6 +69,7 @@ void DrawScreen()
 
 	//log_d("x=%d, y=%d, r=%d", _PosX, _PosY, _ballRadius);
 
+	u8g2.setDrawColor(1);
 	u8g2.drawDisc(_PosX, _PosY, _ballRadius);
 
 	_ballRadius+=_incRadius;
@@ -81,9 +83,9 @@ void DrawScreen()
 	// 		u8g2.drawPixel(x, y);
 	// 	}
 	// }
-//	u8g2.setFontMode(1);
-//	u8g2.setDrawColor(2);
-	//u8g2.drawStr(0, 6, "Soc Peque 6px");
+	u8g2.setFontMode(1);
+	u8g2.setDrawColor(2);
+	u8g2.drawStr(20, 15, Utils::string_format("FPS=%3.2f", _fps).c_str());
 	// u8g2.setFont(u8g2_font_profont10_mf);
 	// u8g2.drawStr(0, 6, "Soc Peque 6px");
 	// u8g2.setFont(u8g2_font_ncenB14_tr);
