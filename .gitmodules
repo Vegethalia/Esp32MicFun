@@ -1,0 +1,3 @@
+[submodule "Esp32SharedUtils"]
+	path = Esp32SharedUtils
+	url = https://github.com/Vegethalia/Esp32SharedUtils
