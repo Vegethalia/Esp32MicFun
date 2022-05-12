@@ -2,6 +2,7 @@
 #include <U8g2lib.h>
 #include <memory>
 #include "SharedUtils\Utils.h"
+#include "fft.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,9 +18,11 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define DEFAULT_VREF       1100
-#define INPUT_0_VALUE      2100 //input is biased towards 2.1V (dc value)
-#define VOLATGE_DRAW_RANGE 400  //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define SAMPLE_RATE        5000
+#define INPUT_0_VALUE      2100  //input is biased towards 2.1V (dc value)
+#define VOLATGE_DRAW_RANGE 250   //400  //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define MIN_FFT_MAGNITUDE  200   //a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_MAGNITUDE  7000  //a magnitude greater than this value will be considered Max Power
+#define SAMPLE_RATE        10000 //we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define MASK_12BIT 0x0fff
 
@@ -54,6 +57,8 @@ uint8_t _adc_i2s_event_queue_size = 1;
 struct TaskParams {
 	uint16_t data1[SCREEN_WIDTH];
 	uint16_t data2[SCREEN_WIDTH];
+	int32_t fftMag[SCREEN_WIDTH / 2];
+	uint16_t dataOrig[SCREEN_WIDTH * 2];
 	uint8_t lastBuffSet; //0=none, 1=data1, 2=data2
 	bool newDataReady;
 	uint32_t buffNumber;
@@ -69,32 +74,37 @@ TaskParams _TaskParams;
 // Task to read samples.
 void vTaskReader(void* pvParameters)
 {
-	size_t buffSize =sizeof(_TaskParams.data1);
+	size_t buffSize = sizeof(_TaskParams.data1);
+	size_t buffSizeOrig = sizeof(_TaskParams.dataOrig);
 	size_t bytesRead=0;
 	log_d("Estic a la ReaderTask. BuffSize=[%d]", buffSize);
 	i2s_event_t adc_i2s_evt;
 	uint32_t recInit=millis();
 	uint32_t totalData=0;
+	uint16_t numCalls=0;
 	for(;; ) {
 		if(xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
 			if(adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
 				uint16_t* pDest = _TaskParams.lastBuffSet == 2 ? _TaskParams.data1 : _TaskParams.data2;
 
 				_TaskParams.lastBuffSet = _TaskParams.lastBuffSet == 2 ? 1 : 2;
-				auto err = i2s_read(I2S_NUM_0, pDest, buffSize, &bytesRead, portMAX_DELAY);
+				auto err = i2s_read(I2S_NUM_0, (void*)_TaskParams.dataOrig, buffSizeOrig, &bytesRead, portMAX_DELAY);
 				if(err != ESP_OK) {
 					log_d("is_read error! [%d]", err);
 				}
 				else {
-					if(bytesRead!=buffSize) {
+					if(bytesRead != buffSizeOrig) {
 						log_d("bytesRead=%d", bytesRead);
 					}
 					totalData += bytesRead;
+					numCalls++;
 					_TaskParams.buffNumber++;
 					//now we convert the values to mv from 1V to 3V
-					for(int i = 0; i < SCREEN_WIDTH; i++) {
+					for(int i = 0, k=0; i < bytesRead; i+=2, k++) {
 							//pDest[i] = (uint16_t)(esp_adc_cal_raw_to_voltage(pDest[i] & MASK_12BIT, _adc_chars) - (INPUT_0_VALUE / 2));
-							pDest[i] = (uint16_t)(esp_adc_cal_raw_to_voltage(pDest[i] & MASK_12BIT, _adc_chars));
+						pDest[k] = (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i] & MASK_12BIT, _adc_chars));
+						pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i+1] & MASK_12BIT, _adc_chars));
+						pDest[k] = pDest[k]/2;
 							//pDest[i] = (uint16_t)pDest[i] & MASK_12BIT;
 						//log_d("%d", pDest[i]);
 					}
@@ -103,9 +113,10 @@ void vTaskReader(void* pvParameters)
 					_TaskParams.newDataReady = true;
 					auto now=millis();
 					if((now-recInit)>=1000) {
-						log_d("1sec receiving: time=%d totalData=%d", now - recInit, totalData);
+						log_d("1sec receiving: time=%d totalData=%d numCalls=%d", now - recInit, totalData, numCalls);
 						recInit=now;
 						totalData=0;
+						numCalls=0;
 					}
 				}
 			}
@@ -122,16 +133,46 @@ void vTaskDrawer(void* pvParameters)
 	log_d("In vTaskDrawer.afterSetBus...");
 	u8g2.begin();
 	log_d("In vTaskDrawer.afterBegin...");
-	u8g2.setFont(u8g2_font_profont10_mf);
+	u8g2.setFont(u8g2_font_profont12_mf);
 	log_d("In vTaskDrawer.afterSetFont...");
+
+			// Create the FFT config structure
+	fft_config_t* real_fft_plan = fft_init(SCREEN_WIDTH, FFT_REAL, FFT_FORWARD, NULL, NULL);
+	float freqs_x_bin=(float)(SAMPLE_RATE/2)/(float)SCREEN_WIDTH;
+	log_d("Freqs_x_Bin=%3.2f", freqs_x_bin);
+
 	uint8_t lastBuff=0;
 	uint32_t samplesDrawn=0;
 	while(true)
 	{
 		if(_TaskParams.newDataReady) {
+			uint16_t* pDest = _TaskParams.lastBuffSet == 1 ? _TaskParams.data1 : _TaskParams.data2;
+
 			if(_numFrames == 0) {
 				_InitTime = millis();
 			}
+
+			//TEEEEST FFT
+			for(int i=0; i<SCREEN_WIDTH; i++) {
+				real_fft_plan->input[i]=(float)pDest[i];
+			}
+			fft_execute(real_fft_plan);
+			int32_t maxMag=0;
+			uint16_t maxMagI=0;
+			for(int i = 1; i < SCREEN_WIDTH/2; i++) {
+				_TaskParams.fftMag[i] = (int32_t)sqrt(pow(real_fft_plan->output[i * 2], 2) + pow(real_fft_plan->output[(i * 2)+1], 2));
+
+				//log_d("Freq=%3.2f Magn=%3.2f", i * freqs_x_bin, _TaskParams.fftMag[i]);
+
+				if(_TaskParams.fftMag[i]>maxMag) {
+					maxMag = _TaskParams.fftMag[i];
+					maxMagI=i;
+				}
+			}
+			// if(maxMag>MIN_FFT_MAGNITUDE) {
+			// 	log_d("MaxFreq=%3.2f Magn=%d", maxMagI * freqs_x_bin, maxMag);
+			// }
+			//FI TEEEEST FFT
 
 			_TaskParams.newDataReady = false;
 			if(lastBuff == _TaskParams.lastBuffSet) {
@@ -141,7 +182,6 @@ void vTaskDrawer(void* pvParameters)
 			// log_d("DataReady! DataBuffer=[%d]. BuffNumber=[%d]", _TaskParams.lastBuffSet, _TaskParams.buffNumber);
 			u8g2.clearBuffer();
 
-			uint16_t* pDest = _TaskParams.lastBuffSet == 1 ? _TaskParams.data1 : _TaskParams.data2;
 			uint16_t value=0;
 			for(int i=0; i<SCREEN_WIDTH; i++) {
 				value = constrain(pDest[i], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE);
@@ -150,9 +190,17 @@ void vTaskDrawer(void* pvParameters)
 			}
 			samplesDrawn+=SCREEN_WIDTH;
 
-			u8g2.setFontMode(1);
+			//Now the FFT
 			u8g2.setDrawColor(2);
-			u8g2.drawStr(20, 15, Utils::string_format("FPS=%3.2f", _fps).c_str());
+			for(int i = 1; i < SCREEN_WIDTH / 2; i++) {
+				value = constrain(_TaskParams.fftMag[i], MIN_FFT_MAGNITUDE, 8000);
+				value = map(value, MIN_FFT_MAGNITUDE, 8000, 0, SCREEN_HEIGHT - 1);
+				u8g2.drawFrame(i * 2, SCREEN_HEIGHT - value, 2, value);
+			}
+
+			u8g2.setFontMode(1);
+//			u8g2.setDrawColor(2);
+			u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f  F=%04dHz", _fps, maxMag > MIN_FFT_MAGNITUDE ? (int32_t)(maxMagI * freqs_x_bin) : 0).c_str());
 			u8g2.sendBuffer();
 			_numFrames++;
 
@@ -246,17 +294,17 @@ void setup()
 	// }
 	log_d("Installing Driver...");
 	i2s_config_t i2s_config = {
-		.mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
-		.sample_rate = SAMPLE_RATE*2,
+		.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
+		.sample_rate = SAMPLE_RATE,//samplerate configured are the number of samples returned if channel=Left+Right, not frequency. So we need to multiply*2.
 		.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
 		.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
 		.communication_format = I2S_COMM_FORMAT_I2S_MSB,
 		.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,  // Interrupt level 1, default 0
-		.dma_buf_count = 5,
-		.dma_buf_len = SCREEN_WIDTH*sizeof(uint16_t),
-		.use_apll = true, //false,
-		.tx_desc_auto_clear = false,
-		.fixed_mclk = SAMPLE_RATE*2
+		.dma_buf_count = 8,
+		.dma_buf_len = SCREEN_WIDTH*2, //these are the number of samples we will read from i2s_read
+		.use_apll = false,
+		.tx_desc_auto_clear = false
+		//.fixed_mclk = SAMPLE_RATE
 	};
 	//install and start i2s driver
 	auto err = i2s_driver_install(I2S_NUM_0, &i2s_config, _adc_i2s_event_queue_size, &_adc_i2s_event_queue);
