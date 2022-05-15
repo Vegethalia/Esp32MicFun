@@ -2,7 +2,7 @@
 #include <U8g2lib.h>
 #include <memory>
 #include "SharedUtils\Utils.h"
-#include "fft.h"
+#include "FftPower.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -18,11 +18,17 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define DEFAULT_VREF       1100
-#define INPUT_0_VALUE      2100  //input is biased towards 2.1V (dc value)
-#define VOLATGE_DRAW_RANGE 250   //400  //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MIN_FFT_MAGNITUDE  200   //a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_MAGNITUDE  7000  //a magnitude greater than this value will be considered Max Power
-#define SAMPLE_RATE        10000 //we will oversample by 2. We can only draw up to 5kpixels per second
+#define INPUT_0_VALUE      1225  //input is biased towards 1.5V
+#define VOLATGE_DRAW_RANGE 1100   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define MIN_FFT_DB         -50    //a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_MAGNITUDE  75000  //a magnitude greater than this value will be considered Max Power
+#define MAX_FFT_DB         15     //a magnitude greater than this value will be considered Max Power
+
+#define TARGET_SAMPLE_RATE 8192
+#define OVERSAMPLING       2     //we will oversample by this amount
+#define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
+
+#define AUDIO_DATA_OUT     (SCREEN_WIDTH*2)
 
 #define MASK_12BIT 0x0fff
 
@@ -50,26 +56,28 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t *)cal
 TaskHandle_t _readerTaskHandle;
 TaskHandle_t _drawTaskHandle;
 
-QueueHandle_t _adc_i2s_event_queue;
+QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer;
 uint8_t _adc_i2s_event_queue_size = 1;
 
 
 struct TaskParams {
-	uint16_t data1[SCREEN_WIDTH];
-	uint16_t data2[SCREEN_WIDTH];
-	int32_t fftMag[SCREEN_WIDTH / 2];
-	uint16_t dataOrig[SCREEN_WIDTH * 2];
+	uint16_t data1[AUDIO_DATA_OUT];
+	uint16_t data2[AUDIO_DATA_OUT];
+	int32_t fftMag[AUDIO_DATA_OUT / 2];
+	uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
 	uint8_t lastBuffSet; //0=none, 1=data1, 2=data2
-	bool newDataReady;
-	uint32_t buffNumber;
 
 	TaskParams() {
 		lastBuffSet=0;
-		newDataReady=false;
-		buffNumber=0;
 	}
 };
 TaskParams _TaskParams;
+
+struct MsgAudio2Draw {
+	uint16_t* pAudio;
+	int32_t* pFftMag;
+	uint16_t max_freq;
+};
 
 // Task to read samples.
 void vTaskReader(void* pvParameters)
@@ -80,8 +88,18 @@ void vTaskReader(void* pvParameters)
 	log_d("Estic a la ReaderTask. BuffSize=[%d]", buffSize);
 	i2s_event_t adc_i2s_evt;
 	uint32_t recInit=millis();
-	uint32_t totalData=0;
+	uint32_t totalSamples=0;
 	uint16_t numCalls=0;
+	int32_t superMaxMag=-10000;
+	MsgAudio2Draw mad;
+	FftPower theFFT(AUDIO_DATA_OUT);
+	float *pInputFft=theFFT.GetInputBuffer();
+
+	// Create the FFT config structure
+	//fft_config_t* real_fft_plan = fft_init(AUDIO_DATA_OUT, FFT_REAL, FFT_FORWARD, NULL, NULL);
+	float freqs_x_bin = (float)(TARGET_SAMPLE_RATE) / (float)AUDIO_DATA_OUT;
+	log_d("Freqs_x_Bin=%3.2f", freqs_x_bin);
+
 	for(;; ) {
 		if(xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
 			if(adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
@@ -96,30 +114,46 @@ void vTaskReader(void* pvParameters)
 					if(bytesRead != buffSizeOrig) {
 						log_d("bytesRead=%d", bytesRead);
 					}
-					totalData += bytesRead;
+					totalSamples += bytesRead/sizeof(uint16_t);
 					numCalls++;
-					_TaskParams.buffNumber++;
+					//_TaskParams.buffNumber++;
 					//now we convert the values to mv from 1V to 3V
-					for(int i = 0, k=0; i < bytesRead; i+=2, k++) {
-							//pDest[i] = (uint16_t)(esp_adc_cal_raw_to_voltage(pDest[i] & MASK_12BIT, _adc_chars) - (INPUT_0_VALUE / 2));
-						pDest[k] = (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i] & MASK_12BIT, _adc_chars));
-						pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i+1] & MASK_12BIT, _adc_chars));
-						pDest[k] = pDest[k]/2;
-							//pDest[i] = (uint16_t)pDest[i] & MASK_12BIT;
-						//log_d("%d", pDest[i]);
+					for(int i = 0, k=0; i < bytesRead; i+=OVERSAMPLING, k++) {
+						pDest[k] = 0;
+						for(uint8_t ov=0; ov<OVERSAMPLING; ov++) {
+							pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i + ov] & MASK_12BIT, _adc_chars));
+						}
+						pDest[k] = pDest[k] / OVERSAMPLING;
+						pInputFft[k] = (float)pDest[k];
+
+						//i ara escalem el valor
+						pDest[k] = constrain(pDest[k], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE);
+						pDest[k] = map(pDest[k], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
 					}
-					// uint32_t avg = ((pDest[0] & MASK_12BIT) + (pDest[1] & MASK_12BIT) + (pDest[2] & MASK_12BIT)) / 3;
-					// log_d("ReadNumber [%d]. Buff=[%d]. Read [%d] bytes.", _TaskParams.buffNumber, _TaskParams.lastBuffSet, bytesRead);
-					_TaskParams.newDataReady = true;
+					uint16_t maxMagI=0;
+					mad.pAudio = pDest;
+					mad.pFftMag = _TaskParams.fftMag;
+					theFFT.Execute();
+					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::HALF, maxMagI);
+					mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
+
+					if(!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+						log_d("Draw Queue FULL!!");
+					}
+
 					auto now=millis();
 					if((now-recInit)>=1000) {
-						log_d("1sec receiving: time=%d totalData=%d numCalls=%d", now - recInit, totalData, numCalls);
+						log_d("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d", now - recInit, totalSamples, numCalls, superMaxMag);
 						recInit=now;
-						totalData=0;
+						totalSamples=0;
 						numCalls=0;
+						superMaxMag=-10000;
 					}
 				}
 			}
+			// else if(adc_i2s_evt.type == I2S_EVENT_RX_Q_OVF) {
+			// 	log_d("RX data dropped!!\n");
+			// }
 		}
 	}
 	vTaskDelete(NULL);
@@ -129,52 +163,27 @@ void vTaskReader(void* pvParameters)
 void vTaskDrawer(void* pvParameters)
 {
 	log_d("In vTaskDrawer. Begin Display...");
-	u8g2.setBusClock(700000);
+	u8g2.setBusClock(600000);
 	log_d("In vTaskDrawer.afterSetBus...");
 	u8g2.begin();
 	log_d("In vTaskDrawer.afterBegin...");
 	u8g2.setFont(u8g2_font_profont12_mf);
 	log_d("In vTaskDrawer.afterSetFont...");
 
-			// Create the FFT config structure
-	fft_config_t* real_fft_plan = fft_init(SCREEN_WIDTH, FFT_REAL, FFT_FORWARD, NULL, NULL);
-	float freqs_x_bin=(float)(SAMPLE_RATE/2)/(float)SCREEN_WIDTH;
-	log_d("Freqs_x_Bin=%3.2f", freqs_x_bin);
-
 	uint8_t lastBuff=0;
 	uint32_t samplesDrawn=0;
+	MsgAudio2Draw mad;
+
 	while(true)
 	{
-		if(_TaskParams.newDataReady) {
-			uint16_t* pDest = _TaskParams.lastBuffSet == 1 ? _TaskParams.data1 : _TaskParams.data2;
+		if(xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY)) {
+			uint16_t* pDest = mad.pAudio;
 
 			if(_numFrames == 0) {
 				_InitTime = millis();
 			}
 
-			//TEEEEST FFT
-			for(int i=0; i<SCREEN_WIDTH; i++) {
-				real_fft_plan->input[i]=(float)pDest[i];
-			}
-			fft_execute(real_fft_plan);
-			int32_t maxMag=0;
-			uint16_t maxMagI=0;
-			for(int i = 1; i < SCREEN_WIDTH/2; i++) {
-				_TaskParams.fftMag[i] = (int32_t)sqrt(pow(real_fft_plan->output[i * 2], 2) + pow(real_fft_plan->output[(i * 2)+1], 2));
-
-				//log_d("Freq=%3.2f Magn=%3.2f", i * freqs_x_bin, _TaskParams.fftMag[i]);
-
-				if(_TaskParams.fftMag[i]>maxMag) {
-					maxMag = _TaskParams.fftMag[i];
-					maxMagI=i;
-				}
-			}
-			// if(maxMag>MIN_FFT_MAGNITUDE) {
-			// 	log_d("MaxFreq=%3.2f Magn=%d", maxMagI * freqs_x_bin, maxMag);
-			// }
-			//FI TEEEEST FFT
-
-			_TaskParams.newDataReady = false;
+			//_TaskParams.newDataReady = false;
 			if(lastBuff == _TaskParams.lastBuffSet) {
 				log_d("Buff repeat! :(");
 			}
@@ -182,25 +191,43 @@ void vTaskDrawer(void* pvParameters)
 			// log_d("DataReady! DataBuffer=[%d]. BuffNumber=[%d]", _TaskParams.lastBuffSet, _TaskParams.buffNumber);
 			u8g2.clearBuffer();
 
-			uint16_t value=0;
-			for(int i=0; i<SCREEN_WIDTH; i++) {
-				value = constrain(pDest[i], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE);
-				value = map(value, INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
-				u8g2.drawPixel(i, value);
+			//busquem el pass per "0" després de la muntanya més gran
+			int16_t value=0;
+			uint16_t pas0=0;
+			uint16_t maxAmp = (SCREEN_HEIGHT / 2);
+			uint16_t iMaxAmp=0;
+			for(int i = 0; i < (AUDIO_DATA_OUT - SCREEN_WIDTH - SCREEN_WIDTH/3); i++) {
+				if(pDest[i] < maxAmp) {
+					maxAmp = value;
+					iMaxAmp=i;
+					break;
+				}
+			} //ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
+			for(int i = iMaxAmp; i < (AUDIO_DATA_OUT - SCREEN_WIDTH); i++) {
+				if(pDest[i] >= (SCREEN_HEIGHT / 2)) {
+					pas0=i;
+					break;
+				}
 			}
-			samplesDrawn+=SCREEN_WIDTH;
+			for(uint16_t i = pas0; i < (pas0 + SCREEN_WIDTH); i++) {
+				 value = constrain(pDest[i], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE);
+				 value = map(value, INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
+				u8g2.drawPixel(i - pas0, pDest[i]);
+			}
+			samplesDrawn += AUDIO_DATA_OUT;
 
 			//Now the FFT
 			u8g2.setDrawColor(2);
-			for(int i = 1; i < SCREEN_WIDTH / 2; i++) {
-				value = constrain(_TaskParams.fftMag[i], MIN_FFT_MAGNITUDE, 8000);
-				value = map(value, MIN_FFT_MAGNITUDE, 8000, 0, SCREEN_HEIGHT - 1);
-				u8g2.drawFrame(i * 2, SCREEN_HEIGHT - value, 2, value);
+			uint16_t maxIndex = min(AUDIO_DATA_OUT / 4, SCREEN_WIDTH);
+			for(uint16_t i = 1; i < maxIndex; i++) {
+				value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+				value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
+				u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1);
 			}
 
 			u8g2.setFontMode(1);
 //			u8g2.setDrawColor(2);
-			u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f  F=%04dHz", _fps, maxMag > MIN_FFT_MAGNITUDE ? (int32_t)(maxMagI * freqs_x_bin) : 0).c_str());
+			u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f  F=%04dHz", _fps, mad.max_freq).c_str());
 			u8g2.sendBuffer();
 			_numFrames++;
 
@@ -212,49 +239,6 @@ void vTaskDrawer(void* pvParameters)
 				_numFrames = 0;
 			}
 		}
-		else {
-			vTaskDelay(1);
-		}
-		// u8g2.setContrast(_ScreenBrightness);
-		// u8g2.clearBuffer();
-
-		// _PosX += _incX;
-		// if(_PosX >= (SCREEN_WIDTH - _ballRadius) && _incX > 0) {
-		// 	_PosX = SCREEN_WIDTH - _ballRadius;
-		// 	_incX = (-_incX);
-		// 	_incRadius = (-_incRadius);
-		// }
-		// else if(_PosX <= _ballRadius && _incX < 0) {
-		// 	_PosX = _ballRadius;
-		// 	_incX = (-_incX);
-		// 	_incRadius = (-_incRadius);
-		// }
-		// _PosY += _incY;
-		// if(_PosY >= (SCREEN_HEIGHT - _ballRadius) && _incY > 0) {
-		// 	_PosY = SCREEN_HEIGHT - _ballRadius;
-		// 	_incY = (-_incY);
-		// }
-		// else if(_PosY <= _ballRadius && _incY < 0) {
-		// 	_PosY = _ballRadius;
-		// 	_incY = (-_incY);
-		// }
-
-		// //log_d("x=%d, y=%d, r=%d", _PosX, _PosY, _ballRadius);
-
-		// u8g2.setDrawColor(1);
-		// u8g2.drawDisc(_PosX, _PosY, _ballRadius);
-
-		// _ballRadius += _incRadius;
-		// if(_ballRadius < 1) {
-		// 	_ballRadius = 1;
-		// }
-
-		// u8g2.setFontMode(1);
-		// u8g2.setDrawColor(2);
-		// u8g2.drawStr(20, 15, Utils::string_format("FPS=%3.2f", _fps).c_str());
-
-		// u8g2.sendBuffer();
-		//_numFrames++;
 	}
 }
 
@@ -263,11 +247,6 @@ void setup()
 	Serial.begin(115200);
 	// wait for serial monitor to open
 	while(!Serial);
-
-	// log_d("Begin Display...");
-	// u8g2.setBusClock(600000);
-	// u8g2.begin();
-	// u8g2.setFont(u8g2_font_profont10_mf);
 
 	//range 0...4096
 	adc1_config_width(ADC_WIDTH_BIT_12);
@@ -298,24 +277,27 @@ void setup()
 		.sample_rate = SAMPLE_RATE,//samplerate configured are the number of samples returned if channel=Left+Right, not frequency. So we need to multiply*2.
 		.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
 		.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-		.communication_format = I2S_COMM_FORMAT_I2S_MSB,
+		.communication_format = I2S_COMM_FORMAT_I2S_MSB, // I2S_COMM_FORMAT_STAND_MSB,
 		.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,  // Interrupt level 1, default 0
-		.dma_buf_count = 8,
-		.dma_buf_len = SCREEN_WIDTH*2, //these are the number of samples we will read from i2s_read
+		.dma_buf_count = 2, //8,
+		.dma_buf_len = (AUDIO_DATA_OUT * OVERSAMPLING), //AUDIO_DATA_OUT*OVERSAMPLING, //these are the number of samples we will read from i2s_read
 		.use_apll = false,
-		.tx_desc_auto_clear = false
-		//.fixed_mclk = SAMPLE_RATE
+		.tx_desc_auto_clear = false,
+		.fixed_mclk = 0 //,//SAMPLE_RATE,
+		// .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
+		// .bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT
 	};
 	//install and start i2s driver
 	auto err = i2s_driver_install(I2S_NUM_0, &i2s_config, _adc_i2s_event_queue_size, &_adc_i2s_event_queue);
 	if(err!=ESP_OK) {
 		log_d("driver install failed");
 	}
+	//i2s_set_clk(I2S_NUM_0, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
 	static const i2s_pin_config_t pin_config = {
 	.bck_io_num = I2S_PIN_NO_CHANGE,							// Sample f(Hz) (= sample f * 2)  on this pin (optional).
 	.ws_io_num = I2S_PIN_NO_CHANGE,							// Left/Right   (= sample f)      on this pin (optional).
 	.data_out_num = I2S_PIN_NO_CHANGE,
-	.data_in_num = ADC1_CHANNEL_4_GPIO_NUM
+	.data_in_num = RTCIO_CHANNEL_4_GPIO_NUM//ADC1_CHANNEL_4_GPIO_NUM// RTCIO_CHANNEL_4_GPIO_NUM
 	};
 	err= i2s_set_pin(I2S_NUM_0, &pin_config);
 	if(err != ESP_OK) {
@@ -329,95 +311,15 @@ void setup()
 	// //enable de ADC
 	 err=i2s_adc_enable(I2S_NUM_0);
 
+	//Create queue to communicate reader & drawer
+	_xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
 	//start task to read samples from I2S
-	xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 1, &_readerTaskHandle, 1);
+	xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 1, &_readerTaskHandle, 0);
 	//start task to draw screen
-	xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 8192, (void*)&_TaskParams, 1, &_drawTaskHandle, 0);
-}
-
-void DrawScreen()
-{
-//	u8g2.setContrast(_ScreenBrightness);
-	u8g2.clearBuffer();
-
-	_PosX += _incX;
-	if(_PosX >= (SCREEN_WIDTH - _ballRadius) && _incX > 0) {
-		_PosX = SCREEN_WIDTH - _ballRadius;
-		_incX=(-_incX);
-		_incRadius= (-_incRadius);
-	}
-	else if(_PosX <= _ballRadius && _incX<0) {
-		_PosX = _ballRadius;
-		_incX = (-_incX);
-		_incRadius = (-_incRadius);
-	}
-	_PosY += _incY;
-	if(_PosY >= (SCREEN_HEIGHT - _ballRadius) && _incY > 0) {
-		_PosY = SCREEN_HEIGHT - _ballRadius;
-		_incY = (-_incY);
-	}
-	else if(_PosY <= _ballRadius && _incY<0) {
-		_PosY = _ballRadius;
-		_incY = (-_incY);
-	}
-
-	//log_d("x=%d, y=%d, r=%d", _PosX, _PosY, _ballRadius);
-
-	u8g2.setDrawColor(1);
-	u8g2.drawDisc(_PosX, _PosY, _ballRadius);
-
-	_ballRadius+=_incRadius;
-	if(_ballRadius<1) {
-		_ballRadius=1;
-	}
-
-	// u8g2.setDrawColor(1);
-	// for(int y = 0; y < SCREEN_HEIGHT; y++) {
-	// 	for(int x = y+_numFrames; x < SCREEN_WIDTH; x+=10) {
-	// 		u8g2.drawPixel(x, y);
-	// 	}
-	// }
-	u8g2.setFontMode(1);
-	u8g2.setDrawColor(2);
-	u8g2.drawStr(20, 15, Utils::string_format("FPS=%3.2f", _fps).c_str());
-	// u8g2.setFont(u8g2_font_profont10_mf);
-	// u8g2.drawStr(0, 6, "Soc Peque 6px");
-	// u8g2.setFont(u8g2_font_ncenB14_tr);
-	// u8g2.drawStr(0, 24, "Hola Bola!");
-	// u8g2.setFont(u8g2_font_tom_thumb_4x6_mf);
-	// u8g2.drawStr(0, 30, "Soc Peque 5px");
-	// u8g2.setFont(u8g2_font_p01type_tf);
-	// u8g2.drawStr(64, 30, "Soc Peque 4px");
-	// u8g2.setFont(u8g2_font_open_iconic_check_2x_t);
-	// u8g2.drawStr(40 -_numFrames * 2, 30 + _numFrames * 3, "ABCDE");
-	// u8g2.drawPixel(_numFrames * 10, 35);
-	// u8g2.drawPixel((_numFrames * 10) + 1, 35+1);
-	// u8g2.drawPixel((_numFrames * 10) + 2, 35+2);
-	// u8g2.drawPixel((_numFrames * 10) + 3, 35 + 3);
-	// u8g2.drawPixel((_numFrames * 10) + 4, 35 + 4);
-	u8g2.sendBuffer();
+	xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 8192, (void*)&_TaskParams, 1, &_drawTaskHandle, 1);
 }
 
 void loop()
 {
-	// if(_numFrames==10) {
-	// 	_fps=1000.0f/((millis()-_InitTime)/10);
-	// 	 //log_d("time=%d fps=%3.2f", millis() - _InitTime, _fps);
-	// 	_numFrames=0;
-	// }
-	// if(_numFrames==0) {
-	// 	_InitTime=millis();
-	// }
-
-	//DrawScreen();
-
-	// uint32_t reading = adc1_get_raw(ADC1_CHANNEL_4);
-	// uint32_t voltage = esp_adc_cal_raw_to_voltage(reading, _adc_chars);
-// 	if(_TaskParams.newDataReady) {
-// 		_TaskParams.newDataReady = false;
-// //		log_d("DataReady! DataBuffer=[%d]. BuffNumber=[%d]", _TaskParams.lastBuffSet, _TaskParams.buffNumber);
-// 	}
-
-	// log_d("r=%d v=%d", reading, voltage);
-	//delay(1000);
+	delay(500);
 }
