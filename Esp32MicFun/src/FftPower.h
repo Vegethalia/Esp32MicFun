@@ -42,11 +42,12 @@ public:
 	//Call after Execute. Returns the frequency power for each bin. The aary must be (numSamples/2)+1 long.
 	//values are escaled according to maxFftMagnitude (depends on input levels... 70k is ok)
 	//Returns the bin index with the higher power
-	void GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin)
+	void GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t &maxMag)
 	{
-		int32_t maxMag=-10000;
-		uint16_t maxIndex=_numSamples / 2;
+		uint16_t maxIndex = _numSamples / 2;
+
 		maxBin=0;
+		maxMag = -10000;
 		pFreqPower[0]=0; //dc is not calculated
 
 		if(binRes!=BinResolution::AUTO32) {
@@ -76,6 +77,28 @@ public:
 				}
 			}
 		}
+		else { //binRes==BinResolution::AUTO32
+			uint16_t ind=1;
+			int32_t mag=0;
+
+			maxIndex=32;
+			do {
+				pFreqPower[ind] = 0;
+				for(uint16_t k = _Auto32Groups[ind-1]; k < _Auto32Groups[ind]; k++) {
+					mag = (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
+					if(mag > pFreqPower[ind]) {
+						pFreqPower[ind]=mag;
+					}
+				}
+				// log_d("ind=%d avg=%d", ind, avg);
+				pFreqPower[ind] = (10.0 * log((float)pFreqPower[ind] / (float)maxFftMagnitude));
+				if(pFreqPower[ind] > maxMag) {
+					maxMag = pFreqPower[ind];
+					maxBin = _Auto32Groups[ind-1];
+				}
+				ind++;
+			} while(ind < maxIndex);
+		}
 	}
 	// void NewAudio(uint16_t *pAudioIn, uint16_t samplesIn)
 	// {
@@ -83,8 +106,12 @@ public:
 	// }
 
 private:
-					// Create the FFT config structure
 	fft_config_t* _pRealFftPlan;
 	uint16_t _numSamples;
 
+	const uint8_t _Auto32Groups[32]={
+		1 , 2, 3, 4, 5, 6, 7, 8,   //8
+		9 ,11,13,15,17,19,21,23,   //12
+		25,29,33,37,41,45,49,53,   //24
+		57,65,73,81,89,97,105,128};//32
 };

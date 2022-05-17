@@ -9,10 +9,12 @@
 #include "driver/adc.h"
 #include "driver/i2s.h"
 #include "esp_adc_cal.h"
-//#include <components/freertos/FreeRTOS-Kernel/include/freertos/queue.h>
+//#include <components/freertos/FreeRTOS-Kernel/incl                 ude/freertos/queue.h>
 
 #define PIN_I2C_SDA 21
 #define PIN_I2C_SCL 22
+#define PIN_BASS_LED 33
+#define BUS_SPEED   800000
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -20,11 +22,11 @@
 #define DEFAULT_VREF       1100
 #define INPUT_0_VALUE      1225  //input is biased towards 1.5V
 #define VOLATGE_DRAW_RANGE 1100   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MIN_FFT_DB         -50    //a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_MAGNITUDE  75000  //a magnitude greater than this value will be considered Max Power
-#define MAX_FFT_DB         15     //a magnitude greater than this value will be considered Max Power
+#define MIN_FFT_DB         -40    //a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_DB         2     //a magnitude greater than this value will be considered Max Power
 
-#define TARGET_SAMPLE_RATE 8192
+#define TARGET_SAMPLE_RATE 10752 //10496 //10240 //9216
 #define OVERSAMPLING       2     //we will oversample by this amount
 #define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
 
@@ -32,15 +34,15 @@
 
 #define MASK_12BIT 0x0fff
 
-//U8G2_SH1106_128X64_NONAME_2_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 //U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
+//U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
 
 uint8_t _ScreenBrightness=0;
 uint32_t _InitTime=0;
 uint8_t  _numFrames = 0;
 float _fps=0.0f;
-
+bool _BassOn=false;
 
 int16_t _PosX=13;
 int16_t _PosY=37;
@@ -134,7 +136,7 @@ void vTaskReader(void* pvParameters)
 					mad.pAudio = pDest;
 					mad.pFftMag = _TaskParams.fftMag;
 					theFFT.Execute();
-					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::HALF, maxMagI);
+					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::AUTO32, maxMagI, superMaxMag);
 					mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
 					if(!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
@@ -163,12 +165,13 @@ void vTaskReader(void* pvParameters)
 void vTaskDrawer(void* pvParameters)
 {
 	log_d("In vTaskDrawer. Begin Display...");
-	u8g2.setBusClock(600000);
+	u8g2.setBusClock(BUS_SPEED);
 	log_d("In vTaskDrawer.afterSetBus...");
 	u8g2.begin();
 	log_d("In vTaskDrawer.afterBegin...");
 	u8g2.setFont(u8g2_font_profont12_mf);
 	log_d("In vTaskDrawer.afterSetFont...");
+	u8g2.setContrast(64);
 
 	uint8_t lastBuff=0;
 	uint32_t samplesDrawn=0;
@@ -191,8 +194,45 @@ void vTaskDrawer(void* pvParameters)
 			// log_d("DataReady! DataBuffer=[%d]. BuffNumber=[%d]", _TaskParams.lastBuffSet, _TaskParams.buffNumber);
 			u8g2.clearBuffer();
 
+			//Now the FFT
+			int16_t value = 0;
+
+			u8g2.setDrawColor(1);
+			uint16_t maxIndex = min(AUDIO_DATA_OUT / 8, SCREEN_WIDTH); // /2->ALL /4->HALF /8->QUARTER
+			uint8_t maxBassValue=0;
+			for(uint16_t i = 1; i < maxIndex; i++) {
+				value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+				value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
+				// u8g2.drawLine(i, SCREEN_HEIGHT - value, i, SCREEN_HEIGHT-1); --> ALL
+				// u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1); --> HALF
+				u8g2.drawBox(i * 4, SCREEN_HEIGHT - value, 3, value); //--> QUARTER/AUTO
+				if(i<4 && value>maxBassValue) { //BASS bins
+					maxBassValue=value;
+				}
+			}
+			if(maxBassValue > (SCREEN_HEIGHT - (SCREEN_HEIGHT/4))) {
+				//u8g2.setContrast(255);
+				_BassOn=true;
+				digitalWrite(PIN_BASS_LED, HIGH);
+			}
+			else {
+				_BassOn=false;
+				digitalWrite(PIN_BASS_LED, LOW);
+				//u8g2.setContrast(64);
+				//u8g2.setContrast(map(maxBassValue, 0, SCREEN_HEIGHT - 1, 1, 128));
+			}
+			//now we simulate that the bars are made of "boxes"
+			u8g2.setDrawColor(0);
+			for(uint16_t i = 4; i < SCREEN_HEIGHT; i += 6) {
+				u8g2.drawLine(0, i, SCREEN_WIDTH - 1, i);
+				u8g2.drawLine(0, i + 1, SCREEN_WIDTH - 1, i + 1);
+				//u8g2.drawLine(0, i + 2, SCREEN_WIDTH - 1, i + 2);
+			}
+
+			//Now The Wave
+			u8g2.setDrawColor(2);
+
 			//busquem el pass per "0" després de la muntanya més gran
-			int16_t value=0;
 			uint16_t pas0=0;
 			uint16_t maxAmp = (SCREEN_HEIGHT / 2);
 			uint16_t iMaxAmp=0;
@@ -212,21 +252,13 @@ void vTaskDrawer(void* pvParameters)
 			for(uint16_t i = pas0; i < (pas0 + SCREEN_WIDTH); i++) {
 				 value = constrain(pDest[i], INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE);
 				 value = map(value, INPUT_0_VALUE - VOLATGE_DRAW_RANGE, INPUT_0_VALUE + VOLATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
-				u8g2.drawPixel(i - pas0, pDest[i]);
+				 u8g2.drawPixel(i - pas0, pDest[i]);
 			}
 			samplesDrawn += AUDIO_DATA_OUT;
 
-			//Now the FFT
-			u8g2.setDrawColor(2);
-			uint16_t maxIndex = min(AUDIO_DATA_OUT / 4, SCREEN_WIDTH);
-			for(uint16_t i = 1; i < maxIndex; i++) {
-				value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-				value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
-				u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1);
-			}
-
+			//And finally the text
 			u8g2.setFontMode(1);
-//			u8g2.setDrawColor(2);
+			u8g2.setDrawColor(2);
 			u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f  F=%04dHz", _fps, mad.max_freq).c_str());
 			u8g2.sendBuffer();
 			_numFrames++;
@@ -247,6 +279,8 @@ void setup()
 	Serial.begin(115200);
 	// wait for serial monitor to open
 	while(!Serial);
+
+	pinMode(PIN_BASS_LED, OUTPUT);
 
 	//range 0...4096
 	adc1_config_width(ADC_WIDTH_BIT_12);
@@ -321,5 +355,11 @@ void setup()
 
 void loop()
 {
-	delay(500);
+	// if(_BassOn) {
+	// 	digitalWrite(PIN_BASS_LED, HIGH);
+	// }
+	// else {
+	// 	digitalWrite(PIN_BASS_LED, LOW);
+	// }
+	delay(100);
 }
