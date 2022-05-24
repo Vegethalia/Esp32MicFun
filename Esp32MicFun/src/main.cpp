@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <memory>
+#include <FastLED.h>
 #include "SharedUtils\Utils.h"
 #include "FftPower.h"
 
@@ -11,10 +12,11 @@
 #include "esp_adc_cal.h"
 //#include <components/freertos/FreeRTOS-Kernel/incl                 ude/freertos/queue.h>
 
-#define PIN_I2C_SDA 21
-#define PIN_I2C_SCL 22
-#define PIN_BASS_LED 33
-#define BUS_SPEED   800000
+#define PIN_I2C_SDA   21
+#define PIN_I2C_SCL   22
+#define PIN_BASS_LED  33
+#define PIN_DATA_LEDS 16
+#define BUS_SPEED   750000
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -26,7 +28,7 @@
 #define MIN_FFT_DB         -40    //a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB         2     //a magnitude greater than this value will be considered Max Power
 
-#define TARGET_SAMPLE_RATE 10752 //10496 //10240 //9216
+#define TARGET_SAMPLE_RATE 10240 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING       2     //we will oversample by this amount
 #define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
 
@@ -37,6 +39,12 @@
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 //U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 //U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
+
+#define BARS_RESOLUTION 8 //8=32 4=64 2=128
+
+#define MAX_MILLIS   450
+#define NUM_LEDS     (AUDIO_DATA_OUT/BARS_RESOLUTION) //198//32
+CRGBArray<NUM_LEDS>  _TheLeds;
 
 uint8_t _ScreenBrightness=0;
 uint32_t _InitTime=0;
@@ -57,8 +65,9 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t *)cal
 
 TaskHandle_t _readerTaskHandle;
 TaskHandle_t _drawTaskHandle;
+TaskHandle_t _showLedsTaskHandle;
 
-QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer;
+QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
 uint8_t _adc_i2s_event_queue_size = 1;
 
 
@@ -80,6 +89,32 @@ struct MsgAudio2Draw {
 	int32_t* pFftMag;
 	uint16_t max_freq;
 };
+
+void DrawLeds(MsgAudio2Draw& mad)
+{
+	uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
+	uint8_t maxBassValue = 0;
+	int16_t value = 0;
+
+	for(uint16_t i = 1; i < maxIndex; i++) {
+		value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+		value = map(value, MIN_FFT_DB, MAX_FFT_DB, 1, 128);
+
+		if(value > 100) {
+			_TheLeds[NUM_LEDS - i - 1] = CHSV(HSVHue::HUE_RED, 255, 255);
+		}
+		// else if(value<=2) {
+		// 	_TheLeds[NUM_LEDS - i - 1] = CRGB(1, 1, 1);//CHSV(HSVHue::HUE_PURPLE, 255, value);
+		// }
+		else {
+			_TheLeds[NUM_LEDS - i - 1] = CHSV(HSVHue::HUE_PINK, 255, value);//CRGB(value, value, value);//CHSV(HSVHue::HUE_PURPLE, 255, value);
+		}
+		// if(i<4 && value>maxBassValue) { //BASS bins
+		// 	maxBassValue = value;
+		// }
+	}
+	FastLED.show();
+}
 
 // Task to read samples.
 void vTaskReader(void* pvParameters)
@@ -136,13 +171,19 @@ void vTaskReader(void* pvParameters)
 					mad.pAudio = pDest;
 					mad.pFftMag = _TaskParams.fftMag;
 					theFFT.Execute();
-					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::AUTO32, maxMagI, superMaxMag);
+					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
+						BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF : FftPower::AUTO32,
+					maxMagI, superMaxMag);
 					mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
 					if(!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
 						log_d("Draw Queue FULL!!");
 					}
+					DrawLeds(mad);
 
+					// if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
+					// 	log_d("ShowLeds Queue FULL!!");
+					// }
 					auto now=millis();
 					if((now-recInit)>=1000) {
 						log_d("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d", now - recInit, totalSamples, numCalls, superMaxMag);
@@ -158,6 +199,26 @@ void vTaskReader(void* pvParameters)
 			// }
 		}
 	}
+	vTaskDelete(NULL);
+}
+
+//Task to draw the LEDS
+void vTaskDrawLeds(void* pvParameters)
+{
+	log_d("In vTaskDrawLeds...");
+	MsgAudio2Draw mad;
+
+	uint32_t lastShow=0;
+
+	while(true) {
+		if(xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY) && (millis()-lastShow)>100) {
+			uint32_t init=millis();
+			DrawLeds(mad);
+			lastShow=millis();
+			//log_d("ShowTime=%dms", millis()-init);
+		}
+	}
+
 	vTaskDelete(NULL);
 }
 
@@ -198,14 +259,16 @@ void vTaskDrawer(void* pvParameters)
 			int16_t value = 0;
 
 			u8g2.setDrawColor(1);
-			uint16_t maxIndex = min(AUDIO_DATA_OUT / 8, SCREEN_WIDTH); // /2->ALL /4->HALF /8->QUARTER
+			uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
+			uint8_t barW = BARS_RESOLUTION == 2 ? 1 : BARS_RESOLUTION == 4 ? 2 : 4;
+			uint8_t adjust = BARS_RESOLUTION == 2?0:1;
 			uint8_t maxBassValue=0;
 			for(uint16_t i = 1; i < maxIndex; i++) {
 				value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
 				value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
 				// u8g2.drawLine(i, SCREEN_HEIGHT - value, i, SCREEN_HEIGHT-1); --> ALL
 				// u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1); --> HALF
-				u8g2.drawBox(i * 4, SCREEN_HEIGHT - value, 3, value); //--> QUARTER/AUTO
+				u8g2.drawBox(i * barW, SCREEN_HEIGHT - value, barW - adjust, value); //--> QUARTER/AUTO
 				if(i<4 && value>maxBassValue) { //BASS bins
 					maxBassValue=value;
 				}
@@ -213,11 +276,11 @@ void vTaskDrawer(void* pvParameters)
 			if(maxBassValue > (SCREEN_HEIGHT - (SCREEN_HEIGHT/4))) {
 				//u8g2.setContrast(255);
 				_BassOn=true;
-				digitalWrite(PIN_BASS_LED, HIGH);
+				// digitalWrite(PIN_BASS_LED, HIGH);
 			}
 			else {
 				_BassOn=false;
-				digitalWrite(PIN_BASS_LED, LOW);
+				// digitalWrite(PIN_BASS_LED, LOW);
 				//u8g2.setContrast(64);
 				//u8g2.setContrast(map(maxBassValue, 0, SCREEN_HEIGHT - 1, 1, 128));
 			}
@@ -260,8 +323,14 @@ void vTaskDrawer(void* pvParameters)
 			u8g2.setFontMode(1);
 			u8g2.setDrawColor(2);
 			u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f  F=%04dHz", _fps, mad.max_freq).c_str());
+
 			u8g2.sendBuffer();
 			_numFrames++;
+
+			// if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
+			// 	log_d("ShowLeds Queue FULL!!");
+			// }
+			// DrawLeds(mad);
 
 			auto now=millis();
 			if((now - _InitTime) >= 1000) {
@@ -281,6 +350,12 @@ void setup()
 	while(!Serial);
 
 	pinMode(PIN_BASS_LED, OUTPUT);
+	pinMode(PIN_DATA_LEDS, OUTPUT);
+
+	FastLED.addLeds<WS2812B, PIN_DATA_LEDS, GRB>(_TheLeds, NUM_LEDS);
+	FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIS);
+
+	//_TheLeds.fill_rainbow(HSVHue::HUE_YELLOW);
 
 	//range 0...4096
 	adc1_config_width(ADC_WIDTH_BIT_12);
@@ -346,11 +421,17 @@ void setup()
 	 err=i2s_adc_enable(I2S_NUM_0);
 
 	//Create queue to communicate reader & drawer
-	_xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
+	 _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
+	 _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
 	//start task to read samples from I2S
-	xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 1, &_readerTaskHandle, 0);
+	 xTaskCreate(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle);
+	 //xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
 	//start task to draw screen
-	xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 8192, (void*)&_TaskParams, 1, &_drawTaskHandle, 1);
+	xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 2, &_drawTaskHandle);
+	//xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
+	//start task to draw leds
+	//xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
+//	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 }
 
 void loop()
@@ -361,5 +442,10 @@ void loop()
 	// else {
 	// 	digitalWrite(PIN_BASS_LED, LOW);
 	// }
+	// uint8_t thisSpeed = 10;
+	// uint8_t deltaHue = 10;
+	// uint8_t thisHue = beat8(thisSpeed, 255);
+	// fill_rainbow(_TheLeds, NUM_LEDS, thisHue, deltaHue);
+	// FastLED.show();
 	delay(100);
 }

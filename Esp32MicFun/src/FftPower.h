@@ -66,9 +66,12 @@ public:
 			for(uint16_t i = 1, ind=1; i < maxIndex; i+=avgN, ind++) {
 				pFreqPower[ind]=0;
 				for(uint8_t k=i; k<i+avgN; k++) {
-					pFreqPower[ind] += (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
+					auto value = (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
+					if(value>pFreqPower[ind]) {
+						pFreqPower[ind] = value;
+					}
 				}
-				pFreqPower[ind] = pFreqPower[ind]/avgN;
+				// pFreqPower[ind] = pFreqPower[ind]/avgN;
 				pFreqPower[ind] = (10.0 * log((float)pFreqPower[ind] / (float)maxFftMagnitude));
 				//log_d("%d", _TaskParams.fftMag[i]);
 				if(pFreqPower[ind] > maxMag) {
@@ -110,8 +113,8 @@ private:
 	uint16_t _numSamples;
 
 	const uint8_t _Auto32Groups[32]={
-		1 , 2, 3, 4, 5, 6, 7, 8,   //8
-		9 ,11,13,15,17,19,21,23,   //12
-		25,29,33,37,41,45,49,53,   //24
-		57,65,73,81,89,97,105,128};//32
+		2 , 3, 4, 5, 6, 7, 9, 11,   //8
+		13 ,15,17,19,21,23,26,29,   //12
+		31,34,37,41,45,49,53,57,   //24
+		61,65,73,81,89,97,105,128};//32
 };
