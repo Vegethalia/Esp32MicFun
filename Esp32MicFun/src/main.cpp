@@ -33,6 +33,7 @@
 #define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT     (SCREEN_WIDTH*2)
+#define VISUALIZATION      FftPower::AUTO34
 
 #define MASK_12BIT 0x0fff
 
@@ -43,7 +44,7 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 #define BARS_RESOLUTION 8 //8=32 4=64 2=128
 
 #define MAX_MILLIS   450
-#define NUM_LEDS     (AUDIO_DATA_OUT/BARS_RESOLUTION) //198//32
+#define NUM_LEDS     (VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 CRGBArray<NUM_LEDS>  _TheLeds;
 
 uint8_t _ScreenBrightness=0;
@@ -96,18 +97,22 @@ void DrawLeds(MsgAudio2Draw& mad)
 	uint8_t maxBassValue = 0;
 	int16_t value = 0;
 
+	if(VISUALIZATION==FftPower::AUTO34) {
+		maxIndex=34;
+	}
+//log_d("maxIndex=%d", maxIndex);
 	for(uint16_t i = 1; i < maxIndex; i++) {
 		value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
 		value = map(value, MIN_FFT_DB, MAX_FFT_DB, 1, 128);
 
 		if(value > 100) {
-			_TheLeds[NUM_LEDS - i - 1] = CHSV(HSVHue::HUE_RED, 255, 255);
+			_TheLeds[NUM_LEDS - i] = CHSV(HSVHue::HUE_AQUA, 255, 128);
 		}
 		// else if(value<=2) {
 		// 	_TheLeds[NUM_LEDS - i - 1] = CRGB(1, 1, 1);//CHSV(HSVHue::HUE_PURPLE, 255, value);
 		// }
 		else {
-			_TheLeds[NUM_LEDS - i - 1] = CHSV(HSVHue::HUE_PINK, 255, value);//CRGB(value, value, value);//CHSV(HSVHue::HUE_PURPLE, 255, value);
+			_TheLeds[NUM_LEDS - i] = CHSV(HSVHue::HUE_BLUE, 255, value);//CRGB(value, value, value);//CHSV(HSVHue::HUE_PURPLE, 255, value);
 		}
 		// if(i<4 && value>maxBassValue) { //BASS bins
 		// 	maxBassValue = value;
@@ -172,8 +177,8 @@ void vTaskReader(void* pvParameters)
 					mad.pFftMag = _TaskParams.fftMag;
 					theFFT.Execute();
 					theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
-						BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF : FftPower::AUTO32,
-					maxMagI, superMaxMag);
+						BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF : FftPower::AUTO34,
+						maxMagI, superMaxMag);
 					mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
 					if(!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
