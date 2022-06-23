@@ -4,6 +4,7 @@
 #include <FastLED.h>
 #include "SharedUtils\Utils.h"
 #include "FftPower.h"
+#include "PowerBarsPanel.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -16,19 +17,19 @@
 #define PIN_I2C_SCL   22
 #define PIN_BASS_LED  33
 #define PIN_DATA_LEDS 16
-#define BUS_SPEED   750000
+#define BUS_SPEED   800000
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define DEFAULT_VREF       1100
 #define INPUT_0_VALUE      1225  //input is biased towards 1.5V
-#define VOLATGE_DRAW_RANGE 1100   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE  75000  //a magnitude greater than this value will be considered Max Power
+#define VOLATGE_DRAW_RANGE 800   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define MAX_FFT_MAGNITUDE  66000  //a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB         -40    //a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_DB         2     //a magnitude greater than this value will be considered Max Power
+#define MAX_FFT_DB         -2     //a magnitude greater than this value will be considered Max Power
 
-#define TARGET_SAMPLE_RATE 10240 //9984//9728//10752 //10496 //10240 //9216
+#define TARGET_SAMPLE_RATE 11025 //11025 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING       2     //we will oversample by this amount
 #define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
 
@@ -43,9 +44,12 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 
 #define BARS_RESOLUTION 8 //8=32 4=64 2=128
 
-#define MAX_MILLIS   450
-#define NUM_LEDS     (VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+#define MAX_MILLIS   1000
+#define BAR_HEIGHT   8    //we havve this amount of "vertical leds" per bar. 0 based.
+#define NUM_LEDS     300 //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 CRGBArray<NUM_LEDS>  _TheLeds;
+PanelMapping33x9 _TheMapping;
+PowerBarsPanel<NUM_LEDS, PANEL_WIDTH_33, PANEL_HEIGHT_9> _ThePanel;
 
 uint8_t _ScreenBrightness=0;
 uint32_t _InitTime=0;
@@ -91,7 +95,28 @@ struct MsgAudio2Draw {
 	uint16_t max_freq;
 };
 
-void DrawLeds(MsgAudio2Draw& mad)
+void DrawLedBars(MsgAudio2Draw& mad)
+{
+	uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
+	uint8_t maxBassValue = 0;
+	int16_t value = 0;
+
+	if(VISUALIZATION == FftPower::AUTO34) {
+		maxIndex = 34;
+	}
+	FastLED.clear();
+	assert(BAR_HEIGHT>1);
+	for(uint16_t i = 1; i < maxIndex; i++) {
+		value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+		value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, BAR_HEIGHT*10);
+
+		 _ThePanel.DrawBar(i-1, value);
+	}
+
+	FastLED.show();
+}
+
+void DrawLedsSingleLine(MsgAudio2Draw& mad)
 {
 	uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
 	uint8_t maxBassValue = 0;
@@ -184,7 +209,8 @@ void vTaskReader(void* pvParameters)
 					if(!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
 						log_d("Draw Queue FULL!!");
 					}
-					DrawLeds(mad);
+					DrawLedBars(mad);
+					//DrawLeds(mad);
 
 					// if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
 					// 	log_d("ShowLeds Queue FULL!!");
@@ -218,7 +244,7 @@ void vTaskDrawLeds(void* pvParameters)
 	while(true) {
 		if(xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY) && (millis()-lastShow)>100) {
 			uint32_t init=millis();
-			DrawLeds(mad);
+			DrawLedBars(mad);
 			lastShow=millis();
 			//log_d("ShowTime=%dms", millis()-init);
 		}
@@ -263,39 +289,39 @@ void vTaskDrawer(void* pvParameters)
 			//Now the FFT
 			int16_t value = 0;
 
-			u8g2.setDrawColor(1);
-			uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
-			uint8_t barW = BARS_RESOLUTION == 2 ? 1 : BARS_RESOLUTION == 4 ? 2 : 4;
-			uint8_t adjust = BARS_RESOLUTION == 2?0:1;
-			uint8_t maxBassValue=0;
-			for(uint16_t i = 1; i < maxIndex; i++) {
-				value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-				value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
-				// u8g2.drawLine(i, SCREEN_HEIGHT - value, i, SCREEN_HEIGHT-1); --> ALL
-				// u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1); --> HALF
-				u8g2.drawBox(i * barW, SCREEN_HEIGHT - value, barW - adjust, value); //--> QUARTER/AUTO
-				if(i<4 && value>maxBassValue) { //BASS bins
-					maxBassValue=value;
-				}
-			}
-			if(maxBassValue > (SCREEN_HEIGHT - (SCREEN_HEIGHT/4))) {
-				//u8g2.setContrast(255);
-				_BassOn=true;
-				// digitalWrite(PIN_BASS_LED, HIGH);
-			}
-			else {
-				_BassOn=false;
-				// digitalWrite(PIN_BASS_LED, LOW);
-				//u8g2.setContrast(64);
-				//u8g2.setContrast(map(maxBassValue, 0, SCREEN_HEIGHT - 1, 1, 128));
-			}
-			//now we simulate that the bars are made of "boxes"
-			u8g2.setDrawColor(0);
-			for(uint16_t i = 4; i < SCREEN_HEIGHT; i += 6) {
-				u8g2.drawLine(0, i, SCREEN_WIDTH - 1, i);
-				u8g2.drawLine(0, i + 1, SCREEN_WIDTH - 1, i + 1);
-				//u8g2.drawLine(0, i + 2, SCREEN_WIDTH - 1, i + 2);
-			}
+			// u8g2.setDrawColor(1);
+			// uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
+			// uint8_t barW = BARS_RESOLUTION == 2 ? 1 : BARS_RESOLUTION == 4 ? 2 : 4;
+			// uint8_t adjust = BARS_RESOLUTION == 2?0:1;
+			// uint8_t maxBassValue=0;
+			// for(uint16_t i = 1; i < maxIndex; i++) {
+			// 	value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+			// 	value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
+			// 	// u8g2.drawLine(i, SCREEN_HEIGHT - value, i, SCREEN_HEIGHT-1); --> ALL
+			// 	// u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1); --> HALF
+			// 	u8g2.drawBox(i * barW, SCREEN_HEIGHT - value, barW - adjust, value); //--> QUARTER/AUTO
+			// 	if(i<4 && value>maxBassValue) { //BASS bins
+			// 		maxBassValue=value;
+			// 	}
+			// }
+			// if(maxBassValue > (SCREEN_HEIGHT - (SCREEN_HEIGHT/4))) {
+			// 	//u8g2.setContrast(255);
+			// 	_BassOn=true;
+			// 	// digitalWrite(PIN_BASS_LED, HIGH);
+			// }
+			// else {
+			// 	_BassOn=false;
+			// 	// digitalWrite(PIN_BASS_LED, LOW);
+			// 	//u8g2.setContrast(64);
+			// 	//u8g2.setContrast(map(maxBassValue, 0, SCREEN_HEIGHT - 1, 1, 128));
+			// }
+			// //now we simulate that the bars are made of "boxes"
+			// u8g2.setDrawColor(0);
+			// for(uint16_t i = 4; i < SCREEN_HEIGHT; i += 6) {
+			// 	u8g2.drawLine(0, i, SCREEN_WIDTH - 1, i);
+			// 	u8g2.drawLine(0, i + 1, SCREEN_WIDTH - 1, i + 1);
+			// 	//u8g2.drawLine(0, i + 2, SCREEN_WIDTH - 1, i + 2);
+			// }
 
 			//Now The Wave
 			u8g2.setDrawColor(2);
@@ -359,6 +385,7 @@ void setup()
 
 	FastLED.addLeds<WS2812B, PIN_DATA_LEDS, GRB>(_TheLeds, NUM_LEDS);
 	FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIS);
+	_ThePanel.SetParams(&_TheLeds, &_TheMapping);
 
 	//_TheLeds.fill_rainbow(HSVHue::HUE_YELLOW);
 
@@ -439,6 +466,8 @@ void setup()
 //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 }
 
+// uint8_t thisSpeed = 3;
+// uint8_t initial = 1;
 void loop()
 {
 	// if(_BassOn) {
@@ -447,10 +476,9 @@ void loop()
 	// else {
 	// 	digitalWrite(PIN_BASS_LED, LOW);
 	// }
-	// uint8_t thisSpeed = 10;
-	// uint8_t deltaHue = 10;
-	// uint8_t thisHue = beat8(thisSpeed, 255);
-	// fill_rainbow(_TheLeds, NUM_LEDS, thisHue, deltaHue);
+
+	// fill_rainbow(_TheLeds, NUM_LEDS, initial, thisSpeed);
+	// initial+=thisSpeed;
 	// FastLED.show();
 	delay(100);
 }
