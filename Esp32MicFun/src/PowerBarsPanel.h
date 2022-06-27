@@ -5,6 +5,9 @@
 constexpr uint16_t PANEL_WIDTH_33 = 33; //from 1 to 33
 constexpr uint16_t PANEL_HEIGHT_9 = 9; //from 1 to 9
 
+constexpr uint16_t BAR_DEC_TIME_MS=40; //hold each bar max current value at least this amount of time
+constexpr uint16_t BAR_TOP_TIME_MS = BAR_DEC_TIME_MS*10; //hold the top for this amount
+
 template<uint16_t PANEL_WIDTH, uint16_t PANEL_HEIGHT>
 class IPanelMapping
 {
@@ -54,11 +57,13 @@ private:
 		uint8_t CurrentTop;
 		uint8_t CurrentHeight;
 		uint32_t LastHeightDecreaseTime;
+		uint32_t LastTopSetTime;
 
 		Column() {
 			CurrentTop=0;
 			CurrentHeight=0;
 			LastHeightDecreaseTime=0;
+			LastTopSetTime=0;
 		}
 	};
 
@@ -87,26 +92,61 @@ public:
 	void DrawBar(uint8_t numBar, uint8_t value)
 	{
 		constexpr uint16_t maxheight = PANEL_HEIGHT-1;
-		if(!_pTheLeds || !_pTheMapping) {
+		if(!_pTheLeds || !_pTheMapping || numBar>=PANEL_WIDTH) {
 			return;
 		}
 
-		bool isMax = value > (maxheight * 10);
+		auto now=millis();
 
-		if(value < 5) {
-			(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight)] = CHSV(HSVHue::HUE_BLUE + numBar * 0, 255, 12);
+		if(_TheColumns[numBar].CurrentHeight<value) {
+			_TheColumns[numBar].CurrentHeight=value;
+			_TheColumns[numBar].LastHeightDecreaseTime=now;
+		}
+		if(_TheColumns[numBar].CurrentTop < value) {
+			_TheColumns[numBar].CurrentTop = value;
+			_TheColumns[numBar].LastTopSetTime = now;
+		}
+
+		if((now - _TheColumns[numBar].LastHeightDecreaseTime) > BAR_DEC_TIME_MS) {
+			if(_TheColumns[numBar].CurrentHeight>=10) {
+				_TheColumns[numBar].CurrentHeight -= 10;
+			}
+			_TheColumns[numBar].LastHeightDecreaseTime=now;
+		}
+		if((now - _TheColumns[numBar].LastTopSetTime) > BAR_TOP_TIME_MS) {
+			_TheColumns[numBar].LastTopSetTime = now - (BAR_TOP_TIME_MS*2/3);
+			if(_TheColumns[numBar].CurrentTop>=10) {
+				_TheColumns[numBar].CurrentTop -= 10;
+			}
+			//_TheColumns[numBar].CurrentTop = _TheColumns[numBar].CurrentHeight;
+		}
+
+		value = _TheColumns[numBar].CurrentHeight;
+
+		bool isMax = value > ((maxheight-1) * 10);
+
+		if(value < 5 && _TheColumns[numBar].CurrentTop < 10) {
+			(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight)] = CHSV(HSVHue::HUE_BLUE + numBar * 0, 255, 15);// CRGB(2,2,1);//
 		}
 		else {
 			uint8_t y = 0;
-			while(y <= value / 10) {
+			uint8_t maxY = value / 10;
+			while(y <= maxY) {
 				(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = CHSV(HSVHue::HUE_BLUE + (y * 18) + numBar * 0, 255, (y + 1) * 15);
 				++y;
 			};
-			if(isMax) {
-				y = maxheight;
-				(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = CHSV(HSVHue::HUE_AQUA, 255, 15 * (maxheight + 1));
-			}
+			// if(isMax) {
+			// 	y = maxheight;
+			// 	(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = CHSV(HSVHue::HUE_AQUA,                         255, 15 * (maxheight + 1));
+			// }
 		}
+
+		//Now the top
+		if(_TheColumns[numBar].CurrentTop >= 10) {
+			uint8_t y = _TheColumns[numBar].CurrentTop/10;
+			(*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = CHSV(HSVHue::HUE_BLUE + (y * 18) + numBar * 0, 255, (y + 1) * 15);
+		}
+
 	}
 
 private:
