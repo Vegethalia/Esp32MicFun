@@ -24,13 +24,13 @@
 
 #define DEFAULT_VREF       1100
 #define INPUT_0_VALUE      1225  //input is biased towards 1.5V
-#define VOLATGE_DRAW_RANGE 800   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE  66000  //a magnitude greater than this value will be considered Max Power
-#define MIN_FFT_DB         -40    //a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_DB         -2     //a magnitude greater than this value will be considered Max Power
+#define VOLATGE_DRAW_RANGE 900   //total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define MAX_FFT_MAGNITUDE  75000  //a magnitude greater than this value will be considered Max Power
+#define MIN_FFT_DB         -45    //a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_DB         0     //a magnitude greater than this value will be considered Max Power
 
-#define TARGET_SAMPLE_RATE 11025 //11025 //9984//9728//10752 //10496 //10240 //9216
-#define OVERSAMPLING       2     //we will oversample by this amount
+#define TARGET_SAMPLE_RATE  11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
+#define OVERSAMPLING       4     //we will oversample by this amount
 #define SAMPLE_RATE        (TARGET_SAMPLE_RATE*OVERSAMPLING) //we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT     (SCREEN_WIDTH*2)
@@ -44,12 +44,12 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 
 #define BARS_RESOLUTION 8 //8=32 4=64 2=128
 
-#define MAX_MILLIS   1000
-#define BAR_HEIGHT   8    //we havve this amount of "vertical leds" per bar. 0 based.
-#define NUM_LEDS     300 //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+#define MAX_MILLIS   1500
+#define BAR_HEIGHT   (PANEL_HEIGHT_13-1)    //we havve this amount of "vertical leds" per bar. 0 based.
+#define NUM_LEDS     (PANEL_WIDTH_33*PANEL_HEIGHT_13) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 CRGBArray<NUM_LEDS>  _TheLeds;
-PanelMapping33x9 _TheMapping;
-PowerBarsPanel<NUM_LEDS, PANEL_WIDTH_33, PANEL_HEIGHT_9> _ThePanel;
+PanelMapping33x13 _TheMapping;
+PowerBarsPanel<NUM_LEDS, PANEL_WIDTH_33, PANEL_HEIGHT_13> _ThePanel;
 
 uint8_t _ScreenBrightness=0;
 uint32_t _InitTime=0;
@@ -103,12 +103,24 @@ void DrawLedBars(MsgAudio2Draw& mad)
 
 	if(VISUALIZATION == FftPower::AUTO34) {
 		maxIndex = 34;
+
 	}
+	//_TheLeds.fill_solid(CRGB(1,1,1));
 	FastLED.clear();
 	assert(BAR_HEIGHT>1);
+	uint8_t minBoostBin = (uint8_t)(maxIndex * 0.33); //the first 13 bars in 33 width panel
+	constexpr float maxTrebleBoost = 30.0;
+	constexpr float minBassBoost = 1.0;
+	float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)maxIndex);
+
 	for(uint16_t i = 1; i < maxIndex; i++) {
+		if(i > minBoostBin) { //boost hi frequencies (to make them more visible)
+			auto boost = 1.0f + (i * freqBoost);
+			value = (int)(value * boost);
+		}
+
 		value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-		value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, BAR_HEIGHT*10);
+		value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, (BAR_HEIGHT*10)+9); //fins a 89
 
 		 _ThePanel.DrawBar(i-1, value);
 	}
@@ -181,16 +193,24 @@ void vTaskReader(void* pvParameters)
 					if(bytesRead != buffSizeOrig) {
 						log_d("bytesRead=%d", bytesRead);
 					}
-					totalSamples += bytesRead/sizeof(uint16_t);
+					uint16_t samplesRead = bytesRead / sizeof(uint16_t);
+					totalSamples += samplesRead;
 					numCalls++;
 					//_TaskParams.buffNumber++;
 					//now we convert the values to mv from 1V to 3V
-					for(int i = 0, k=0; i < bytesRead; i+=OVERSAMPLING, k++) {
+					//int k=0;
+					//log_d("BytesRead=%d buzzSizeOrig=%d SamplesRead=%d TotalSamples=%d", bytesRead, buffSizeOrig, samplesRead, totalSamples);
+					for(int i = 0, k=0; i < samplesRead; i += OVERSAMPLING, k++) {
 						pDest[k] = 0;
 						for(uint8_t ov=0; ov<OVERSAMPLING; ov++) {
 							pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i + ov] & MASK_12BIT, _adc_chars));
 						}
 						pDest[k] = pDest[k] / OVERSAMPLING;
+
+						//apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
+						//auto hann = 0.5f * (1 - cos((2 * PI * k) / AUDIO_DATA_OUT));
+						//log_d("%d - %1.4f", i, hann);
+						//pInputFft[k] = hann * (float)pDest[k];
 						pInputFft[k] = (float)pDest[k];
 
 						//i ara escalem el valor
