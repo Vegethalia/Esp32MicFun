@@ -173,9 +173,16 @@ private:
 
 public:
     PowerBarsPanel()
-        : _CurrentBaseHue(HSVHue::HUE_RED)
+        : _CurrentBaseHue(HSVHue::HUE_AQUA)
         , _ColorScheme(COLOR_SCHEME::CS1) {};
     virtual ~PowerBarsPanel() {};
+
+    // Sets the base hue for the color scheme
+    void SetBaseHue(uint8_t theHue) { _CurrentBaseHue = theHue; }
+    // Returns the current base hue
+    uint8_t GetBaseHue() { return _CurrentBaseHue; }
+    // Increments the base hue by the step value
+    void IncBaseHue(uint8_t step) { _CurrentBaseHue += step; }
 
     // Configure the class basic params: the FastLed object and the dimensions of the panel.
     // The only valid dimension so far is  PANEL_WIDTH x PANEL_HEIGHT.
@@ -195,7 +202,7 @@ public:
     }
 
     // Draws the n-th bar (0 based) with the value passed. Value must be scaled from 0 to PANEL_HEIGHT*10
-    void DrawBar(uint8_t numBar, uint8_t value)
+    void DrawBar(uint8_t numBar, uint8_t value, uint8_t brightness)
     {
         constexpr uint16_t maxheight = PANEL_HEIGHT - 1;
         if (!_pTheLeds || !_pTheMapping || numBar >= PANEL_WIDTH) {
@@ -261,10 +268,10 @@ public:
                 case COLOR_SCHEME::CS1:
                 default:
                     auto bright = (y)*10;
-                    colPixel = CHSV(HSVHue::HUE_AQUA, 255, (y + 2) * 15); // CRGB(bright, bright, bright);
+                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 10); //(y + 2) * 15); // CRGB(bright, bright, bright);
                     break;
                 }
-                (*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = colPixel;
+                (*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] += colPixel;
                 ++y;
             };
         }

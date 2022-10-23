@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "Esp32MicFun"
+		},
+		{
+			"path": "../CorridorLeds"
+		},
+		{
+			"path": "../pythonScripts"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"chrono": "cpp"
+		}
+	}
+}
