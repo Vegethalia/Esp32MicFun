@@ -12,7 +12,8 @@
 	],
 	"settings": {
 		"files.associations": {
-			"chrono": "cpp"
+			"chrono": "cpp",
+			"cmath": "cpp"
 		}
 	}
 }

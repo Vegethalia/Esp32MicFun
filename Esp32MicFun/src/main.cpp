@@ -12,7 +12,7 @@
 #include "esp_adc_cal.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-//#include <components/freertos/FreeRTOS-Kernel/include/freertos/queue.h>
+// #include <components/freertos/FreeRTOS-Kernel/include/freertos/queue.h>
 
 #include "mykeys.h"
 
@@ -35,8 +35,10 @@
 void Connect2MQTT();
 // PubSubClient callback for received messages
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dalaLength);
-//Draws an image
+// Draws an image
 void DrawImage();
+// Draw a parametric curve
+void DrawParametric();
 
 bool Connect2WiFi()
 {
@@ -63,19 +65,76 @@ bool Connect2WiFi()
     return false; // Too soon to retry, wait.
 }
 
+void DrawHorizSpectrogram(MsgAudio2Draw& mad)
+{
+    int16_t value = 0;
+
+    //_TheLeds.fill_solid(CRGB(1,1,1));
+    //   FastLED.clear();
+    assert(BAR_HEIGHT > 1);
+    const auto numItems = _TheMapping.GetHeight();
+    uint8_t values[numItems];
+
+    for (uint16_t i = 1; i <= _TheMapping.GetHeight(); i++) {
+        value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
+        values[i - 1] = (uint8_t)value;
+    }
+    _ThePanel.PushBar(values);
+
+    FastLED.show();
+}
+
+void DrawVertSpectrogram(MsgAudio2Draw& mad)
+{
+    int16_t value = 0;
+    static int lastFrame = 0;
+
+    // if((millis()-lastFrame)<10) {
+    //     return;
+    // }
+
+    //_TheLeds.fill_solid(CRGB(1,1,1));
+    //   FastLED.clear();
+    assert(THE_PANEL_WIDTH > 1);
+    const auto numItems = _TheMapping.GetWidth();
+    uint8_t values[numItems];
+
+    // uint8_t minBoostBin = (uint8_t)(numItems * 0.33); // the first 13 bars in 33 width panel
+    // constexpr float maxTrebleBoost = 5.0;
+    // constexpr float minBassBoost = 1.0;
+    // float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
+
+    for (uint16_t i = 1; i <= _TheMapping.GetWidth(); i++) {
+        value = constrain(mad.pFftMag[i], MIN_FFT_DB - 5, MAX_FFT_DB);
+        // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
+        //     auto boost = 1.0f + (i * freqBoost);
+        //     value = (int)(value * boost);
+        // }
+
+        // value = constrain(mad.pFftMag[i], MIN_FFT_DB-5, MAX_FFT_DB);
+        value = map(value, MIN_FFT_DB - 5, MAX_FFT_DB, 0, 255);
+        values[i - 1] = (uint8_t)value;
+    }
+    _ThePanel.PushLine(values);
+
+    FastLED.show();
+    lastFrame = millis();
+}
+
 void DrawLedBars(MsgAudio2Draw& mad)
 {
     // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
 
-    static uint32_t lastSuperBass = 0;
-    static uint32_t lastLowBass = 0;
-    static uint32_t lastTouch = 0;
-    static constexpr int lowBass = ((MIN_FFT_DB + MAX_FFT_DB) / 2);
-    static constexpr int hiBass = (MIN_FFT_DB / 6);
-    static constexpr int touchMinMs = 200;
-    static constexpr int touchMaxMs = 500;
-    static constexpr int minTimeBetweenTouches = 1000;
-    static uint8_t state = 0; // 0=waiting for low. 1=with hi bass. 2=with low after hi
+    // static uint32_t lastSuperBass = 0;
+    // static uint32_t lastLowBass = 0;
+    // static uint32_t lastTouch = 0;
+    // static constexpr int lowBass = ((MIN_FFT_DB + MAX_FFT_DB) / 2);
+    // static constexpr int hiBass = (MIN_FFT_DB / 6);
+    // static constexpr int touchMinMs = 200;
+    // static constexpr int touchMaxMs = 500;
+    // static constexpr int minTimeBetweenTouches = 1000;
+    // static uint8_t state = 0; // 0=waiting for low. 1=with hi bass. 2=with low after hi
 
     uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
     uint8_t maxBassValue = 0;
@@ -92,25 +151,25 @@ void DrawLedBars(MsgAudio2Draw& mad)
     constexpr float minBassBoost = 1.0;
     float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)maxIndex);
 
-/*    bool isHiBass = false, isLowBass = false;
-    auto now = millis();
-    if (mad.pFftMag[1] >= hiBass) { // || mad.pFftMag[2] >= hiBass) {
-        isHiBass = true;
-        lastSuperBass = now;
-    } else if (mad.pFftMag[1] < lowBass) { //|| mad.pFftMag[2] < lowBass) {
-        isLowBass = true;
-        lastLowBass = now;
-    }
-    if (state == 0 && isHiBass && (now - lastLowBass) > touchMinMs && (now - lastLowBass) < touchMaxMs) {
-        state = 1;
-    } else if (state == 1 && isLowBass && (now - lastTouch) > minTimeBetweenTouches) {
-        //_ThePanel.IncBaseHue(41);
-        lastTouch = now;
-        state = 0;
-    } else {
-        state = 0;
-    }
-*/
+    /*    bool isHiBass = false, isLowBass = false;
+        auto now = millis();
+        if (mad.pFftMag[1] >= hiBass) { // || mad.pFftMag[2] >= hiBass) {
+            isHiBass = true;
+            lastSuperBass = now;
+        } else if (mad.pFftMag[1] < lowBass) { //|| mad.pFftMag[2] < lowBass) {
+            isLowBass = true;
+            lastLowBass = now;
+        }
+        if (state == 0 && isHiBass && (now - lastLowBass) > touchMinMs && (now - lastLowBass) < touchMaxMs) {
+            state = 1;
+        } else if (state == 1 && isLowBass && (now - lastTouch) > minTimeBetweenTouches) {
+            //_ThePanel.IncBaseHue(41);
+            lastTouch = now;
+            state = 0;
+        } else {
+            state = 0;
+        }
+    */
     // // lets find out the max power bins
     // struct orderedBinByPow {
     //     uint16_t binNum;
@@ -142,12 +201,13 @@ void DrawLedBars(MsgAudio2Draw& mad)
     //     }
     // }
 
-    //DrawImage();
+    // DrawImage();
+    //_ThePanel.SetBaseHue();
     for (uint16_t i = 1; i < maxIndex; i++) {
-        if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
-            auto boost = 1.0f + (i * freqBoost);
-            value = (int)(value * boost);
-        }
+        // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
+        //     auto boost = 1.0f + (i * freqBoost);
+        //     value = (int)(value * boost);
+        // }
 
         value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
         value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, (BAR_HEIGHT * 10) + 9); // fins a 89
@@ -169,47 +229,19 @@ void DrawLedBars(MsgAudio2Draw& mad)
 
             _ThePanel.DrawBar(bin - 1, value, binByPow[i].brightness);
         }*/
+    // DrawParametric();
 
-    FastLED.show();
-}
-
-void DrawLedsSingleLine(MsgAudio2Draw& mad)
-{
-    uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
-    uint8_t maxBassValue = 0;
-    int16_t value = 0;
-
-    if (VISUALIZATION == FftPower::AUTO34) {
-        maxIndex = 34;
-    }
-    // log_d("maxIndex=%d", maxIndex);
-    for (uint16_t i = 1; i < maxIndex; i++) {
-        value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 1, 128);
-
-        if (value > 100) {
-            _TheLeds[NUM_LEDS - i] = CHSV(HSVHue::HUE_AQUA, 255, 128);
-        }
-        // else if(value<=2) {
-        // 	_TheLeds[NUM_LEDS - i - 1] = CRGB(1, 1, 1);//CHSV(HSVHue::HUE_PURPLE, 255, value);
-        // }
-        else {
-            _TheLeds[NUM_LEDS - i] = CHSV(HSVHue::HUE_BLUE, 255, value); // CRGB(value, value, value);//CHSV(HSVHue::HUE_PURPLE, 255, value);
-        }
-        // if(i<4 && value>maxBassValue) { //BASS bins
-        // 	maxBassValue = value;
-        // }
-    }
     FastLED.show();
 }
 
 // Task to read samples.
 void vTaskReader(void* pvParameters)
 {
+    uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
     size_t buffSize = sizeof(_TaskParams.data1);
-    size_t buffSizeOrig = sizeof(_TaskParams.dataOrig);
+    size_t buffSizeOrig = sizeof(dataOrig);
     size_t bytesRead = 0;
-    log_d("Estic a la ReaderTask. BuffSize=[%d]", buffSize);
+    log_d("Estic a la ReaderTask. BuffSize=[%d]. BuffSizeOrig=[%d]", buffSize, buffSizeOrig);
     i2s_event_t adc_i2s_evt;
     uint32_t recInit = millis();
     uint32_t totalSamples = 0;
@@ -228,10 +260,10 @@ void vTaskReader(void* pvParameters)
     for (;;) {
         if (xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
             if (adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
-                uint16_t* pDest = _TaskParams.lastBuffSet == 2 ? _TaskParams.data1 : _TaskParams.data2;
+                uint16_t* pDest = _TaskParams.data1;
 
-                _TaskParams.lastBuffSet = _TaskParams.lastBuffSet == 2 ? 1 : 2;
-                auto err = i2s_read(I2S_NUM_0, (void*)_TaskParams.dataOrig, buffSizeOrig, &bytesRead, portMAX_DELAY);
+                //_TaskParams.lastBuffSet = _TaskParams.lastBuffSet == 2 ? 1 : 2;
+                auto err = i2s_read(I2S_NUM_0, (void*)dataOrig, buffSizeOrig, &bytesRead, portMAX_DELAY);
                 if (err != ESP_OK) {
                     log_e("is_read error! [%d]", err);
                 } else {
@@ -248,7 +280,7 @@ void vTaskReader(void* pvParameters)
                     for (int i = 0, k = 0; i < samplesRead; i += OVERSAMPLING, k++) {
                         pDest[k] = 0;
                         for (uint8_t ov = 0; ov < OVERSAMPLING; ov++) {
-                            pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(_TaskParams.dataOrig[i + ov] & MASK_12BIT, _adc_chars));
+                            pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(dataOrig[i + ov] & MASK_12BIT, _adc_chars));
                         }
                         pDest[k] = pDest[k] / OVERSAMPLING;
 
@@ -256,25 +288,29 @@ void vTaskReader(void* pvParameters)
                         auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)AUDIO_DATA_OUT));
                         // log_d("%d - %1.4f", i, hann);
                         pInputFft[k] = hann * (float)pDest[k];
-                        //pInputFft[k] = (float)pDest[k];
+                        // pInputFft[k] = (float)pDest[k];
 
-                        // i ara escalem el valor
+                        // i ara escalem el valor. Only needed to paint the wave
                         if (USE_SCREEN) {
                             pDest[k] = constrain(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
                             pDest[k] = map(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
                         }
                     }
-                    uint16_t maxMagI = 0;
-                    mad.pAudio = pDest;
-                    mad.pFftMag = _TaskParams.fftMag;
-                    theFFT.Execute();
-                    theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
-                        BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF
-                                                                                    : FftPower::AUTO34,
-                        maxMagI, superMaxMag);
-                    mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
+                    if (!_Drawing) {
+                        uint16_t maxMagI = 0;
+                        mad.pAudio = pDest;
+                        mad.pFftMag = _TaskParams.fftMag;
+                        theFFT.Execute();
+                        theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
+                            BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF
+                                                                                        : FftPower::AUTO34,
+                            maxMagI, superMaxMag);
+                        mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
-                    if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+                        if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+                            missedFrames++;
+                        }
+                    } else {
                         missedFrames++;
                     }
                     // DrawLedBars(mad);
@@ -284,8 +320,12 @@ void vTaskReader(void* pvParameters)
                     // 	log_d("ShowLeds Queue FULL!!");
                     // }
                     auto now = millis();
-                    if ((now - recInit) >= 10000) {
-                        log_d("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d", now - recInit, totalSamples, numCalls, superMaxMag, missedFrames);
+                    if ((now - recInit) >= 30000) {
+                        std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d",
+                            now - recInit, totalSamples, numCalls, superMaxMag, missedFrames));
+                        // log_d(msg.c_str());
+                        _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), true);
+
                         recInit = now;
                         totalSamples = 0;
                         numCalls = 0;
@@ -350,12 +390,14 @@ void vTaskDrawer(void* pvParameters)
             }
 
             //_TaskParams.newDataReady = false;
-            if (lastBuff == _TaskParams.lastBuffSet) {
-                missedFrames++;
-            }
-            lastBuff = _TaskParams.lastBuffSet;
+            // if (lastBuff == _TaskParams.lastBuffSet) {
+            //     missedFrames++;
+            // }
+            // lastBuff = _TaskParams.lastBuffSet;
             // log_d("DataReady! DataBuffer=[%d]. BuffNumber=[%d]", _TaskParams.lastBuffSet, _TaskParams.buffNumber);
-            u8g2.clearBuffer();
+            if (USE_SCREEN) {
+                u8g2.clearBuffer();
+            }
 
             // Now the FFT
             int16_t value = 0;
@@ -429,20 +471,34 @@ void vTaskDrawer(void* pvParameters)
 
                 u8g2.sendBuffer();
             }
-            _numFrames++;
 
             // if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
             // 	log_d("ShowLeds Queue FULL!!");
             // }
-            DrawLedBars(mad);
+            _Drawing = true;
+            switch (_TheDrawStyle) {
+            case DRAW_STYLE::BARS_WITH_TOP:
+                DrawLedBars(mad);
+                break;
+            case DRAW_STYLE::HORIZ_FIRE:
+                DrawHorizSpectrogram(mad);
+                break;
+            default:
+                DrawVertSpectrogram(mad);
+                break;
+            }
+            _Drawing = false;
+
+            _numFrames++;
 
             auto now = millis();
-            if (_numFrames && (now - _InitTime) >= 10000) {
+            if (_numFrames && (now - _InitTime) >= 30000) {
                 _fps = 1000.0f / ((now - _InitTime) / _numFrames);
                 log_d("time=%d frames=%d fps=%3.2f samplesDrawn=%d missedFrames=%d", now - _InitTime, _numFrames, _fps, samplesDrawn, missedFrames);
                 samplesDrawn = 0;
                 _numFrames = 0;
                 missedFrames = 0;
+                _ThePubSub.publish(TOPIC_FPS, Utils::string_format("%3.2f", _fps).c_str(), true);
             }
         }
     }
@@ -452,7 +508,9 @@ void vTaskWifiReconnect(void* pvParameters)
 {
     bool reconnected = false;
 
-    _OTA.Setup();
+    sleep(20); // wait a bit...
+
+    _OTA.Setup("MicFun", "", 3434);
     WiFi.mode(WIFI_STA);
 
     while (true) {
@@ -488,6 +546,9 @@ void vTaskWifiReconnect(void* pvParameters)
             _TheNTPClient.update();
             if (!_ThePubSub.connected()) {
                 Connect2MQTT();
+                if (_ThePubSub.connected()) {
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), true);
+                }
             }
         }
         delay(2000);
@@ -513,6 +574,12 @@ void Connect2MQTT()
             if (!_ThePubSub.subscribe(TOPIC_DELAYFRAME)) {
                 log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_DELAYFRAME);
             }
+            if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
+                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_STYLE);
+            }
+            // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
+            //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
+            // }
         }
     }
 }
@@ -602,7 +669,7 @@ void setup()
     xTaskCreate(vTaskReader, "ReaderTask", 4096, (void*)&_TaskParams, 3, &_readerTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
-  //  xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 3, &_drawTaskHandle);
+    xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 3, &_drawTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
     // // start task to draw leds
     // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
@@ -621,7 +688,7 @@ void DrawParametric()
     static uint16_t sizePoses = 8; // sizeof(__2to3PiHalf.initialPoints) / sizeof(uint16_t);
     static HSVHue theHues[8] = { HSVHue::HUE_AQUA, HSVHue::HUE_BLUE, HSVHue::HUE_GREEN, HSVHue::HUE_ORANGE, HSVHue::HUE_PINK, HSVHue::HUE_PURPLE, HSVHue::HUE_RED, HSVHue::HUE_YELLOW };
 
-    FastLED.clear();
+    //    FastLED.clear();
     //_TheLeds.fadeLightBy(90);
 
     // for (int i = 0; i < sizePoses; i++) {
@@ -631,34 +698,33 @@ void DrawParametric()
     //         = CHSV(theHues[i], 255, 200);
     // }
     for (int i = 0; i < sizePoses; i++) {
-        float x = __2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
-        float y = __2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
-        int x1 = (int)x + 1;
-        int y1 = (int)y + 1;
-        float x1Percent = x - (int)x;
-        float x0Percent = 1.0 - x1Percent;
-        float y1Percent = y - (int)y;
-        float y0Percent = 1.0 - x1Percent;
-        float c0Percent = (x0Percent + y0Percent) / 2;
-        float c1Percent = (x1Percent + y1Percent) / 2;
+        // float x = __2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
+        // float y = __2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
+        // int x1 = (int)x + 1;
+        // int y1 = (int)y + 1;
+        // float x1Percent = x - (int)x;
+        // float x0Percent = 1.0 - x1Percent;
+        // float y1Percent = y - (int)y;
+        // float y0Percent = 1.0 - x1Percent;
+        // float c0Percent = (x0Percent + y0Percent) / 2;
+        // float c1Percent = (x1Percent + y1Percent) / 2;
 
-        if (x1 >= _TheMapping.GetWidth() || y1 >= _TheMapping.GetHeight()) {
-            _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255);
-        } else {
-            _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255 * c0Percent);
-            _TheLeds[_TheMapping.XY((int)x1, (int)y1)] = CHSV(theHues[i], 255, 255 * c1Percent);
-        }
+        // if (x1 >= _TheMapping.GetWidth() || y1 >= _TheMapping.GetHeight()) {
+        //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255);
+        // } else {
+        //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255 * c0Percent);
+        //     _TheLeds[_TheMapping.XY((int)x1, (int)y1)] = CHSV(theHues[i], 255, 255 * c1Percent);
+        // }
 
-        // _TheLeds[_TheMapping.XY(round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]), round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
-        //     = CHSV(theHues[i], 255, 200);
+        _TheLeds[_TheMapping.XY(
+            round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]),
+            round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
+            = CHSV(theHues[i], 255, 200);
     }
 
     ++currPos;
     // currPos = currPos % 252;
-    FastLED.show();
-    if (_delayFrame) {
-        delay(_delayFrame);
-    }
+    //   FastLED.show();
 }
 
 void DrawImage()
@@ -675,6 +741,75 @@ void DrawImage()
     // FastLED.show();
 }
 
+#include <math.h>
+constexpr int pixelCount = 800;
+uint8_t sparkHue = HSVHue::HUE_AQUA; // .5; //.2 => fire .1 => redish fire .5 => aqua
+int sparkSaturation = 1;
+constexpr int numSparks = 1 + (pixelCount / 20);
+float decay = 0.995;
+uint8_t maxSpeed = 100;
+float newThreshhold = 0.03;
+
+float sparks[numSparks];
+float sparkX[numSparks];
+float pixels[pixelCount];
+
+uint16_t frames = 0;
+
+void DrawSparks()
+{
+    if (++frames > 500) {
+        sparkHue = random8();
+        frames = 0;
+    }
+
+    float delta = 3; // po ejemplo
+
+    for (int i = 0; i < pixelCount; i++) {
+        pixels[i] = pixels[i] * 0.92;
+    }
+
+    for (int i = 0; i < numSparks; i++) {
+        if (sparks[i] >= -newThreshhold && sparks[i] <= newThreshhold) {
+            sparks[i] = ((int)(maxSpeed / 2) - (int)random8(maxSpeed)) / 100.0; // random entre -maxspeed/2 i maxspeed/2, entre 100.0
+            sparkX[i] = random16(pixelCount);
+        }
+
+        sparks[i] *= decay;
+        sparkX[i] += sparks[i] * delta;
+
+        if (sparkX[i] >= pixelCount) {
+            sparkX[i] = 0;
+        }
+
+        if (sparkX[i] < 0) {
+            sparkX[i] = pixelCount - 1;
+        }
+
+        pixels[(int)floor(sparkX[i])] += sparks[i]; // com mes "calent" més ràpid
+    }
+
+    // log_v("-------------");
+    // uint8_t maxv = 0;
+    // float maxf = 0.0;
+    for (int i = 0; i < pixelCount; i++) {
+        float f = (pixels[i] * pixels[i] * 5.0) * 255.0;
+        uint8_t v = f > 255.0 ? 255 : (uint8_t)f;
+        _TheLeds[i] = CHSV(sparkHue, 255, v);
+        // log_v("Pixel[%d]=%d", i, v);
+        // if (v > maxv) {
+        //     maxv = v;
+        // }
+        // if (pixels[i] > maxf) {
+        //     maxf = pixels[i];
+        // }
+    }
+    // log_v("maxV=%d maxF=%2.3f", maxv, maxf);
+
+    FastLED.show();
+    // delay(5);
+}
+
 void loop()
 {
     // if(_BassOn) {
@@ -688,20 +823,24 @@ void loop()
     // initial+=thisSpeed;
     // FastLED.show();
 
-    
-        // static int pos = 0;
-        // static int temp = 0;
-        // for (int i = 0; i < 33; i++) {
-        //     for (int j = 0; j < 16; j++) {
-        //         _TheLeds[_TheMapping.XY((i + pos) % 33, j)] = __imgArletErola2[i][j];
-        //         napplyGamma_video(_TheLeds[_TheMapping.XY((i + pos) % 33, j)], 1.8f);
-        //     }
-        // }
-        // pos++;
-        // FastLED.show();
-    //delay(_delayFrame);
+    // static int pos = 0;
+    // static int temp = 0;
+    // for (int i = 0; i < 33; i++) {
+    //     for (int j = 0; j < 16; j++) {
+    //         _TheLeds[_TheMapping.XY((i + pos) % 33, j)] = __imgArletErola2[i][j];
+    //         napplyGamma_video(_TheLeds[_TheMapping.XY((i + pos) % 33, j)], 1.8f);
+    //     }
+    // }
+    // pos++;
+    // FastLED.show();
+    // delay(_delayFrame);
 
-        DrawParametric();
+    //  DrawParametric();
+    // DrawSparks();
+    delay(1000);
+    //      if (_delayFrame) {
+    //          delay(_delayFrame);
+    //      }
 }
 
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
@@ -735,5 +874,9 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     if (theTopic.find(TOPIC_DELAYFRAME) != std::string::npos) {
         _delayFrame = max(std::atoi(theMsg.c_str()), (int)0);
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated delay=%dms", _delayFrame).c_str(), true);
+    }
+    if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
+        _TheDrawStyle = (DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1);
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
     }
 }

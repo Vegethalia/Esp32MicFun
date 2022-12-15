@@ -168,7 +168,8 @@ private:
     enum COLOR_SCHEME {
         NONE = 0,
         CS1 = 1,
-        CS2 = 2
+        CS2 = 2, // basehue bars brighter if higher
+        CS3 = 3 // White bars, brighter if higher
     };
 
 public:
@@ -265,11 +266,18 @@ public:
                 case COLOR_SCHEME::CS2:
                     colPixel = CHSV(_CurrentBaseHue + (y * 18) + numBar * 6, 255, (y + 2) * 15);
                     break;
-                case COLOR_SCHEME::CS1:
-                default:
-                    auto bright = (y)*10;
+                case COLOR_SCHEME::CS1: {
+                    // auto bright2 = (y)*10;
                     colPixel = CHSV(_CurrentBaseHue, 255, maxY * 10); //(y + 2) * 15); // CRGB(bright, bright, bright);
                     break;
+                }
+                default: {
+                    // auto bright0 = maxY * 10;
+                    CHSV white = rgb2hsv_approximate(CRGB::DarkRed); // CRGB::FairyLight
+                    white.v = maxY * 3;
+                    colPixel = white; // CRGB(maxY, maxY, maxY);
+                    break;
+                }
                 }
                 (*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] += colPixel;
                 ++y;
@@ -301,14 +309,56 @@ public:
                 colPixel = CHSV(_CurrentBaseHue + (y * 18) + numBar * 6, 255, (y + 1) * 15);
                 break;
             case COLOR_SCHEME::CS1:
-            default:
-                auto bright = (y + 2) * 15;
                 colPixel = CHSV(HSVHue::HUE_PINK, 255, 10 * maxheight);
+                break;
+            default:
+                // auto bright = (y + 2) * 15;
+                colPixel = CHSV(HSVHue::HUE_PINK, 255, 5 * maxheight);
                 break;
             }
             (*_pTheLeds)[_pTheMapping->XY(numBar, maxheight - y)] = colPixel;
         }
         //_CurrentBaseHue++;
+    }
+
+    // shifts all bars to the left and inserts the new one. The values are interpreted as the intensity (V) in HSV
+    // The array is supposed to hold PANEL_HEIGHT values
+    void PushBar(const uint8_t* pTheValues)
+    {
+        int ledDest = 0;
+        // shift all columns to the left
+        for (int iBar = 0; iBar < PANEL_WIDTH - 1; iBar++) {
+            for (int y = 0; y < PANEL_HEIGHT; y++) {
+                ledDest = _pTheMapping->XY(iBar, y);
+                (*_pTheLeds)[ledDest] = (*_pTheLeds)[_pTheMapping->XY(iBar + 1, y)];
+                (*_pTheLeds)[ledDest].subtractFromRGB(4);
+            }
+        }
+        // i ara pintem la nova column
+        for (int y = 0; y < PANEL_HEIGHT; y++) {
+            (*_pTheLeds)[_pTheMapping->XY(PANEL_WIDTH - 1, y)] = CHSV(_CurrentBaseHue, 255, pTheValues[y]);
+        }
+        _CurrentBaseHue++;
+    }
+
+    // shifts all lines to the top and inserts the new one. The values are interpreted as the intensity (V) in HSV
+    // The array is supposed to hold PANEL_WIDTH values
+    void PushLine(const uint8_t* pTheValues)
+    {
+        int ledDest = 0;
+        // shift all columns to the left
+        for (int iLine = 0; iLine < PANEL_HEIGHT - 1; iLine++) {
+            for (int x = 0; x < PANEL_WIDTH; x++) {
+                ledDest = _pTheMapping->XY(x, iLine);
+                (*_pTheLeds)[ledDest] = (*_pTheLeds)[_pTheMapping->XY(x, iLine + 1)];
+                (*_pTheLeds)[ledDest].subtractFromRGB(7);
+            }
+        }
+        // i ara pintem la nova column
+        for (int x = 0; x < PANEL_WIDTH; x++) {
+            (*_pTheLeds)[_pTheMapping->XY(x, PANEL_HEIGHT - 1)] = CHSV(_CurrentBaseHue, 255, pTheValues[x]);
+        }
+        _CurrentBaseHue++;
     }
 
 private:
