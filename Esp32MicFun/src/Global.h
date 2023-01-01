@@ -4,6 +4,7 @@
 #define PIN_DATA_LEDS 16
 #define BUS_SPEED 800000
 
+#define INIT_SCREEN true
 #define USE_SCREEN false
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -26,22 +27,34 @@
 
 #define RETRY_WIFI_EVERY_SECS 60
 
-U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
+U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
 
 #define BARS_RESOLUTION 8 // 8=32 4=64 2=128
+// #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
 
-#define DEFAULT_MILLIS 100
+#define DEFAULT_MILLIS 10
 #define MAX_MILLIS 2000
 uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 
-#define BAR_HEIGHT (PANEL_HEIGHT_16 - 1) // we have this amount of "vertical leds" per bar. 0 based.
-#define THE_PANEL_WIDTH PANEL_WIDTH_33
-#define NUM_LEDS (THE_PANEL_WIDTH * PANEL_HEIGHT_16) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+// #define BAR_HEIGHT (PANEL_HEIGHT_16 - 1) // we have this amount of "vertical leds" per bar. 0 based.
+// #define THE_PANEL_WIDTH PANEL_WIDTH_33
+// #define NUM_LEDS (THE_PANEL_WIDTH * PANEL_HEIGHT_16) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+#define THE_PANEL_HEIGHT PANEL_HEIGHT_16 // PANEL_HEIGHT_8
+#define THE_PANEL_WIDTH PANEL_WIDTH_33 // PANEL_WIDTH_64
+#define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
+#define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+
+// FftPower::BinResolution BIN_RESOLUTION = FftPower::BinResolution::HALF; // defines how many bins are returned from FFT
+// defines how many bins are returned from FFT
+FftPower::BinResolution BIN_RESOLUTION = (BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF
+                                                                                                      : FftPower::AUTO34);
+
 CRGBArray<NUM_LEDS> _TheLeds;
 PanelMapping33x16 _TheMapping;
-PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, PANEL_HEIGHT_16> _ThePanel;
+// PanelMapping64x8 _TheMapping;
+PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, THE_PANEL_HEIGHT> _ThePanel;
 
 OtaUpdater _OTA;
 PubSubClient _ThePubSub;
@@ -55,6 +68,7 @@ uint16_t _numFrames = 0;
 float _fps = 0.0f;
 // bool _BassOn = false;
 bool _Connected2Wifi = false;
+bool _WithClock = true;
 
 uint32_t _LastCheck4Wifi = 0;
 

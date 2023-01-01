@@ -40,7 +40,7 @@ public:
 		fft_execute(_pRealFftPlan);
 	}
 
-	//Call after Execute. Returns the frequency power for each bin. The aary must be (numSamples/2)+1 long.
+	//Call after Execute. Returns the frequency power for each bin. The array must be (numSamples/2)+1 long.
 	//values are escaled according to maxFftMagnitude (depends on input levels... 70k is ok)
 	//Returns the bin index with the higher power
 	void GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t &maxMag)
@@ -49,7 +49,7 @@ public:
 
 		maxBin=0;
 		maxMag = -10000;
-		pFreqPower[0]=0; //dc is not calculated
+		pFreqPower[0]=-100; //dc is not calculated
 
 		if(binRes<BinResolution::AUTO32) {
 			uint8_t avgN=1;
@@ -64,12 +64,14 @@ public:
 					avgN=4;
 					break;
 			}
-			for(uint16_t i = 1, ind=1; i < maxIndex; i+=avgN, ind++) {
-				pFreqPower[ind]=0;
+			for(uint16_t i = 0, ind=0; i <= (maxIndex-avgN); i+=avgN, ind++) {
+				pFreqPower[ind]=-100;
 				for(uint8_t k=i; k<i+avgN; k++) {
-					auto value = (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
-					if(value>pFreqPower[ind]) {
-						pFreqPower[ind] = value;
+					if(k>0) {
+						auto value = (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
+						if(value>pFreqPower[ind]) {
+							pFreqPower[ind] = value;
+						}
 					}
 				}
 				// pFreqPower[ind] = pFreqPower[ind]/avgN;
