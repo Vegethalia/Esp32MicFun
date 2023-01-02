@@ -199,7 +199,7 @@ void DrawClock()
     // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
     _u8g2.clearBuffer();
     //    _u8g2.setFont(u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
-    _u8g2.drawStr(THE_PANEL_WIDTH-27, 6, theTime.c_str());
+    _u8g2.drawStr(THE_PANEL_WIDTH - 27, 6, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 1, baseHue++, max((int)164, (int)_1stBarValue));

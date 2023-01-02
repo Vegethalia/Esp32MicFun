@@ -16,7 +16,7 @@
 #define MIN_FFT_DB -40 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 
-#define TARGET_SAMPLE_RATE 14000 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
+#define TARGET_SAMPLE_RATE 11000 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING 2 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 

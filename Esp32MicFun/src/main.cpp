@@ -84,6 +84,15 @@ void vTaskReader(void* pvParameters)
     MsgAudio2Draw mad;
     FftPower theFFT(AUDIO_DATA_OUT);
     float* pInputFft = theFFT.GetInputBuffer();
+    float hanningPreCalc[AUDIO_DATA_OUT];
+
+    for (uint16_t i = 0; i < AUDIO_DATA_OUT; i++) {
+        // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
+        // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
+        float hann = 0.5f * (1.0f - cos((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1)));
+        hanningPreCalc[i] = hann;
+   //     *0.25 * sin((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1));
+    }
 
     // Create the FFT config structure
     // fft_config_t* real_fft_plan = fft_init(AUDIO_DATA_OUT, FFT_REAL, FFT_FORWARD, NULL, NULL);
@@ -118,9 +127,9 @@ void vTaskReader(void* pvParameters)
                         pDest[k] = pDest[k] / OVERSAMPLING;
 
                         // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
-                        auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)AUDIO_DATA_OUT));
+                        // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
                         // log_d("%d - %1.4f", i, hann);
-                        pInputFft[k] = hann * (float)pDest[k];
+                        pInputFft[k] = hanningPreCalc[k] * (float)pDest[k];
                         // pInputFft[k] = (float)pDest[k];
 
                         // i ara escalem el valor. Only needed to paint the wave
@@ -505,7 +514,7 @@ void setup()
     _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
-    xTaskCreate(vTaskReader, "ReaderTask", 4096, (void*)&_TaskParams, 3, &_readerTaskHandle);
+    xTaskCreate(vTaskReader, "ReaderTask", 8196, (void*)&_TaskParams, 3, &_readerTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
     // xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 3, &_drawTaskHandle);
