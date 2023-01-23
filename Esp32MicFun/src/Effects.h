@@ -1,4 +1,7 @@
 
+#define CLOCK_HORIZ_PIXELS 41
+#define CLOCK_VERT_PIXELS 7
+
 void DrawHorizSpectrogram(MsgAudio2Draw& mad)
 {
     int16_t value = 0;
@@ -9,10 +12,10 @@ void DrawHorizSpectrogram(MsgAudio2Draw& mad)
     const auto numItems = _TheMapping.GetHeight();
     uint8_t values[numItems];
 
-    for (uint16_t i = 1; i <= _TheMapping.GetHeight(); i++) {
+    for (uint16_t i = 0; i < numItems; i++) {
         value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
         value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-        values[i - 1] = (uint8_t)value;
+        values[i] = (uint8_t)value;
     }
     _ThePanel.PushBar(values);
 
@@ -31,31 +34,35 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
 
     //_TheLeds.fill_solid(CRGB(1,1,1));
     //   FastLED.clear();
+
+    _ThePanel.SetBaseHue(HSVHue::HUE_ORANGE);
+
     assert(THE_PANEL_WIDTH > 1);
     const auto numItems = _TheMapping.GetWidth();
     uint8_t values[numItems];
+    memset8(values, 0, sizeof(values));
 
     // uint8_t minBoostBin = (uint8_t)(numItems * 0.33); // the first 13 bars in 33 width panel
     // constexpr float maxTrebleBoost = 5.0;
     // constexpr float minBassBoost = 1.0;
     // float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
     _1stBarValue = 0;
-    for (uint16_t i = 1; i <= _TheMapping.GetWidth(); i++) {
-        value = constrain(mad.pFftMag[i], MIN_FFT_DB - 5, MAX_FFT_DB);
+    for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
+        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB + (int)(_pianoMode ? 5 : 0), MAX_FFT_DB);
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
         //     value = (int)(value * boost);
         // }
 
         // value = constrain(mad.pFftMag[i], MIN_FFT_DB-5, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB - 5, MAX_FFT_DB, 0, 255);
-        values[i - 1] = (uint8_t)value;
-        if (i <= 3 && _1stBarValue < value) {
+        value = map(value, (int)MIN_FFT_DB + (int)(_pianoMode ? 5 : 0), MAX_FFT_DB, 0, 255);
+        values[i] = (uint8_t)value;
+        if (i <= 5 && _1stBarValue < value) {
             _1stBarValue = value;
         }
     }
     if (_WithClock) {
-        _ThePanel.PushLine(values, THE_PANEL_WIDTH - 27, 5);
+        _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS - 8, CLOCK_VERT_PIXELS - 1);
         //_ThePanel.PushLine(values, 6, 12);
     } else {
         _ThePanel.PushLine(values);
@@ -67,86 +74,20 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
 
 void DrawLedBars(MsgAudio2Draw& mad)
 {
-    // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
-
-    // static uint32_t lastSuperBass = 0;
-    // static uint32_t lastLowBass = 0;
-    // static uint32_t lastTouch = 0;
-    // static constexpr int lowBass = ((MIN_FFT_DB + MAX_FFT_DB) / 2);
-    // static constexpr int hiBass = (MIN_FFT_DB / 6);
-    // static constexpr int touchMinMs = 200;
-    // static constexpr int touchMaxMs = 500;
-    // static constexpr int minTimeBetweenTouches = 1000;
-    // static uint8_t state = 0; // 0=waiting for low. 1=with hi bass. 2=with low after hi
-
-    uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
+    const auto numItems = _TheMapping.GetWidth();
     uint8_t maxBassValue = 0;
     int16_t value = 0;
 
-    if (VISUALIZATION == FftPower::AUTO34) {
-        maxIndex = 34;
-    }
-    //_TheLeds.fill_solid(CRGB(1,1,1));
-    FastLED.clear();
     assert(BAR_HEIGHT > 1);
-    uint8_t minBoostBin = (uint8_t)(maxIndex * 0.33); // the first 13 bars in 33 width panel
+    uint8_t minBoostBin = (uint8_t)(numItems * 0.33); // the first 13 bars in 33 width panel
     constexpr float maxTrebleBoost = 30.0;
     constexpr float minBassBoost = 1.0;
-    float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)maxIndex);
+    float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
 
-    /*    bool isHiBass = false, isLowBass = false;
-        auto now = millis();
-        if (mad.pFftMag[1] >= hiBass) { // || mad.pFftMag[2] >= hiBass) {
-            isHiBass = true;
-            lastSuperBass = now;
-        } else if (mad.pFftMag[1] < lowBass) { //|| mad.pFftMag[2] < lowBass) {
-            isLowBass = true;
-            lastLowBass = now;
-        }
-        if (state == 0 && isHiBass && (now - lastLowBass) > touchMinMs && (now - lastLowBass) < touchMaxMs) {
-            state = 1;
-        } else if (state == 1 && isLowBass && (now - lastTouch) > minTimeBetweenTouches) {
-            //_ThePanel.IncBaseHue(41);
-            lastTouch = now;
-            state = 0;
-        } else {
-            state = 0;
-        }
-    */
-    // // lets find out the max power bins
-    // struct orderedBinByPow {
-    //     uint16_t binNum;
-    //     int32_t fftMag;
-    //     uint8_t brightness;
-    // };
-    // std::vector<orderedBinByPow> binByPow;
-    // for (uint16_t i = 0; i < maxIndex; i++) {
-    //     binByPow.push_back({ i, mad.pFftMag[i], 32 });
-    // }
-    // binByPow[0].fftMag = MIN_FFT_DB;
-    // std::sort(binByPow.begin(), binByPow.end(),
-    //     [](orderedBinByPow& a, orderedBinByPow& b) {
-    //         return a.fftMag < b.fftMag;
-    //     });
-    // for (uint16_t i = 0; i < maxIndex; i++) {
-    //     if (i < 4) {
-    //         binByPow[i].brightness = 200;
-    //     } else if (i < 8) {
-    //         binByPow[i].brightness = 160;
-    //     } else if (i < 12) {
-    //         binByPow[i].brightness = 120;
-    //     } else if (i < 16) {
-    //         binByPow[i].brightness = 100;
-    //     } else if (i < 20) {
-    //         binByPow[i].brightness = 80;
-    //     } else {
-    //         binByPow[i].brightness = 64;
-    //     }
-    // }
-
+    FastLED.clear();
     // DrawImage();
     //_ThePanel.SetBaseHue();
-    for (uint16_t i = 1; i < maxIndex; i++) {
+    for (uint16_t i = 0; i < numItems; i++) {
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
         //     value = (int)(value * boost);
@@ -155,9 +96,9 @@ void DrawLedBars(MsgAudio2Draw& mad)
         value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
         value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, (BAR_HEIGHT * 10) + 9); // fins a 89
 
-        _ThePanel.DrawBar(i - 1, value, 200);
-        if (i == 1) {
-            _1stBarValue = map(value, 0, (BAR_HEIGHT * 10) + 9, 0, 255); // fins a 89;
+        _ThePanel.DrawBar(i, value, 200);
+        if (i <= 5 && _1stBarValue < value) {
+            _1stBarValue = value;
         }
     }
     /*    for (uint16_t i = 0; i < maxIndex; i++) {
@@ -181,6 +122,90 @@ void DrawLedBars(MsgAudio2Draw& mad)
     //_ThePanel.IncBaseHue();
 }
 
+void DrawParametric(MsgAudio2Draw& mad)
+{
+    static ParametricCurve s_TheCurrentCurve;
+    static bool s_initialized = false;
+    static const uint16_t s_numCoords = 252;
+    static uint16_t s_frameNum = 0;
+    static float s_steps[s_numCoords];
+    static float s_delta = 0.0f;
+    static uint8_t s_hue = 0;
+
+    // FastLED.clear();
+
+    if (!s_initialized) {
+        float every = (float)s_numCoords / THE_PANEL_WIDTH;
+        for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
+            s_TheCurrentCurve.initialPoints[i] = (uint16_t)(every * i);
+        }
+        double menysPI = -PI;
+        for (uint16_t i = 0; i < s_numCoords; i++) {
+            s_steps[i] = menysPI + (i * 0.025); // 0.025=2Pi/252. 252 son el num d'steps
+        }
+        s_initialized = true;
+    }
+
+    if (s_frameNum == 0) {
+        /* x = 31.1*sin(3*step+pi/2)+32
+           y = 15.1*sin(2*step)+16*/
+        for (uint16_t i = 0; i < s_numCoords; i++) {
+            s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
+            s_TheCurrentCurve.yCoord[i] = 15.1f * sin(3 * s_steps[i] + s_delta) + 16.0f;
+        }
+        s_delta += 0.02;
+        if (s_delta >= TWO_PI) {
+            s_delta = 0.0f;
+        }
+    }
+    for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
+        s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+        uint16_t coord = s_TheCurrentCurve.initialPoints[i];
+        int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
+        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(s_hue, 255, (uint8_t)value);
+    }
+
+    s_frameNum = (s_frameNum + 1) % 3;
+    s_hue++;
+}
+
+void DrawWave(MsgAudio2Draw& mad)
+{
+    // if (_TheFrameNumber%2==0) {
+    //     return;
+    // }
+    uint8_t height = _TheMapping.GetHeight() - 1;
+    uint16_t width = _TheMapping.GetWidth();
+    uint16_t i;
+    int16_t value;
+
+    // busquem el pass per "0" després de la muntanya més gran
+    uint16_t pas0 = 0;
+    uint16_t maxAmp = INPUT_0_VALUE;
+    uint16_t iMaxAmp = 0;
+    for (i = 0; i < (width / 2); i++) {
+        if (mad.pAudio[i] > maxAmp) {
+            maxAmp = mad.pAudio[i];
+            iMaxAmp = i;
+        }
+    } // ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
+    for (i = iMaxAmp; i < width; i++) {
+        if (mad.pAudio[i] <= INPUT_0_VALUE) {
+            pas0 = i;
+            break;
+        }
+    }
+
+    for (i = 0; i < width; i++) {
+        value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        value += constrain(mad.pAudio[pas0 + (i * 2)+1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        value = map(value/2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE, 128, 48);
+    }
+    //_ThePanel.IncBaseHue();
+}
+
 void DrawClock()
 {
     static int baseHue = 0;
@@ -199,9 +224,10 @@ void DrawClock()
     // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
     _u8g2.clearBuffer();
     //    _u8g2.setFont(u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
-    _u8g2.drawStr(THE_PANEL_WIDTH - 27, 6, theTime.c_str());
+    _u8g2.drawStr(THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
+    _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber/4));
     _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 1, baseHue++, max((int)164, (int)_1stBarValue));
     //        FastLED.show();
 }
@@ -214,50 +240,50 @@ void DrawClock()
 // uint8_t initial = 1;
 int _delayFrame = 100;
 
-void DrawParametric()
-{
-    static uint16_t currPos = 0;
-    static uint16_t sizePoses = 8; // sizeof(__2to3PiHalf.initialPoints) / sizeof(uint16_t);
-    static HSVHue theHues[8] = { HSVHue::HUE_AQUA, HSVHue::HUE_BLUE, HSVHue::HUE_GREEN, HSVHue::HUE_ORANGE, HSVHue::HUE_PINK, HSVHue::HUE_PURPLE, HSVHue::HUE_RED, HSVHue::HUE_YELLOW };
+// void DrawParametricHardcoded()
+// {
+//     static uint16_t currPos = 0;
+//     static uint16_t sizePoses = 8; // sizeof(__2to3PiHalf.initialPoints) / sizeof(uint16_t);
+//     static HSVHue theHues[8] = { HSVHue::HUE_AQUA, HSVHue::HUE_BLUE, HSVHue::HUE_GREEN, HSVHue::HUE_ORANGE, HSVHue::HUE_PINK, HSVHue::HUE_PURPLE, HSVHue::HUE_RED, HSVHue::HUE_YELLOW };
 
-    //    FastLED.clear();
-    //_TheLeds.fadeLightBy(90);
+//     //    FastLED.clear();
+//     //_TheLeds.fadeLightBy(90);
 
-    // for (int i = 0; i < sizePoses; i++) {
-    //     _TheLeds[_TheMapping.XY(
-    //         round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]),
-    //         round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
-    //         = CHSV(theHues[i], 255, 200);
-    // }
-    for (int i = 0; i < sizePoses; i++) {
-        // float x = __2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
-        // float y = __2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
-        // int x1 = (int)x + 1;
-        // int y1 = (int)y + 1;
-        // float x1Percent = x - (int)x;
-        // float x0Percent = 1.0 - x1Percent;
-        // float y1Percent = y - (int)y;
-        // float y0Percent = 1.0 - x1Percent;
-        // float c0Percent = (x0Percent + y0Percent) / 2;
-        // float c1Percent = (x1Percent + y1Percent) / 2;
+//     // for (int i = 0; i < sizePoses; i++) {
+//     //     _TheLeds[_TheMapping.XY(
+//     //         round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]),
+//     //         round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
+//     //         = CHSV(theHues[i], 255, 200);
+//     // }
+//     for (int i = 0; i < sizePoses; i++) {
+//         // float x = __2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
+//         // float y = __2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252];
+//         // int x1 = (int)x + 1;
+//         // int y1 = (int)y + 1;
+//         // float x1Percent = x - (int)x;
+//         // float x0Percent = 1.0 - x1Percent;
+//         // float y1Percent = y - (int)y;
+//         // float y0Percent = 1.0 - x1Percent;
+//         // float c0Percent = (x0Percent + y0Percent) / 2;
+//         // float c1Percent = (x1Percent + y1Percent) / 2;
 
-        // if (x1 >= _TheMapping.GetWidth() || y1 >= _TheMapping.GetHeight()) {
-        //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255);
-        // } else {
-        //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255 * c0Percent);
-        //     _TheLeds[_TheMapping.XY((int)x1, (int)y1)] = CHSV(theHues[i], 255, 255 * c1Percent);
-        // }
+//         // if (x1 >= _TheMapping.GetWidth() || y1 >= _TheMapping.GetHeight()) {
+//         //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255);
+//         // } else {
+//         //     _TheLeds[_TheMapping.XY((int)x, (int)y)] = CHSV(theHues[i], 255, 255 * c0Percent);
+//         //     _TheLeds[_TheMapping.XY((int)x1, (int)y1)] = CHSV(theHues[i], 255, 255 * c1Percent);
+//         // }
 
-        _TheLeds[_TheMapping.XY(
-            round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]),
-            round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
-            = CHSV(theHues[i], 255, 200);
-    }
+//         _TheLeds[_TheMapping.XY(
+//             round(__2to3PiHalf.xCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]),
+//             round(__2to3PiHalf.yCoord[(__2to3PiHalf.initialPoints[i] + currPos) % 252]))]
+//             = CHSV(theHues[i], 255, 200);
+//     }
 
-    ++currPos;
-    // currPos = currPos % 252;
-    //   FastLED.show();
-}
+//     ++currPos;
+//     // currPos = currPos % 252;
+//     //   FastLED.show();
+// }
 
 void DrawImage()
 {

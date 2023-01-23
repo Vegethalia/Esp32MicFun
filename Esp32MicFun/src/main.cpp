@@ -21,6 +21,8 @@
 #include "SharedUtils/OtaUpdater.h"
 #include "SharedUtils\Utils.h"
 
+#include "../.pio/libdeps/az-delivery-devkit-v4/FFT/src/fft.h"
+
 #include "Global.h"
 
 #include "Images.h"
@@ -82,23 +84,25 @@ void vTaskReader(void* pvParameters)
     uint16_t missedFrames = 0;
     int32_t superMaxMag = -10000;
     MsgAudio2Draw mad;
-    FftPower theFFT(AUDIO_DATA_OUT);
+    // uint16_t THE_FFT_SIZE = AUDIO_DATA_OUT * 16;
+    FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT); // AUDIO_DATA_OUT  * 2
     float* pInputFft = theFFT.GetInputBuffer();
-    float hanningPreCalc[AUDIO_DATA_OUT];
+    // float hanningPreCalc[REAL_SIZE_TEMP]; // AUDIO_DATA_OUT
 
-    for (uint16_t i = 0; i < AUDIO_DATA_OUT; i++) {
-        // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
-        // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
-        float hann = 0.5f * (1.0f - cos((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1)));
-        hanningPreCalc[i] = hann;
-   //     *0.25 * sin((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1));
-    }
+    // for (uint16_t i = 0; i < REAL_SIZE_TEMP; i++) {
+    //     // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
+    //     // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
+    //     float hann = 0.5f * (1.0f - cos((2.0f * PI * (float)i) / (float)(REAL_SIZE_TEMP - 1)));
+    //     hanningPreCalc[i] = hann;
+    //     //     *0.25 * sin((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1));
+    // }
 
     // Create the FFT config structure
     // fft_config_t* real_fft_plan = fft_init(AUDIO_DATA_OUT, FFT_REAL, FFT_FORWARD, NULL, NULL);
-    float freqs_x_bin = (float)(TARGET_SAMPLE_RATE) / (float)AUDIO_DATA_OUT;
+    float freqs_x_bin = (float)(TARGET_SAMPLE_RATE) / (float)FFT_SIZE;
     log_d("Freqs_x_Bin=%3.2f", freqs_x_bin);
 
+    memset(_TaskParams.fftMag, -100, sizeof(_TaskParams.fftMag));
     for (;;) {
         if (xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
             if (adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
@@ -119,6 +123,7 @@ void vTaskReader(void* pvParameters)
                     // now we convert the values to mv from 1V to 3V
                     // int k=0;
                     // log_d("BytesRead=%d buzzSizeOrig=%d SamplesRead=%d TotalSamples=%d", bytesRead, buffSizeOrig, samplesRead, totalSamples);
+                    // for (int i = 0, k = 0; i < samplesRead; i += 1, k++) {
                     for (int i = 0, k = 0; i < samplesRead; i += OVERSAMPLING, k++) {
                         pDest[k] = 0;
                         for (uint8_t ov = 0; ov < OVERSAMPLING; ov++) {
@@ -129,29 +134,43 @@ void vTaskReader(void* pvParameters)
                         // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
                         // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
                         // log_d("%d - %1.4f", i, hann);
-                        pInputFft[k] = hanningPreCalc[k] * (float)pDest[k];
+                        // pInputFft[k] = hanningPreCalc[k] * (float)pDest[k];
                         // pInputFft[k] = (float)pDest[k];
 
-                        // i ara escalem el valor. Only needed to paint the wave
-                        if (USE_SCREEN) {
-                            pDest[k] = constrain(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-                            pDest[k] = map(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
-                        }
+                        // // i ara escalem el valor. Only needed to paint the wave
+                        // if (USE_SCREEN) {
+                        //     pDest[k] = constrain(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+                        //     pDest[k] = map(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
+                        // }
                     }
-                    if (!_Drawing) {
-                        uint16_t maxMagI = 0;
-                        mad.pAudio = pDest;
-                        mad.pFftMag = _TaskParams.fftMag;
-                        theFFT.Execute();
-                        theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, BIN_RESOLUTION, maxMagI, superMaxMag);
-                        mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
+                    theFFT.AddSamples(pDest, samplesRead / OVERSAMPLING);
+                    //                    if (!_Drawing) {
+                    uint16_t maxMagI = 0;
+                    mad.pAudio = pDest;
+                    mad.pFftMag = _TaskParams.fftMag;
+                    // auto inTime = esp_timer_get_time();
+                    if (theFFT.Execute(true)) {
+                        // auto totalTime = esp_timer_get_time() - inTime;
+                        // log_d("FFT time=%lldus!!", totalTime);
+                        if (!_Drawing) {
+                            // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
+                            theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
+                                _pianoMode ? FftPower::BinResolution::PIANO64_3Hz : FftPower::BinResolution::AUTO64_3Hz,
+                                maxMagI, superMaxMag);
+                            mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
-                        if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+                            if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+                                missedFrames++;
+                            }
+                        } else {
+                            log_d("MISSED!!");
                             missedFrames++;
                         }
-                    } else {
-                        missedFrames++;
                     }
+                    //                  } else {
+                    //                     log_d("MISSED!!");
+                    //                     missedFrames++;
+                    //                }
                     // DrawLedBars(mad);
                     //  DrawLeds(mad);
 
@@ -211,7 +230,8 @@ void vTaskDrawer(void* pvParameters)
         _u8g2.begin();
         log_d("In vTaskDrawer.afterBegin...");
         //_u8g2.setFont(u8g2_font_profont12_mf);
-        _u8g2.setFont(u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
+        // u8g2_font_tiny_simon_tr --> maca, cuadrada, 3x5 --> 28pixels full time
+        _u8g2.setFont(u8g2_font_nokiafc22_tn); // u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
         log_d("In vTaskDrawer.afterSetFont...");
         _u8g2.setContrast(64);
     }
@@ -316,21 +336,25 @@ void vTaskDrawer(void* pvParameters)
             // 	log_d("ShowLeds Queue FULL!!");
             // }
             _Drawing = true;
-
+            _TheFrameNumber++;
             switch (_TheDrawStyle) {
             case DRAW_STYLE::BARS_WITH_TOP:
+                //                FastLED.clear();
                 DrawLedBars(mad);
+                DrawClock();
                 break;
             case DRAW_STYLE::HORIZ_FIRE:
                 DrawHorizSpectrogram(mad);
                 break;
             default:
+                //FastLED.clear();
                 DrawVertSpectrogram(mad);
+                //DrawParametric(mad);
+                DrawWave(mad);
                 DrawClock();
                 break;
             }
 
-            // FastLED.clear();
             // DrawClock();
             FastLED.show();
             _Drawing = false;
@@ -367,7 +391,7 @@ void vTaskWifiReconnect(void* pvParameters)
         } else {
             auto temps = millis() / 1000;
 
-            if (temps < 3 || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS) {
+            if ((temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS) {
                 _LastCheck4Wifi = temps;
                 log_i("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
                 auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
@@ -438,11 +462,18 @@ void setup()
         ;
 
     pinMode(PIN_BASS_LED, OUTPUT);
-    pinMode(PIN_DATA_LEDS, OUTPUT);
+    pinMode(PIN_DATA_LEDS1, OUTPUT);
+    pinMode(PIN_DATA_LEDS2, OUTPUT);
+    pinMode(PIN_DATA_LEDS3, OUTPUT);
+    pinMode(PIN_DATA_LEDS4, OUTPUT);
 
-    FastLED.addLeds<WS2812B, PIN_DATA_LEDS, GRB>(_TheLeds, NUM_LEDS);
+    FastLED.addLeds<WS2812B, PIN_DATA_LEDS1, GRB>(_TheLeds, 0, THE_PANEL_WIDTH * 8);
+    FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, THE_PANEL_WIDTH * 8, THE_PANEL_WIDTH * 8);
+    FastLED.addLeds<WS2812B, PIN_DATA_LEDS3, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 2, THE_PANEL_WIDTH * 8);
+    FastLED.addLeds<WS2812B, PIN_DATA_LEDS4, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 3, THE_PANEL_WIDTH * 8);
     // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
     FastLED.setTemperature(Halogen);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
     FastLED.setBrightness(_MAX_MILLIS);
 
     _ThePanel.SetParams(&_TheLeds, &_TheMapping);
@@ -514,11 +545,11 @@ void setup()
     _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
-    xTaskCreate(vTaskReader, "ReaderTask", 8196, (void*)&_TaskParams, 3, &_readerTaskHandle);
+    xTaskCreate(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 3, &_readerTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
     // xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 3, &_drawTaskHandle);
-    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
+    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
     // // start task to draw leds
     // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
     // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
@@ -527,7 +558,7 @@ void setup()
 }
 
 // PLAY WITH MATRIX
-//  #define TEMP_LEDS (8*32*2) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+//  #define TEMP_LEDS (16*32*2) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 //  CRGBArray<TEMP_LEDS> _MyTempLeds;
 //  uint16_t _indexPix = 0;
 //  bool added = false;
@@ -538,9 +569,11 @@ void loop()
     // PLAY WITH MATRIX
     // if(!added) {
     //     _MyTempController = &FastLED.addLeds<WS2812B, PIN_DATA_LEDS, GRB>(_MyTempLeds, TEMP_LEDS);
+    //     _MyTempController->setTemperature(Halogen);
+    //     FastLED.setBrightness(20);
     // }
-    // _MyTempLeds.fadeToBlackBy(2);
-    // _MyTempLeds[_indexPix] = CRGB(192, 128, 64);
+    // _MyTempLeds.fadeToBlackBy(10);
+    // _MyTempLeds[_indexPix] = CHSV(HSVHue::HUE_PURPLE, random8(), 100);
     // _indexPix++;
     // _indexPix %= TEMP_LEDS;
     // _MyTempController->showLeds();
@@ -565,7 +598,7 @@ void loop()
 
     //  DrawParametric();
     // DrawSparks();
-    delay(1000);
+    delay(100);
     //      if (_delayFrame) {
     //          delay(_delayFrame);
     //      }
