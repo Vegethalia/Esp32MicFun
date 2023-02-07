@@ -12,7 +12,7 @@ constexpr uint16_t PANEL_HEIGHT_16 = 16; // from 1 to 16
 constexpr uint16_t PANEL_HEIGHT_24 = 24; // from 1 to 24
 constexpr uint16_t PANEL_HEIGHT_32 = 32; // from 1 to 32
 
-constexpr uint16_t BAR_DEC_TIME_MS = 50; // hold each bar max current value at least this amount of time
+constexpr uint16_t BAR_DEC_TIME_MS = 25; // 50; // hold each bar max current value at least this amount of time
 constexpr uint16_t BAR_TOP_TIME_MS = BAR_DEC_TIME_MS * 10; // hold the top for this amount
 
 template <uint16_t PANEL_WIDTH, uint16_t PANEL_HEIGHT>
@@ -384,7 +384,7 @@ public:
                     break;
                 case COLOR_SCHEME::CS1: {
                     // auto bright2 = (y)*10;
-                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 10); //(y + 2) * 15); // CRGB(bright, bright, bright);
+                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 5); //(y + 2) * 15); // CRGB(bright, bright, bright);
                     break;
                 }
                 default: {
@@ -425,7 +425,7 @@ public:
                 colPixel = CHSV(_CurrentBaseHue + (y * 18) + numBar * 6, 255, (y + 1) * 15);
                 break;
             case COLOR_SCHEME::CS1:
-                colPixel = CHSV(HSVHue::HUE_PINK, 255, 8 * maxheight);
+                colPixel = CHSV(HSVHue::HUE_PINK, 255, 5 * maxheight);
                 break;
             default:
                 // auto bright = (y + 2) * 15;
@@ -464,32 +464,39 @@ public:
     void PushLine(const uint8_t* pTheValues, uint16_t ignoreFromX = 10000, uint8_t ignoreToY = 0)
     {
         int ledDest = 0;
-        uint8_t baseFade = 4;//_pianoMode ? 1 : 5; // 5
+        uint8_t baseFade = 4; //_pianoMode ? 1 : 5; // 5
         // shift all columns to the top
         for (int iLine = 0; iLine < PANEL_HEIGHT - 1; iLine++) {
             for (int x = 0; x < PANEL_WIDTH; x++) {
                 ledDest = _pTheMapping->XY(x, iLine);
-                (*_pTheLeds)[ledDest] = (*_pTheLeds)[_pTheMapping->XY(x, iLine + 1)];
+
+                _AuxLeds[ledDest] = _AuxLeds[_pTheMapping->XY(x, iLine + 1)];
+                //(*_pTheLeds)[ledDest] = (*_pTheLeds)[_pTheMapping->XY(x, iLine + 1)];
                 if (x < ignoreFromX || iLine >= ignoreToY) {
-                    if (iLine > 5) {
-                        (*_pTheLeds)[ledDest].subtractFromRGB(baseFade);
-                    } else {
-                        (*_pTheLeds)[ledDest].subtractFromRGB(baseFade * 2);
-                    }
+                    // if (iLine > 5) {
+                    _AuxLeds[ledDest].subtractFromRGB(baseFade);
+                    // } else {
+                    // (*_pTheLeds)[ledDest].subtractFromRGB(baseFade * 2);
+                    // }
                 } else {
-                    (*_pTheLeds)[ledDest].subtractFromRGB(192);
+                    _AuxLeds[ledDest].subtractFromRGB(192);
                 }
             }
         }
         // i ara pintem la nova column
         for (int x = 0; x < PANEL_WIDTH; x++) {
-            (*_pTheLeds)[_pTheMapping->XY(x, PANEL_HEIGHT - 1)] = CHSV(_CurrentBaseHue, 255, pTheValues[x]);
+            _AuxLeds[_pTheMapping->XY(x, PANEL_HEIGHT - 1)] = CHSV(_CurrentBaseHue, 255, pTheValues[x]);
         }
         _SubCounter++;
         if (_SubCounter > 4) {
             _CurrentBaseHue++;
             _SubCounter = 0;
         }
+
+        // i ara restaurem el buffer auxiliar en l'array de leds
+         for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
+            (*_pTheLeds)[z] = _AuxLeds[z];
+         }
     }
 
     // Draw a portion of the contents of the u8g2 screen buffer in the led panel.
@@ -518,6 +525,7 @@ public:
 
 private:
     CRGBArray<TOTAL_LEDS>* _pTheLeds; // The FastLed object
+    CRGBArray<TOTAL_LEDS> _AuxLeds; // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
     IPanelMapping<PANEL_WIDTH, PANEL_HEIGHT>* _pTheMapping; // The class that will provide the mapping coordinates
     Column _TheColumns[PANEL_WIDTH];
 

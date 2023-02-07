@@ -29,7 +29,7 @@
 
 #define MASK_12BIT 0x0fff
 
-#define RETRY_WIFI_EVERY_SECS 40
+#define RETRY_WIFI_EVERY_SECS 20
 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
@@ -77,7 +77,7 @@ float _fps = 0.0f;
 // bool _BassOn = false;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
-bool _pianoMode = true;
+bool _pianoMode = false;
 
 uint32_t _LastCheck4Wifi = 0;
 
@@ -100,6 +100,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 //------------
 TaskHandle_t _readerTaskHandle;
 TaskHandle_t _drawTaskHandle;
+TaskHandle_t _drawTaskShowLeds;
 TaskHandle_t _showLedsTaskHandle;
 TaskHandle_t _wifiReconnectTaskHandle;
 

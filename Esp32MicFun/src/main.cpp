@@ -51,7 +51,7 @@ bool Connect2WiFi()
     }
     auto temps = millis() / 1000;
 
-    if (temps < 3 || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS) {
+    if ((temps >= RETRY_WIFI_EVERY_SECS && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
         _LastCheck4Wifi = temps;
         log_d("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
         auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
@@ -119,6 +119,9 @@ void vTaskReader(void* pvParameters)
                     uint16_t samplesRead = bytesRead / sizeof(uint16_t);
                     totalSamples += samplesRead;
                     numCalls++;
+                    if (_OTA.Status() == OtaUpdater::OtaStatus::UPDATING) {
+                        continue;
+                    }
                     //_TaskParams.buffNumber++;
                     // now we convert the values to mv from 1V to 3V
                     // int k=0;
@@ -259,78 +262,7 @@ void vTaskDrawer(void* pvParameters)
                 _u8g2.clearBuffer();
             }
 
-            // Now the FFT
             int16_t value = 0;
-
-            // u8g2.setDrawColor(1);
-            // uint16_t maxIndex = AUDIO_DATA_OUT / BARS_RESOLUTION; // /2->ALL /4->HALF /8->QUARTER
-            // uint8_t barW = BARS_RESOLUTION == 2 ? 1 : BARS_RESOLUTION == 4 ? 2 : 4;
-            // uint8_t adjust = BARS_RESOLUTION == 2?0:1;
-            // uint8_t maxBassValue=0;
-            // for(uint16_t i = 1; i < maxIndex; i++) {
-            // 	value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-            // 	value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, SCREEN_HEIGHT - 1);
-            // 	// u8g2.drawLine(i, SCREEN_HEIGHT - value, i, SCREEN_HEIGHT-1); --> ALL
-            // 	// u8g2.drawLine(i*2, SCREEN_HEIGHT - value, i*2, SCREEN_HEIGHT-1); --> HALF
-            // 	u8g2.drawBox(i * barW, SCREEN_HEIGHT - value, barW - adjust, value); //--> QUARTER/AUTO
-            // 	if(i<4 && value>maxBassValue) { //BASS bins
-            // 		maxBassValue=value;
-            // 	}
-            // }
-            // if(maxBassValue > (SCREEN_HEIGHT - (SCREEN_HEIGHT/4))) {
-            // 	//u8g2.setContrast(255);
-            // 	_BassOn=true;
-            // 	// digitalWrite(PIN_BASS_LED, HIGH);
-            // }
-            // else {
-            // 	_BassOn=false;
-            // 	// digitalWrite(PIN_BASS_LED, LOW);
-            // 	//u8g2.setContrast(64);
-            // 	//u8g2.setContrast(map(maxBassValue, 0, SCREEN_HEIGHT - 1, 1, 128));
-            // }
-            // //now we simulate that the bars are made of "boxes"
-            // u8g2.setDrawColor(0);
-            // for(uint16_t i = 4; i < SCREEN_HEIGHT; i += 6) {
-            // 	u8g2.drawLine(0, i, SCREEN_WIDTH - 1, i);
-            // 	u8g2.drawLine(0, i + 1, SCREEN_WIDTH - 1, i + 1);
-            // 	//u8g2.drawLine(0, i + 2, SCREEN_WIDTH - 1, i + 2);
-            // }
-
-            // Now The Wave
-            if (USE_SCREEN) {
-                _u8g2.setDrawColor(2);
-
-                // busquem el pass per "0" després de la muntanya més gran
-                uint16_t pas0 = 0;
-                uint16_t maxAmp = (SCREEN_HEIGHT / 2);
-                uint16_t iMaxAmp = 0;
-                for (int i = 0; i < (AUDIO_DATA_OUT - SCREEN_WIDTH - SCREEN_WIDTH / 3); i++) {
-                    if (pDest[i] < maxAmp) {
-                        maxAmp = value;
-                        iMaxAmp = i;
-                        break;
-                    }
-                } // ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
-                for (int i = iMaxAmp; i < (AUDIO_DATA_OUT - SCREEN_WIDTH); i++) {
-                    if (pDest[i] >= (SCREEN_HEIGHT / 2)) {
-                        pas0 = i;
-                        break;
-                    }
-                }
-                for (uint16_t i = pas0; i < (pas0 + SCREEN_WIDTH); i++) {
-                    value = constrain(pDest[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-                    value = map(value, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
-                    _u8g2.drawPixel(i - pas0, pDest[i]);
-                }
-                samplesDrawn += AUDIO_DATA_OUT;
-
-                // And finally the text
-                _u8g2.setFontMode(1);
-                _u8g2.setDrawColor(2);
-                _u8g2.drawStr(5, 15, Utils::string_format("FPS=%3.2f", _fps).c_str());
-
-                _u8g2.sendBuffer();
-            }
 
             // if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
             // 	log_d("ShowLeds Queue FULL!!");
@@ -347,9 +279,9 @@ void vTaskDrawer(void* pvParameters)
                 DrawHorizSpectrogram(mad);
                 break;
             default:
-                //FastLED.clear();
+                // FastLED.clear();
                 DrawVertSpectrogram(mad);
-                //DrawParametric(mad);
+                // DrawParametric(mad);
                 DrawWave(mad);
                 DrawClock();
                 break;
@@ -370,6 +302,36 @@ void vTaskDrawer(void* pvParameters)
                 missedFrames = 0;
                 _ThePubSub.publish(TOPIC_FPS, Utils::string_format("%3.2f", _fps).c_str(), true);
             }
+        }
+    }
+}
+
+void vTaskShowLeds(void* pvParameters)
+{
+    uint8_t state = 0;
+    uint16_t frames = 0;
+    uint32_t startMillis = 0;
+
+    while (true) {
+        if (frames == 0) {
+            startMillis = millis();
+        }
+        if (_OTA.Status() != OtaUpdater::OtaStatus::UPDATING && !_Drawing) {
+            //        s_state++;
+            if (state == 1) {
+                FastLED.show(_MAX_MILLIS);
+                state = 0;
+            } else {
+                FastLED.show(0);
+                state = 1;
+            }
+            frames++;
+        } else if (_OTA.Status() == OtaUpdater::OtaStatus::UPDATING) {
+            sleep(250);
+        }
+        if (frames == 100) {
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("RefreshLeds [%d] Total Time[%d]", frames, (uint32_t)(millis() - startMillis)).c_str(), true);
+            frames = 0;
         }
     }
 }
@@ -548,8 +510,9 @@ void setup()
     xTaskCreate(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 3, &_readerTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
-    // xTaskCreate(vTaskDrawer, "Draw Screen", 2048, (void*)&_TaskParams, 3, &_drawTaskHandle);
+   //  xTaskCreate(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle);
     xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
+    //    xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
     // // start task to draw leds
     // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
     // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);

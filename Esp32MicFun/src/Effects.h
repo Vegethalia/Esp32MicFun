@@ -34,8 +34,23 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
 
     //_TheLeds.fill_solid(CRGB(1,1,1));
     //   FastLED.clear();
+    static int8_t incValue = +1;
+    static int8_t actualInc = 0;
+    static const int8_t MAX_INC = 32;
 
-    _ThePanel.SetBaseHue(HSVHue::HUE_ORANGE);
+    if (_numFrames % 4 == 0) {
+        actualInc += incValue;
+        if (actualInc >= MAX_INC) {
+            incValue = -1;
+        } else if (actualInc == 0) {
+            incValue = +1;
+        }
+    }
+
+    // actualInc = random8(32);
+
+    _ThePanel.SetBaseHue((HSVHue::HUE_ORANGE - (MAX_INC / 3)) + actualInc);
+    //_ThePanel.IncBaseHue();
 
     assert(THE_PANEL_WIDTH > 1);
     const auto numItems = _TheMapping.GetWidth();
@@ -62,7 +77,7 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
         }
     }
     if (_WithClock) {
-        _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS - 8, CLOCK_VERT_PIXELS - 1);
+        _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS - 1);
         //_ThePanel.PushLine(values, 6, 12);
     } else {
         _ThePanel.PushLine(values);
@@ -87,6 +102,7 @@ void DrawLedBars(MsgAudio2Draw& mad)
     FastLED.clear();
     // DrawImage();
     //_ThePanel.SetBaseHue();
+    _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
     for (uint16_t i = 0; i < numItems; i++) {
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
@@ -172,9 +188,19 @@ void DrawParametric(MsgAudio2Draw& mad)
 
 void DrawWave(MsgAudio2Draw& mad)
 {
-    // if (_TheFrameNumber%2==0) {
-    //     return;
-    // }
+    static int8_t incValue = +1;
+    static int8_t actualInc = 0;
+    static const int8_t MAX_INC = 32;
+
+    if (_numFrames % 4 == 0) {
+        actualInc += incValue;
+        if (actualInc >= MAX_INC) {
+            incValue = -1;
+        } else if (actualInc == 0) {
+            incValue = +1;
+        }
+    }
+
     uint8_t height = _TheMapping.GetHeight() - 1;
     uint16_t width = _TheMapping.GetWidth();
     uint16_t i;
@@ -184,7 +210,7 @@ void DrawWave(MsgAudio2Draw& mad)
     uint16_t pas0 = 0;
     uint16_t maxAmp = INPUT_0_VALUE;
     uint16_t iMaxAmp = 0;
-    for (i = 0; i < (width / 2); i++) {
+    for (i = 0; i < (width * 2 / 3); i++) {
         if (mad.pAudio[i] > maxAmp) {
             maxAmp = mad.pAudio[i];
             iMaxAmp = i;
@@ -199,9 +225,9 @@ void DrawWave(MsgAudio2Draw& mad)
 
     for (i = 0; i < width; i++) {
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        value += constrain(mad.pAudio[pas0 + (i * 2)+1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        value = map(value/2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE, 128, 48);
+        value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        value = map(value / 2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE + actualInc, 148, 48);
     }
     //_ThePanel.IncBaseHue();
 }
@@ -227,7 +253,7 @@ void DrawClock()
     _u8g2.drawStr(THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
-    _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber/4));
+    _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber / 4));
     _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 1, baseHue++, max((int)164, (int)_1stBarValue));
     //        FastLED.show();
 }
