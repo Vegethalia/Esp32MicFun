@@ -464,7 +464,7 @@ public:
     void PushLine(const uint8_t* pTheValues, uint16_t ignoreFromX = 10000, uint8_t ignoreToY = 0)
     {
         int ledDest = 0;
-        uint8_t baseFade = 4; //_pianoMode ? 1 : 5; // 5
+        uint8_t baseFade = 5; //_pianoMode ? 1 : 5; // 5
         // shift all columns to the top
         for (int iLine = 0; iLine < PANEL_HEIGHT - 1; iLine++) {
             for (int x = 0; x < PANEL_WIDTH; x++) {

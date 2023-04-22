@@ -62,29 +62,6 @@ float* FftPower::GetInputBuffer()
 // Oldest samples are automatically replaced when the internal buffer is filled.
 void FftPower::AddSamples(const uint16_t* pTheRawSamples, uint16_t numSamples)
 {
-    // std::vector<uint16_t>* pTheBuffer = nullptr;
-    // std::vector<uint16_t>* pTheOtherBuffer = nullptr;
-
-    // if (_bufferInUse == 1) {
-    //     pTheBuffer = &_TheSamplesBuffer1;
-    //     pTheOtherBuffer = &_TheSamplesBuffer2;
-    // } else {
-    //     pTheBuffer = &_TheSamplesBuffer2;
-    //     pTheOtherBuffer = &_TheSamplesBuffer1;
-    // }
-
-    // // Initial loading of the samples buffer
-    // if (_buffPos < (pTheBuffer->size() - numSamples)) {
-    //     log_d("InitialLoad Adding [%d] samples at pos [%d]", numSamples, _buffPos);
-    //     memcpy(pTheBuffer->data(), pTheRawSamples + _buffPos, numSamples * sizeof(uint16_t));
-    //     _buffPos += numSamples;
-    // } else { // once the buffer is full, use the other to avoid working with a circular buffer and copy the samples
-    //     log_d("NextLoad. Buffer=[%d]. Adding [%d] samples at pos [%d]", _bufferInUse, numSamples, (pTheOtherBuffer->size() - numSamples));
-    //     memcpy(pTheOtherBuffer, pTheBuffer + numSamples, pTheBuffer->size() - numSamples);
-    //     memcpy(pTheOtherBuffer + (pTheOtherBuffer->size() - numSamples), pTheRawSamples, numSamples);
-    //     _bufferInUse = _bufferInUse == 1 ? 2 : 1;
-    // }
-
     // cap tot?
     if (_buffPos + numSamples < _numSamples) {
         //  log_d("FullCopy Adding [%d] samples at pos [%d]", numSamples, _buffPos);
@@ -218,7 +195,7 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
             }
             ind++;
         } while (ind < maxIndex);
-    } else if (binRes == BinResolution::AUTO5hz || binRes == BinResolution::AUTO64_3Hz || binRes == BinResolution::PIANO33_3Hz || binRes == BinResolution::PIANO64_3Hz) { // BinResolution::AUTO5hz
+    } else if (binRes == BinResolution::AUTO5hz || binRes == BinResolution::AUTO64_3Hz || binRes == BinResolution::PIANO33_3Hz || binRes == BinResolution::PIANO64_3Hz || binRes == BinResolution::PIANO64_6Hz) { // BinResolution::AUTO5hz
         const FreqBins* pBins = nullptr;
         uint8_t numBins = 32;
         if (binRes == BinResolution::AUTO5hz) {
@@ -229,10 +206,13 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
             numBins = 33;
             // maxFftMagnitude += 50000;
         } else if (binRes == BinResolution::PIANO64_3Hz) {
-            pBins = _64PianoKeys;
+            pBins = _64PianoKeys_3Hz;
             numBins = 64;
         } else if (binRes == BinResolution::AUTO64_3Hz) {
             pBins = _Auto64Bands_v3;
+            numBins = 64;
+        } else if (binRes == BinResolution::PIANO64_6Hz) {
+            pBins = _64PianoKeys_6Hz;
             numBins = 64;
         }
 

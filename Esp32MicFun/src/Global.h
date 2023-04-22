@@ -16,16 +16,16 @@
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 900 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
-#define MIN_FFT_DB -50 // a magnitude under this value will be considered 0 (noise)
+#define MIN_FFT_DB -55 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 5 // a magnitude greater than this value will be considered Max Power
 
-#define FFT_SIZE 4096
-#define TARGET_SAMPLE_RATE (FFT_SIZE * 3) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
+#define FFT_SIZE 2048
+#define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING 2 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
-#define VISUALIZATION FftPower::AUTO34
+//#define VISUALIZATION FftPower::AUTO34
 
 #define MASK_12BIT 0x0fff
 
@@ -35,7 +35,7 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
 
-#define BARS_RESOLUTION 8 // 8=32 4=64 2=128
+//#define BARS_RESOLUTION 8 // 8=32 4=64 2=128
 // #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
 
 #define DEFAULT_MILLIS 10
@@ -49,11 +49,6 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define THE_PANEL_WIDTH PANEL_WIDTH_64 // PANEL_WIDTH_33 // PANEL_WIDTH_64
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
-
-// FftPower::BinResolution BIN_RESOLUTION = FftPower::BinResolution::HALF; // defines how many bins are returned from FFT
-// defines how many bins are returned from FFT
-FftPower::BinResolution BIN_RESOLUTION = (BARS_RESOLUTION == 2 ? FftPower::ALL : BARS_RESOLUTION == 4 ? FftPower::HALF
-                                                                                                      : FftPower::AUTO34);
 
 CRGBArray<NUM_LEDS> _TheLeds;
 // PanelMapping33x16 _TheMapping;
@@ -77,7 +72,7 @@ float _fps = 0.0f;
 // bool _BassOn = false;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
-bool _pianoMode = false;
+bool _pianoMode = true;
 
 uint32_t _LastCheck4Wifi = 0;
 

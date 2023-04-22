@@ -62,7 +62,7 @@ bool Connect2WiFi()
         } else {
             log_d("WiFi CONNECTED!");
             _TheNTPClient.begin();
-            _TheNTPClient.setTimeOffset(3600);
+            _TheNTPClient.setTimeOffset(7200); // 3600
             return true;
         }
     }
@@ -158,7 +158,7 @@ void vTaskReader(void* pvParameters)
                         if (!_Drawing) {
                             // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
                             theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
-                                _pianoMode ? FftPower::BinResolution::PIANO64_3Hz : FftPower::BinResolution::AUTO64_3Hz,
+                                _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_3Hz,
                                 maxMagI, superMaxMag);
                             mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
 
@@ -363,7 +363,7 @@ void vTaskWifiReconnect(void* pvParameters)
                 } else {
                     log_i("WiFi CONNECTED!");
                     _TheNTPClient.begin();
-                    _TheNTPClient.setTimeOffset(3600);
+                    _TheNTPClient.setTimeOffset(7200);
                     _Connected2Wifi = true;
                     reconnected = true;
                 }
@@ -510,7 +510,7 @@ void setup()
     xTaskCreate(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 3, &_readerTaskHandle);
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
-   //  xTaskCreate(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle);
+    //  xTaskCreate(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle);
     xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
     //    xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
     // // start task to draw leds

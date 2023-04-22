@@ -63,14 +63,18 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
     // float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
     _1stBarValue = 0;
     for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
-        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB + (int)(_pianoMode ? 5 : 0), MAX_FFT_DB);
+        int8_t decPower = 0;
+        if (i < 18) {
+            decPower = 14;
+        }
+        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB + (int)(_pianoMode ? 0 : 0) + decPower, MAX_FFT_DB);
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
         //     value = (int)(value * boost);
         // }
 
         // value = constrain(mad.pFftMag[i], MIN_FFT_DB-5, MAX_FFT_DB);
-        value = map(value, (int)MIN_FFT_DB + (int)(_pianoMode ? 5 : 0), MAX_FFT_DB, 0, 255);
+        value = map(value, (int)MIN_FFT_DB + (int)(_pianoMode ? 0 : 0) + decPower, MAX_FFT_DB, 0, 255);
         values[i] = (uint8_t)value;
         if (i <= 5 && _1stBarValue < value) {
             _1stBarValue = value;
@@ -188,18 +192,18 @@ void DrawParametric(MsgAudio2Draw& mad)
 
 void DrawWave(MsgAudio2Draw& mad)
 {
-    static int8_t incValue = +1;
-    static int8_t actualInc = 0;
-    static const int8_t MAX_INC = 32;
+    // static int8_t incValue = +1;
+    // static int8_t actualInc = 0;
+    // static const int8_t MAX_INC = 32;
 
-    if (_numFrames % 4 == 0) {
-        actualInc += incValue;
-        if (actualInc >= MAX_INC) {
-            incValue = -1;
-        } else if (actualInc == 0) {
-            incValue = +1;
-        }
-    }
+    // if (_numFrames % 4 == 0) {
+    //     actualInc += incValue;
+    //     if (actualInc >= MAX_INC) {
+    //         incValue = -1;
+    //     } else if (actualInc == 0) {
+    //         incValue = +1;
+    //     }
+    // }
 
     uint8_t height = _TheMapping.GetHeight() - 1;
     uint16_t width = _TheMapping.GetWidth();
@@ -227,7 +231,7 @@ void DrawWave(MsgAudio2Draw& mad)
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         value = map(value / 2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE + actualInc, 148, 48);
+        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
     //_ThePanel.IncBaseHue();
 }
