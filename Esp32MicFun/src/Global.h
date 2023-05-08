@@ -14,7 +14,7 @@
 
 #define DEFAULT_VREF 1100
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
-#define VOLTATGE_DRAW_RANGE 900 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define VOLTATGE_DRAW_RANGE 800 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB -55 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 5 // a magnitude greater than this value will be considered Max Power
@@ -25,7 +25,7 @@
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
-//#define VISUALIZATION FftPower::AUTO34
+// #define VISUALIZATION FftPower::AUTO34
 
 #define MASK_12BIT 0x0fff
 
@@ -35,10 +35,10 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
 
-//#define BARS_RESOLUTION 8 // 8=32 4=64 2=128
-// #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
+// #define BARS_RESOLUTION 8 // 8=32 4=64 2=128
+//  #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
 
-#define DEFAULT_MILLIS 10
+#define DEFAULT_MILLIS 30
 #define MAX_MILLIS 2000
 uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 
@@ -61,18 +61,16 @@ PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, THE_PANEL_HEIGHT> _ThePanel;
 OtaUpdater _OTA;
 PubSubClient _ThePubSub;
 WiFiClient _TheWifi;
-WiFiUDP _TheWifi4UDP;
-NTPClient _TheNTPClient(_TheWifi4UDP);
 
-// uint8_t _ScreenBrightness = 0;
 uint32_t _InitTime = 0;
 uint16_t _numFrames = 0;
 uint32_t _TheFrameNumber = 0;
 float _fps = 0.0f;
-// bool _BassOn = false;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
 bool _pianoMode = true;
+bool _DemoMode = true; // when the device starts, execute a sequence of "demo" figures
+uint32_t _DemoModeFrame = 0; // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
 
 uint32_t _LastCheck4Wifi = 0;
 

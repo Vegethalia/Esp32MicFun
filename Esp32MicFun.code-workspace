@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../pythonScripts"
+		},
+		{
+			"path": "../FunWith_ESP32-S2"
 		}
 	],
 	"settings": {

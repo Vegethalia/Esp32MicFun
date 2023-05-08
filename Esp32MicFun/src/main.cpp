@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <FastLED.h>
-#include <NTPClient.h>
+// #include <NTPClient.h>
 #include <PubSubClient.h>
 #include <U8g2lib.h>
 #include <WiFi.h>
@@ -10,6 +10,7 @@
 #include "driver/adc.h"
 #include "driver/i2s.h"
 #include "esp_adc_cal.h"
+#include "esp_sntp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 // #include <components/freertos/FreeRTOS-Kernel/include/freertos/queue.h>
@@ -44,6 +45,31 @@ void DrawImage();
 // Draw a parametric curve
 void DrawParametric();
 
+/// @brief Configures the NTP server. In this project the timezone and offsets are hardcoded to suit my needs
+void ConfigureNTP()
+{
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    // Is time set? If not, tm_year will be (1970 - 1900).
+//    if (timeinfo.tm_year < (2020 - 1900)) {
+//        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
+        if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
+            configTime(3600, 3600, "pool.ntp.org");
+            sntp_set_sync_interval(60000);
+            sntp_restart();
+        }
+        // update 'now' variable with current time
+        time(&now);
+    // } else {
+    //     sntp_set_sync_interval(60000);
+    //     sntp_restart();
+    //     setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1); // Configure the TZ. We already have the time set. Andorra time!
+    //     tzset();
+    // }
+}
+
 bool Connect2WiFi()
 {
     if (WiFi.isConnected()) {
@@ -61,8 +87,9 @@ bool Connect2WiFi()
             return false;
         } else {
             log_d("WiFi CONNECTED!");
-            _TheNTPClient.begin();
-            _TheNTPClient.setTimeOffset(7200); // 3600
+            // _TheNTPClient.begin();
+            // _TheNTPClient.setTimeOffset(7200); // 3600
+            ConfigureNTP();
             return true;
         }
     }
@@ -262,31 +289,40 @@ void vTaskDrawer(void* pvParameters)
                 _u8g2.clearBuffer();
             }
 
-            int16_t value = 0;
+            // int16_t value = 0;
 
             // if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
             // 	log_d("ShowLeds Queue FULL!!");
             // }
             _Drawing = true;
             _TheFrameNumber++;
-            switch (_TheDrawStyle) {
-            case DRAW_STYLE::BARS_WITH_TOP:
-                //                FastLED.clear();
-                DrawLedBars(mad);
-                DrawClock();
-                break;
-            case DRAW_STYLE::HORIZ_FIRE:
-                DrawHorizSpectrogram(mad);
-                break;
-            default:
-                // FastLED.clear();
-                DrawVertSpectrogram(mad);
-                // DrawParametric(mad);
-                DrawWave(mad);
-                DrawClock();
-                break;
-            }
 
+            if (_DemoMode) {
+                FastLED.clear();
+                DrawParametric(mad);
+                if(_Connected2Wifi) {
+                    //_DemoMode = false;
+                }
+            } else {
+
+                switch (_TheDrawStyle) {
+                case DRAW_STYLE::BARS_WITH_TOP:
+                    //                FastLED.clear();
+                    DrawLedBars(mad);
+                    DrawClock();
+                    break;
+                case DRAW_STYLE::HORIZ_FIRE:
+                    DrawHorizSpectrogram(mad);
+                    break;
+                default:
+                    //FastLED.clear();
+                    DrawVertSpectrogram(mad);
+                    //DrawParametric(mad);
+                     DrawWave(mad);
+                    DrawClock();
+                    break;
+                }
+            }
             // DrawClock();
             FastLED.show();
             _Drawing = false;
@@ -362,10 +398,11 @@ void vTaskWifiReconnect(void* pvParameters)
                     log_e("WiFi connection FAILED! Error=[%d]. Will retry later", err);
                 } else {
                     log_i("WiFi CONNECTED!");
-                    _TheNTPClient.begin();
-                    _TheNTPClient.setTimeOffset(7200);
+                    // _TheNTPClient.begin();
+                    // _TheNTPClient.setTimeOffset(7200);
                     _Connected2Wifi = true;
                     reconnected = true;
+                    ConfigureNTP();
                 }
             }
         }
@@ -375,7 +412,7 @@ void vTaskWifiReconnect(void* pvParameters)
         if (_Connected2Wifi) {
             _ThePubSub.loop(); // allow the pubsubclient to process incoming messages
             _OTA.Process();
-            _TheNTPClient.update();
+            // _TheNTPClient.update();
             if (!_ThePubSub.connected()) {
                 Connect2MQTT();
                 if (_ThePubSub.connected()) {

@@ -145,13 +145,19 @@ void DrawLedBars(MsgAudio2Draw& mad)
 void DrawParametric(MsgAudio2Draw& mad)
 {
     static ParametricCurve s_TheCurrentCurve;
+    static DemoModeParams s_TheDemoParams;
     static bool s_initialized = false;
     static const uint16_t s_numCoords = 252;
     static uint16_t s_frameNum = 0;
     static float s_steps[s_numCoords];
     static float s_delta = 0.0f;
+    // static float s_deltaRatio = 0.01f;
+    // static float s_deltaRatioTotal = 1.0f;
     static uint8_t s_hue = 0;
-
+    static float xMag = 1.0;
+    static float yMag = 1.0;
+    static bool reachingMag = false;
+    static bool rotating = false;
     // FastLED.clear();
 
     if (!s_initialized) {
@@ -162,31 +168,100 @@ void DrawParametric(MsgAudio2Draw& mad)
         double menysPI = -PI;
         for (uint16_t i = 0; i < s_numCoords; i++) {
             s_steps[i] = menysPI + (i * 0.025); // 0.025=2Pi/252. 252 son el num d'steps
+            // s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
         }
         s_initialized = true;
+    }
+
+    // Calculate max BASS power among first bars
+    _1stBarValue = 0;
+    for (uint16_t i = 0; i < THE_PANEL_WIDTH / 6; i++) {
+        auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 10, 200);
+        if (_1stBarValue < value) {
+            _1stBarValue = value;
+        }
+    }
+
+    if (_DemoMode && _Connected2Wifi) {
+        if (_DemoModeFrame == 0) {
+            s_TheDemoParams.currentPhase = 0;
+            s_TheDemoParams.numPhases = 3;
+            s_TheDemoParams.phaseMagsx[0] = 1.0;
+            s_TheDemoParams.phaseMagsx[1] = 1.0;
+            s_TheDemoParams.phaseMagsx[2] = 1.0;
+            s_TheDemoParams.phaseMagsx[3] = 2.0;
+            s_TheDemoParams.phaseMagsx[4] = 3.0;
+            s_TheDemoParams.phaseMagsy[0] = 1.0;
+            s_TheDemoParams.phaseMagsy[1] = 2.0;
+            s_TheDemoParams.phaseMagsy[2] = 3.0;
+            s_TheDemoParams.phaseMagsy[3] = 3.0;
+            s_TheDemoParams.phaseMagsy[4] = 4.0;
+
+            xMag = s_TheDemoParams.phaseMagsx[0];
+            yMag = s_TheDemoParams.phaseMagsy[0];
+            reachingMag = false;
+            rotating = true;
+        }
+
+        if (reachingMag) {
+            // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Reaching x=[%2.2f] y=[%2.2f] frame=%d Phase=%d", xMag, yMag, _DemoModeFrame, s_TheDemoParams.currentPhase).c_str(), true);
+
+            if (xMag < s_TheDemoParams.phaseMagsx[s_TheDemoParams.currentPhase]) {
+                xMag += 0.01;
+            }
+            if (yMag < s_TheDemoParams.phaseMagsy[s_TheDemoParams.currentPhase]) {
+                yMag += 0.01;
+            }
+            if (xMag >= s_TheDemoParams.phaseMagsx[s_TheDemoParams.currentPhase] && yMag >= s_TheDemoParams.phaseMagsy[s_TheDemoParams.currentPhase]) {
+                reachingMag = false;
+                rotating = true;
+            }
+        }
+        if (rotating) {
+            if (_DemoModeFrame >= ((uint32_t)(s_TheDemoParams.currentPhase + 1) * 300)) {
+                s_TheDemoParams.currentPhase++;
+                if (s_TheDemoParams.currentPhase < MAX_DEMO_PHASES) {
+                    rotating = false;
+                    reachingMag = true;
+                } else {
+                    _DemoMode = false;
+                }
+            }
+            _DemoModeFrame++;
+        }
     }
 
     if (s_frameNum == 0) {
         /* x = 31.1*sin(3*step+pi/2)+32
            y = 15.1*sin(2*step)+16*/
         for (uint16_t i = 0; i < s_numCoords; i++) {
-            s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
-            s_TheCurrentCurve.yCoord[i] = 15.1f * sin(3 * s_steps[i] + s_delta) + 16.0f;
+            s_TheCurrentCurve.xCoord[i] = 31.1f * sin(xMag * s_steps[i] + HALF_PI) + 32.0f;
+            s_TheCurrentCurve.yCoord[i] = 15.1f * sin(yMag * s_steps[i] + s_delta) + 16.0f;
         }
-        s_delta += 0.02;
+        s_delta += 0.025;
         if (s_delta >= TWO_PI) {
             s_delta = 0.0f;
         }
+        // if (s_deltaRatioTotal > 6.0 || s_deltaRatioTotal < 1.0) {
+        //     s_deltaRatio = (-s_deltaRatio);
+        // }
+        // s_deltaRatioTotal += s_deltaRatio;
     }
     for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
-        s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+        if (rotating) {
+            s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+        }
         uint16_t coord = s_TheCurrentCurve.initialPoints[i];
-        int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
-        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(s_hue, 255, (uint8_t)value);
+        // int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        //  int value = constrain(_1stBarValue, MIN_FFT_DB, MAX_FFT_DB);
+        //  value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
+        //_TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_BLUE, 255, (uint8_t)value);
+        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, _1stBarValue); //(uint8_t)value);
     }
 
-    s_frameNum = (s_frameNum + 1) % 3;
+    // s_frameNum = 0;
+    // s_frameNum= (s_frameNum + 1) % 3;
     s_hue++;
 }
 
@@ -214,8 +289,8 @@ void DrawWave(MsgAudio2Draw& mad)
     uint16_t pas0 = 0;
     uint16_t maxAmp = INPUT_0_VALUE;
     uint16_t iMaxAmp = 0;
-    for (i = 0; i < (width * 2 / 3); i++) {
-        if (mad.pAudio[i] > maxAmp) {
+    for (i = 0; i < (width / 2); i++) {
+        if (mad.pAudio[i] > (maxAmp + 100)) {
             maxAmp = mad.pAudio[i];
             iMaxAmp = i;
         }
@@ -231,6 +306,14 @@ void DrawWave(MsgAudio2Draw& mad)
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         value = map(value / 2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+
+        // value = constrain(mad.pAudio[pas0 + (i * 3)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        // value += constrain(mad.pAudio[pas0 + (i * 3) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        // value += constrain(mad.pAudio[pas0 + (i * 3) + 2], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        // value = map(value / 3, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+
+        // value = constrain(mad.pAudio[pas0 + i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        // value = map(value, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
         _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
     //_ThePanel.IncBaseHue();
@@ -239,7 +322,16 @@ void DrawWave(MsgAudio2Draw& mad)
 void DrawClock()
 {
     static int baseHue = 0;
-    String theTime = _TheNTPClient.getFormattedTime();
+
+    struct tm timeinfo;
+    if (_Connected2Wifi) {
+        getLocalTime(&timeinfo);
+    } else {
+        time_t now = time(0); // secs since boot
+        timeinfo = *localtime(&now);
+    }
+    std::string theTime;
+    theTime = Utils::string_format("%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     // static int count = 0;
     // if ((count % 25) == 0) {
     //     log_d("Time=%s", theTime.c_str());
@@ -268,7 +360,8 @@ void DrawClock()
 
 // uint8_t thisSpeed = 3;
 // uint8_t initial = 1;
-int _delayFrame = 100;
+int _delayFrame
+    = 100;
 
 // void DrawParametricHardcoded()
 // {
