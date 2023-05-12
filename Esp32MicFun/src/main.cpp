@@ -53,15 +53,15 @@ void ConfigureNTP()
     time(&now);
     localtime_r(&now, &timeinfo);
     // Is time set? If not, tm_year will be (1970 - 1900).
-//    if (timeinfo.tm_year < (2020 - 1900)) {
-//        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
-        if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
-            configTime(3600, 3600, "pool.ntp.org");
-            sntp_set_sync_interval(60000);
-            sntp_restart();
-        }
-        // update 'now' variable with current time
-        time(&now);
+    //    if (timeinfo.tm_year < (2020 - 1900)) {
+    //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
+    if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
+        configTime(3600, 3600, "pool.ntp.org");
+        sntp_set_sync_interval(60000);
+        sntp_restart();
+    }
+    // update 'now' variable with current time
+    time(&now);
     // } else {
     //     sntp_set_sync_interval(60000);
     //     sntp_restart();
@@ -77,7 +77,7 @@ bool Connect2WiFi()
     }
     auto temps = millis() / 1000;
 
-    if ((temps >= RETRY_WIFI_EVERY_SECS && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
+    if ((temps >= RETRY_WIFI_EVERY_SECS/2 && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
         _LastCheck4Wifi = temps;
         log_d("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
         auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
@@ -300,7 +300,7 @@ void vTaskDrawer(void* pvParameters)
             if (_DemoMode) {
                 FastLED.clear();
                 DrawParametric(mad);
-                if(_Connected2Wifi) {
+                if (_Connected2Wifi) {
                     //_DemoMode = false;
                 }
             } else {
@@ -315,10 +315,10 @@ void vTaskDrawer(void* pvParameters)
                     DrawHorizSpectrogram(mad);
                     break;
                 default:
-                    //FastLED.clear();
+                    // FastLED.clear();
                     DrawVertSpectrogram(mad);
-                    //DrawParametric(mad);
-                     DrawWave(mad);
+                    // DrawParametric(mad);
+                    DrawWave(mad);
                     DrawClock();
                     break;
                 }
@@ -445,6 +445,9 @@ void Connect2MQTT()
             }
             if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
                 log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_STYLE);
+            }
+            if (!_ThePubSub.subscribe(TOPIC_RESET)) {
+                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_RESET);
             }
             // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
             //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
@@ -639,5 +642,20 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
         _TheDrawStyle = (DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1);
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+    }
+    if (theTopic.find(TOPIC_RESET) != std::string::npos) {
+        ESP.restart();
+    }
+    if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
+        byte nightOn = std::atoi(theMsg.c_str()) != 0;
+        if (nightOn) {
+            _MAX_MILLIS = NIGHT_MILLIS;
+            FastLED.setBrightness(_MAX_MILLIS);
+            _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+        }
+        else {
+            FastLED.setBrightness(DEFAULT_MILLIS);
+            _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+        }
     }
 }

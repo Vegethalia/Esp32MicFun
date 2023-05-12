@@ -158,11 +158,12 @@ void DrawParametric(MsgAudio2Draw& mad)
     static float yMag = 1.0;
     static bool reachingMag = false;
     static bool rotating = false;
+    static uint32_t shiftCount = 0;
     // FastLED.clear();
 
     if (!s_initialized) {
-        float every = (float)s_numCoords / THE_PANEL_WIDTH;
-        for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
+        float every = (float)s_numCoords / MOVING_PARAMETRIC_POINTS;
+        for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
             s_TheCurrentCurve.initialPoints[i] = (uint16_t)(every * i);
         }
         double menysPI = -PI;
@@ -175,9 +176,9 @@ void DrawParametric(MsgAudio2Draw& mad)
 
     // Calculate max BASS power among first bars
     _1stBarValue = 0;
-    for (uint16_t i = 0; i < THE_PANEL_WIDTH / 6; i++) {
+    for (uint16_t i = 4; i < THE_PANEL_WIDTH / 5; i++) {
         auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 10, 200);
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
         if (_1stBarValue < value) {
             _1stBarValue = value;
         }
@@ -225,6 +226,10 @@ void DrawParametric(MsgAudio2Draw& mad)
                     rotating = false;
                     reachingMag = true;
                 } else {
+                    // _DemoModeFrame = 0;
+                    // s_TheDemoParams.currentPhase = 0;
+                    // xMag = s_TheDemoParams.phaseMagsx[0];
+                    // yMag = s_TheDemoParams.phaseMagsy[0];
                     _DemoMode = false;
                 }
             }
@@ -236,28 +241,39 @@ void DrawParametric(MsgAudio2Draw& mad)
         /* x = 31.1*sin(3*step+pi/2)+32
            y = 15.1*sin(2*step)+16*/
         for (uint16_t i = 0; i < s_numCoords; i++) {
-            s_TheCurrentCurve.xCoord[i] = 31.1f * sin(xMag * s_steps[i] + HALF_PI) + 32.0f;
-            s_TheCurrentCurve.yCoord[i] = 15.1f * sin(yMag * s_steps[i] + s_delta) + 16.0f;
+            s_TheCurrentCurve.xCoord[i] = 31.5f * sin(xMag * s_steps[i] + HALF_PI) + 32.0f;
+            s_TheCurrentCurve.yCoord[i] = 15.5f * sin(yMag * s_steps[i] + s_delta) + 16.0f;
         }
         s_delta += 0.025;
         if (s_delta >= TWO_PI) {
             s_delta = 0.0f;
         }
-        // if (s_deltaRatioTotal > 6.0 || s_deltaRatioTotal < 1.0) {
-        //     s_deltaRatio = (-s_deltaRatio);
-        // }
-        // s_deltaRatioTotal += s_deltaRatio;
+        // shiftCount = 0;
+        //  if (s_deltaRatioTotal > 6.0 || s_deltaRatioTotal < 1.0) {
+        //      s_deltaRatio = (-s_deltaRatio);
+        //  }
+        //  s_deltaRatioTotal += s_deltaRatio;
     }
-    for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
-        if (rotating) {
-            s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+    for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
+        if (rotating && (_DemoModeFrame%2)==0) {
+            // s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+            // shiftCount = (shiftCount + 1) % s_numCoords;
         }
         uint16_t coord = s_TheCurrentCurve.initialPoints[i];
+        uint8_t intensity = _1stBarValue;
         // int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
         //  int value = constrain(_1stBarValue, MIN_FFT_DB, MAX_FFT_DB);
         //  value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
         //_TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_BLUE, 255, (uint8_t)value);
-        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, _1stBarValue); //(uint8_t)value);
+
+        // if (i > shiftCount && i < ((shiftCount + (s_numCoords / 2)) % s_numCoords)) {
+        //     intensity = intensity / 2;
+        // }
+        // if (i < MOVING_PARAMETRIC_POINTS/2) {
+        //     intensity = intensity / 2;
+        // }
+
+        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity); //(uint8_t)value);
     }
 
     // s_frameNum = 0;

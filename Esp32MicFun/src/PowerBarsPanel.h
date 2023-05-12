@@ -254,7 +254,7 @@ public:
         };
         // any out of bounds address maps to the first hidden pixel
         if ((x >= PANEL_WIDTH_64) || (y >= PANEL_HEIGHT_32)) {
-            return (PANEL_WIDTH_64 * PANEL_HEIGHT_32) - 1;
+            return (PANEL_WIDTH_64 * PANEL_HEIGHT_32);
         }
 
         uint16_t i = (y * PANEL_WIDTH_64) + x;

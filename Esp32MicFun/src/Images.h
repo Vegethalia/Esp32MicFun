@@ -139,8 +139,9 @@ static CRGB __imgMontseJordi[33][16] = {
     { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 1, 1, 1 }, { 23, 23, 23 }, { 83, 74, 72 }, { 101, 85, 82 }, { 100, 78, 69 }, { 98, 70, 57 }, { 93, 63, 50 }, { 86, 58, 46 } }
 };
 
+#define  MOVING_PARAMETRIC_POINTS 64
 struct ParametricCurve {
-    uint16_t initialPoints[64];
+    uint16_t initialPoints[MOVING_PARAMETRIC_POINTS];
     float xCoord[252];
     float yCoord[252];
 };

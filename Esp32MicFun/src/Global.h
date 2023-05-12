@@ -38,8 +38,9 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // #define BARS_RESOLUTION 8 // 8=32 4=64 2=128
 //  #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
 
-#define DEFAULT_MILLIS 30
+#define DEFAULT_MILLIS 40
 #define MAX_MILLIS 2000
+#define NIGHT_MILLIS 4
 uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 
 // #define BAR_HEIGHT (PANEL_HEIGHT_16 - 1) // we have this amount of "vertical leds" per bar. 0 based.
@@ -87,6 +88,8 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_STYLE "caseta/spectrometre/style"
 #define TOPIC_WITHWAVE "caseta/spectrometre/wave"
 #define TOPIC_BASEHUE "caseta/spectrometre/basehue"
+#define TOPIC_RESET "caseta/spectrometre/reset"
+#define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
 
 //------------
 // Task Related
