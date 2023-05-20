@@ -70,31 +70,31 @@ void ConfigureNTP()
     // }
 }
 
-bool Connect2WiFi()
-{
-    if (WiFi.isConnected()) {
-        return false; // false because was already connected
-    }
-    auto temps = millis() / 1000;
+// bool Connect2WiFi()
+// {
+//     if (WiFi.isConnected()) {
+//         return false; // false because was already connected
+//     }
+//     auto temps = millis() / 1000;
 
-    if ((temps >= RETRY_WIFI_EVERY_SECS/2 && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
-        _LastCheck4Wifi = temps;
-        log_d("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
-        auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
-        err = (wl_status_t)WiFi.waitForConnectResult();
-        if (err != wl_status_t::WL_CONNECTED) {
-            log_d("WiFi connection FAILED! Error=[%d]. Will retry later", err);
-            return false;
-        } else {
-            log_d("WiFi CONNECTED!");
-            // _TheNTPClient.begin();
-            // _TheNTPClient.setTimeOffset(7200); // 3600
-            ConfigureNTP();
-            return true;
-        }
-    }
-    return false; // Too soon to retry, wait.
-}
+//     if ((temps >= RETRY_WIFI_EVERY_SECS / 2 && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
+//         _LastCheck4Wifi = temps;
+//         log_d("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
+//         auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
+//         err = (wl_status_t)WiFi.waitForConnectResult();
+//         if (err != wl_status_t::WL_CONNECTED) {
+//             log_d("WiFi connection FAILED! Error=[%d]. Will retry later", err);
+//             return false;
+//         } else {
+//             log_d("WiFi CONNECTED!");
+//             // _TheNTPClient.begin();
+//             // _TheNTPClient.setTimeOffset(7200); // 3600
+//             ConfigureNTP();
+//             return true;
+//         }
+//     }
+//     return false; // Too soon to retry, wait.
+// }
 
 // Task to read samples.
 void vTaskReader(void* pvParameters)
@@ -261,7 +261,8 @@ void vTaskDrawer(void* pvParameters)
         log_d("In vTaskDrawer.afterBegin...");
         //_u8g2.setFont(u8g2_font_profont12_mf);
         // u8g2_font_tiny_simon_tr --> maca, cuadrada, 3x5 --> 28pixels full time
-        _u8g2.setFont(u8g2_font_nokiafc22_tn); // u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
+        //_u8g2.setFont(u8g2_font_nokiafc22_tn); // u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
+        _u8g2.setFont(u8g2_font_princess_tr);
         log_d("In vTaskDrawer.afterSetFont...");
         _u8g2.setContrast(64);
     }
@@ -317,7 +318,6 @@ void vTaskDrawer(void* pvParameters)
                 default:
                     // FastLED.clear();
                     DrawVertSpectrogram(mad);
-                    // DrawParametric(mad);
                     DrawWave(mad);
                     DrawClock();
                     break;
@@ -448,6 +448,9 @@ void Connect2MQTT()
             }
             if (!_ThePubSub.subscribe(TOPIC_RESET)) {
                 log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_RESET);
+            }
+            if (!_ThePubSub.subscribe(TOPIC_NIGHTMODE)) {
+                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_NIGHTMODE);
             }
             // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
             //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
@@ -652,10 +655,10 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
             _MAX_MILLIS = NIGHT_MILLIS;
             FastLED.setBrightness(_MAX_MILLIS);
             _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
-        }
-        else {
+        } else {
             FastLED.setBrightness(DEFAULT_MILLIS);
             _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
         }
     }
+    // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
 }

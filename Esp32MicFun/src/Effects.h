@@ -1,6 +1,6 @@
 
 #define CLOCK_HORIZ_PIXELS 41
-#define CLOCK_VERT_PIXELS 7
+#define CLOCK_VERT_PIXELS 9 // 7
 
 void DrawHorizSpectrogram(MsgAudio2Draw& mad)
 {
@@ -159,6 +159,12 @@ void DrawParametric(MsgAudio2Draw& mad)
     static bool reachingMag = false;
     static bool rotating = false;
     static uint32_t shiftCount = 0;
+    static int16_t textPos = THE_PANEL_WIDTH - 2;
+    static int16_t inc = -1;
+    static std::string theIP;
+
+    bool newPhase = false;
+    static bool alreadyDrawedText = false;
     // FastLED.clear();
 
     if (!s_initialized) {
@@ -184,7 +190,7 @@ void DrawParametric(MsgAudio2Draw& mad)
         }
     }
 
-    if (_DemoMode && _Connected2Wifi) {
+    if ((_DemoMode && _Connected2Wifi) || (_TheFrameNumber > 200)) {
         if (_DemoModeFrame == 0) {
             s_TheDemoParams.currentPhase = 0;
             s_TheDemoParams.numPhases = 3;
@@ -222,6 +228,8 @@ void DrawParametric(MsgAudio2Draw& mad)
         if (rotating) {
             if (_DemoModeFrame >= ((uint32_t)(s_TheDemoParams.currentPhase + 1) * 300)) {
                 s_TheDemoParams.currentPhase++;
+                newPhase = true;
+                alreadyDrawedText = false;
                 if (s_TheDemoParams.currentPhase < MAX_DEMO_PHASES) {
                     rotating = false;
                     reachingMag = true;
@@ -231,6 +239,7 @@ void DrawParametric(MsgAudio2Draw& mad)
                     // xMag = s_TheDemoParams.phaseMagsx[0];
                     // yMag = s_TheDemoParams.phaseMagsy[0];
                     _DemoMode = false;
+                    _u8g2.setFont(u8g2_font_princess_tr);
                 }
             }
             _DemoModeFrame++;
@@ -254,16 +263,18 @@ void DrawParametric(MsgAudio2Draw& mad)
         //  }
         //  s_deltaRatioTotal += s_deltaRatio;
     }
+    uint8_t intensity = std::max((uint8_t)(100), _1stBarValue);
+
     for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
-        if (rotating && (_DemoModeFrame%2)==0) {
+        if (rotating && (_DemoModeFrame % 2) == 0) {
             // s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
             // shiftCount = (shiftCount + 1) % s_numCoords;
         }
         uint16_t coord = s_TheCurrentCurve.initialPoints[i];
-        uint8_t intensity = _1stBarValue;
-        // int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        //  int value = constrain(_1stBarValue, MIN_FFT_DB, MAX_FFT_DB);
-        //  value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
+        // uint8_t intensity = max(DEFAULT_MILLIS, _1stBarValue);
+        //  int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        //   int value = constrain(_1stBarValue, MIN_FFT_DB, MAX_FFT_DB);
+        //   value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
         //_TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_BLUE, 255, (uint8_t)value);
 
         // if (i > shiftCount && i < ((shiftCount + (s_numCoords / 2)) % s_numCoords)) {
@@ -278,6 +289,53 @@ void DrawParametric(MsgAudio2Draw& mad)
 
     // s_frameNum = 0;
     // s_frameNum= (s_frameNum + 1) % 3;
+
+    // i ara pintem el text
+    //_u8g2.clearBuffer();
+    std::string test;
+    if (s_TheDemoParams.currentPhase == 0 && !_Connected2Wifi && !alreadyDrawedText) {
+        _u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_tom_thumb_4x6_mn);
+        test = "Iniciant FlipaLeds";
+        _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
+        alreadyDrawedText = true;
+    } else if (s_TheDemoParams.currentPhase < (MAX_DEMO_PHASES - 2) && _Connected2Wifi && !alreadyDrawedText) {
+        _u8g2.clearBuffer();
+        _u8g2.setFont(u8g2_font_profont10_tr); // u8g2_font_tom_thumb_4x6_mn); //u8g2_font_unifont_t_emoticons big emoticons 14pix
+        test = "Connectat a la wifi!";
+        _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
+        alreadyDrawedText = true;
+    } else if (s_TheDemoParams.currentPhase >= (MAX_DEMO_PHASES - 2)) {
+        if (_Connected2Wifi && !alreadyDrawedText) {
+            _u8g2.clearBuffer();
+            theIP = Utils::string_format("IP=[%s]", WiFi.localIP().toString().c_str());
+            //_u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_tom_thumb_4x6_mn);
+            _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, theIP.c_str());
+            alreadyDrawedText = true;
+        } else if (!_Connected2Wifi && newPhase) {
+            _u8g2.clearBuffer();
+            test = Utils::string_format("Sense WiFi...");
+            //_u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_tom_thumb_4x6_mn);
+            _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
+        }
+    }
+    // botmaker_te --> 16x16 funny
+    // font_princess_tr --> maca, de princesses
+    // emoticons21 --> funny emoticons
+    // u8g2_font_tom_thumb_4x6_tn --> es veu bé, però els ":" ocupen un full char
+    // u8g2_font_eventhrees_tr --> guay però molt petita, 3x3
+    // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
+    // _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 2)-1, test.c_str());
+    //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
+    //   _u8g2.drawStr(6, 12, theTime.c_str());
+    //_ThePanel.SetBaseHue(HSVHue::HUE_YELLOW);
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, textPos, 0, s_hue, intensity);
+
+    textPos += inc;
+    if (textPos < (-THE_PANEL_WIDTH * 2)) {
+        inc = 1;
+    } else if (textPos > THE_PANEL_WIDTH) {
+        inc = (-1);
+    }
     s_hue++;
 }
 
@@ -318,6 +376,8 @@ void DrawWave(MsgAudio2Draw& mad)
         }
     }
 
+    CHSV myValue;
+
     for (i = 0; i < width; i++) {
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
@@ -330,7 +390,9 @@ void DrawWave(MsgAudio2Draw& mad)
 
         // value = constrain(mad.pAudio[pas0 + i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         // value = map(value, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-        _TheLeds[_TheMapping.XY(i, value)].setHSV(HSVHue::HUE_BLUE, 148, 48);
+        myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+        _TheLeds[_TheMapping.XY(i, value)] += myValue;
+        //.setHSV(CHSV.setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
     //_ThePanel.IncBaseHue();
 }
@@ -366,7 +428,7 @@ void DrawClock()
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber / 4));
-    _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 1, baseHue++, max((int)164, (int)_1stBarValue));
+    _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, max((int)164, (int)_1stBarValue));
     //        FastLED.show();
 }
 

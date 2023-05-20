@@ -494,9 +494,9 @@ public:
         }
 
         // i ara restaurem el buffer auxiliar en l'array de leds
-         for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
+        for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
             (*_pTheLeds)[z] = _AuxLeds[z];
-         }
+        }
     }
 
     // Draw a portion of the contents of the u8g2 screen buffer in the led panel.
@@ -517,6 +517,55 @@ public:
                     }
                     mask = mask << 1;
                     pixColor++;
+                }
+            }
+            pTheScreenBuffer += bufferWidthInTiles * 8; // advance to the next tileRow
+        }
+    }
+
+    // Draw a portion of the contents of the u8g2 screen buffer in the led panel.
+    // This method draws the whole horizontal buffer, but only the parts that fall "inside" the led panel.
+    // Starts drawing at first line on firstVertTile (starts at 0), until lastVertTile (included).
+    // First buffer column is always 0.
+    // To define the drawing window, use drawXPos, drawYPos. That position will be the corresponding to position (0, firstVertTile) in buffer.
+    // It is posible to define negative drawXPos values. This way the 1st pixel painted will be the one at the 0 position.
+    // The color and value are specified in Hue/Intensity
+    void DrawScreenBufferXY(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint8_t firstVertTile, uint8_t lasttVertTile,
+        int16_t drawXPos, int16_t drawYPos, uint8_t hue, uint8_t intensity)
+    {
+        uint8_t pixColor = hue;
+
+        pTheScreenBuffer += (bufferWidthInTiles * 8) * firstVertTile;
+
+        int16_t totalPixels = bufferWidthInTiles * 8;
+        for (uint8_t tileRow = firstVertTile; tileRow <= lasttVertTile; tileRow++) {
+            pixColor = hue;
+            int16_t x = 0;
+            if (drawXPos < 0) {
+                x = abs(drawXPos);
+            }
+
+            for (; x < totalPixels; x++) {
+                pixColor++;
+                if ((drawXPos + x) < 0) {
+                    continue;
+                }
+                if ((drawXPos + x) >= PANEL_WIDTH) {
+                    break;
+                }
+                // each byte in the buffer pos represent 8 pixels "vertically", on if the corresponding bit is 1
+                // see https://github.com/olikraus/u8g2/wiki/u8g2reference#memory-structure-for-controller-with-u8x8-support
+                uint8_t mask = 0x01;
+                uint8_t pixelCol = pTheScreenBuffer[x];
+                if(!pixelCol) {
+                    continue;
+                }
+                for (uint8_t xbit = 0; xbit < 8; xbit++) {
+                    if (pixelCol & mask) { // pintar aquest bit!
+                        (*_pTheLeds)[_pTheMapping->XY(x + drawXPos, (tileRow * 8) + xbit + drawYPos)] += CHSV(pixColor, 180, intensity);
+                    }
+                    mask = mask << 1;
+                    // pixColor++;
                 }
             }
             pTheScreenBuffer += bufferWidthInTiles * 8; // advance to the next tileRow
