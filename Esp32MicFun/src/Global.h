@@ -14,7 +14,7 @@
 
 #define DEFAULT_VREF 1100
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
-#define VOLTATGE_DRAW_RANGE 800 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define VOLTATGE_DRAW_RANGE 900 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB -55 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 5 // a magnitude greater than this value will be considered Max Power
@@ -50,6 +50,8 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define THE_PANEL_WIDTH PANEL_WIDTH_64 // PANEL_WIDTH_33 // PANEL_WIDTH_64
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
+
+#define NUM_FADING_WAVES 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
 
 CRGBArray<NUM_LEDS> _TheLeds;
 // PanelMapping33x16 _TheMapping;

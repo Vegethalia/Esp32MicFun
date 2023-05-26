@@ -495,7 +495,7 @@ public:
 
         // i ara restaurem el buffer auxiliar en l'array de leds
         for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
-            (*_pTheLeds)[z] = _AuxLeds[z];
+            (*_pTheLeds)[z] += _AuxLeds[z];
         }
     }
 
@@ -546,7 +546,7 @@ public:
             }
 
             for (; x < totalPixels; x++) {
-                pixColor++;
+                pixColor+=2;
                 if ((drawXPos + x) < 0) {
                     continue;
                 }

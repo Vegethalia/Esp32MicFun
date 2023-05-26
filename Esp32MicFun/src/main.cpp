@@ -316,9 +316,9 @@ void vTaskDrawer(void* pvParameters)
                     DrawHorizSpectrogram(mad);
                     break;
                 default:
-                    // FastLED.clear();
-                    DrawVertSpectrogram(mad);
+                    FastLED.clear();
                     DrawWave(mad);
+                    DrawVertSpectrogram(mad);
                     DrawClock();
                     break;
                 }

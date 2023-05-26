@@ -212,8 +212,6 @@ void DrawParametric(MsgAudio2Draw& mad)
         }
 
         if (reachingMag) {
-            // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Reaching x=[%2.2f] y=[%2.2f] frame=%d Phase=%d", xMag, yMag, _DemoModeFrame, s_TheDemoParams.currentPhase).c_str(), true);
-
             if (xMag < s_TheDemoParams.phaseMagsx[s_TheDemoParams.currentPhase]) {
                 xMag += 0.01;
             }
@@ -226,7 +224,7 @@ void DrawParametric(MsgAudio2Draw& mad)
             }
         }
         if (rotating) {
-            if (_DemoModeFrame >= ((uint32_t)(s_TheDemoParams.currentPhase + 1) * 300)) {
+            if (_DemoModeFrame >= ((uint32_t)(s_TheDemoParams.currentPhase + 1) * 250)) {
                 s_TheDemoParams.currentPhase++;
                 newPhase = true;
                 alreadyDrawedText = false;
@@ -294,14 +292,14 @@ void DrawParametric(MsgAudio2Draw& mad)
     //_u8g2.clearBuffer();
     std::string test;
     if (s_TheDemoParams.currentPhase == 0 && !_Connected2Wifi && !alreadyDrawedText) {
-        _u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_tom_thumb_4x6_mn);
-        test = "Iniciant FlipaLeds";
+        _u8g2.setFont(u8g2_font_oskool_tr); // u8g2_font_tom_thumb_4x6_mn); u8g2_font_princess_tr
+        test = "Iniciant FlipaLeds...";
         _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
         alreadyDrawedText = true;
     } else if (s_TheDemoParams.currentPhase < (MAX_DEMO_PHASES - 2) && _Connected2Wifi && !alreadyDrawedText) {
         _u8g2.clearBuffer();
-        _u8g2.setFont(u8g2_font_profont10_tr); // u8g2_font_tom_thumb_4x6_mn); //u8g2_font_unifont_t_emoticons big emoticons 14pix
-        test = "Connectat a la wifi!";
+        //_u8g2.setFont(u8g2_font_profont10_tr); // u8g2_font_tom_thumb_4x6_mn); //u8g2_font_unifont_t_emoticons big emoticons 14pix
+        test = "Connectat a la wiFi!";
         _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
         alreadyDrawedText = true;
     } else if (s_TheDemoParams.currentPhase >= (MAX_DEMO_PHASES - 2)) {
@@ -341,18 +339,12 @@ void DrawParametric(MsgAudio2Draw& mad)
 
 void DrawWave(MsgAudio2Draw& mad)
 {
-    // static int8_t incValue = +1;
-    // static int8_t actualInc = 0;
-    // static const int8_t MAX_INC = 32;
-
-    // if (_numFrames % 4 == 0) {
-    //     actualInc += incValue;
-    //     if (actualInc >= MAX_INC) {
-    //         incValue = -1;
-    //     } else if (actualInc == 0) {
-    //         incValue = +1;
-    //     }
-    // }
+    struct WavePoint {
+        uint16_t ledIndex;
+        CHSV thePixel;
+    };
+    static WavePoint _WaveBuffer[NUM_FADING_WAVES][THE_PANEL_WIDTH]; // circular buffer of waves
+    static uint8_t _LasttWaveIndex = 0; // index of the circular buffer, apunta a la wave que toca pintar
 
     uint8_t height = _TheMapping.GetHeight() - 1;
     uint16_t width = _TheMapping.GetWidth();
@@ -377,6 +369,7 @@ void DrawWave(MsgAudio2Draw& mad)
     }
 
     CHSV myValue;
+    myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
 
     for (i = 0; i < width; i++) {
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
@@ -390,10 +383,37 @@ void DrawWave(MsgAudio2Draw& mad)
 
         // value = constrain(mad.pAudio[pas0 + i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         // value = map(value, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-        myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
-        _TheLeds[_TheMapping.XY(i, value)] += myValue;
+        // myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+        _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
+        _WaveBuffer[_LasttWaveIndex][i].thePixel = myValue;
+        //_TheLeds[_TheMapping.XY(i, value)] += myValue;
         //.setHSV(CHSV.setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
+
+    if (NUM_FADING_WAVES > 1) { // fem desapareixer la 1era wave, que serà la última ara
+        // pintem les n waves anteriors
+        for (uint8_t numWave = 1; numWave < NUM_FADING_WAVES; numWave++) {
+            uint8_t currentWaveIndex = (_LasttWaveIndex + numWave) % NUM_FADING_WAVES;
+            for (i = 0; i < width; i++) {
+                CHSV currColor = _WaveBuffer[currentWaveIndex][i].thePixel;
+                // currColor.v = currColor.v / (numWave + 1);
+                // currColor.s = currColor.s / 2;
+                currColor.h = HSVHue::HUE_GREEN;
+                // currColor.h + (15 * numWave);
+                // currColor.v = currColor.v / (numWave + 1);
+                _TheLeds[_WaveBuffer[currentWaveIndex][i].ledIndex] = currColor;
+            }
+        }
+    }
+    // ara pintem l'última (o l'única)
+    for (i = 0; i < width; i++) {
+        _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = _WaveBuffer[_LasttWaveIndex][i].thePixel;
+    }
+
+    if (NUM_FADING_WAVES > 1) { // fem desapareixer la 1era wave, que serà la última ara
+        _LasttWaveIndex = (_LasttWaveIndex + 1) % NUM_FADING_WAVES;
+    }
+
     //_ThePanel.IncBaseHue();
 }
 
