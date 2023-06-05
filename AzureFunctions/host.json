@@ -1,0 +1,22 @@
+{
+    "version": "2.0",
+    "extensions": {
+        "durableTask": {
+            "tracing": {
+                "traceInputsAndOutputs": true,
+                "traceReplayEvents": false
+            }
+        }
+    },
+    "logging": {
+        "applicationInsights": {
+            "samplingSettings": {
+                "isEnabled": true,
+                "excludedTypes": "Request"
+            }
+        },
+        "logLevel": {
+            "Host.Triggers.DurableTask": "Information"
+        }
+    }
+}

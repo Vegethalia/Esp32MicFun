@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../FunWith_ESP32-S2"
+		},
+		{
+			"path": "AzureFunctions"
 		}
 	],
 	"settings": {
@@ -72,6 +75,7 @@
 			"thread": "cpp",
 			"cinttypes": "cpp",
 			"typeinfo": "cpp"
-		}
+		},
+		"debug.internalConsoleOptions": "neverOpen"
 	}
 }
