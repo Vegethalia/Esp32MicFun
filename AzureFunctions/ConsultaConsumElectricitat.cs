@@ -51,7 +51,7 @@ namespace Vegethalia
     public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req)
     {
       bool wrongRequest = (req.Query["dataFi"] == null) || (req.Query["numValors"] == null)
-      || (req.Query["maxKWh"] == null) || (req.Query["mapejarDe0a"] == null)
+      || (req.Query["maxWh"] == null) || (req.Query["mapejarDe0a"] == null)
       || (req.Query["agruparPer"] == null);
       if (wrongRequest)
       {
@@ -64,16 +64,25 @@ namespace Vegethalia
 
       ReturnData theData = new ReturnData();
       var response = req.CreateResponse(HttpStatusCode.OK);
-      response.Headers.Add("Content-Type", "application/json");
-
+      bool csvOutput = false;
       try
       {
         int agruparPerMinuts = int.Parse(req.Query["agruparPer"] ?? "1");
         int numValors = int.Parse(req.Query["numValors"] ?? "64");
-        double maxKWh = double.Parse(req.Query["maxKWh"] ?? "3.0");
+        double maxWh = double.Parse(req.Query["maxWh"] ?? "3.0");
         uint mapejarDe0a = uint.Parse(req.Query["mapejarDe0a"] ?? "20");
+        csvOutput = int.Parse(req.Query["csvOutput"] ?? "0") != 0;
         DateTimeOffset dataFiUTC = DateTimeOffset.FromUnixTimeSeconds(uint.Parse(req.Query["dataFi"] ?? "0"));
         DateTimeOffset dataFi, dataIni;
+
+        if (csvOutput)
+        {
+          response.Headers.Add("Content-Type", "application/csv");
+        }
+        else
+        {
+          response.Headers.Add("Content-Type", "application/json");
+        }
 
         TimeZoneInfo tzi = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
         dataFi = TimeZoneInfo.ConvertTimeFromUtc(dataFiUTC.UtcDateTime, tzi);
@@ -83,7 +92,7 @@ namespace Vegethalia
         }
         dataIni = dataFi.AddMinutes(0.0 - (numValors * agruparPerMinuts));
 
-        _logger.LogInformation($"Processant petició: Valors={numValors} AgruparPer={agruparPerMinuts} MaxKWh={maxKWh} DataIni={dataIni.ToString()}  DataFin={dataFi.ToString()}");
+        _logger.LogInformation($"Processant petició: Valors={numValors} AgruparPer={agruparPerMinuts} MaxKWh={maxWh / 1000.0} DataIni={dataIni.ToString()}  DataFin={dataFi.ToString()}");
 
 
         int numElems = 0;
@@ -101,7 +110,7 @@ namespace Vegethalia
           }
 
           //i ara agrupem els valors
-          double currentValue = 0.0;
+          //double currentValue = 0.0;
           int currentIndex = 0;
           DateTimeOffset nextTime = dataIni;
           while (dataIni <= dataFi && currentIndex < minuteReadings.Count)
@@ -140,8 +149,18 @@ namespace Vegethalia
         _logger.LogError($"Error processant la petició: {ex.Message}");
       }
 
-      string theJsonReturned = JsonSerializer.Serialize(theData);
-      response.WriteString(theJsonReturned);
+      if (csvOutput)
+      {
+        foreach (var item in theData.TheEnergyPoints)
+        {
+          response.WriteString($"{item.TheDateFromEpoch}, {(uint)(Math.Round(item.TheValueInKWh * 1000))}{Environment.NewLine}");
+        }
+      }
+      else
+      {
+        string theJsonReturned = JsonSerializer.Serialize(theData);
+        response.WriteString(theJsonReturned);
+      }
 
       return response;
     }

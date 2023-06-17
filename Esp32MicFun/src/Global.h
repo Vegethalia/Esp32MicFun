@@ -7,12 +7,14 @@
 #define PIN_DATA_LEDS4 15
 #define BUS_SPEED 800000
 
+#define WITH_VISUALCURRENT true
+
 #define INIT_SCREEN true
 #define USE_SCREEN false
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-#define DEFAULT_VREF 1100
+#define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 900 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
@@ -21,7 +23,7 @@
 
 #define FFT_SIZE 2048
 #define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
-#define OVERSAMPLING 2 // we will oversample by this amount
+#define OVERSAMPLING 1 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
@@ -30,6 +32,7 @@
 #define MASK_12BIT 0x0fff
 
 #define RETRY_WIFI_EVERY_SECS 10
+#define UPDATE_CONSUM_ELECTRICITAT_CADA_MS (120 * 1000)
 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
 // U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
@@ -93,14 +96,24 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_RESET "caseta/spectrometre/reset"
 #define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
 
+#define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
+#define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
+#define TOPIC_HIWATER_READER "caseta/spectrometre/hiwreader"
+#define TOPIC_HIWATER_DRAWER "caseta/spectrometre/hiwdrawer"
+#define TOPIC_HIWATER_WIFI "caseta/spectrometre/hiwWIFI"
+#define TOPIC_CPU_WIFI "caseta/spectrometre/cpuwifi"
+#define TOPIC_CPU_READER "caseta/spectrometre/cpureader"
+#define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
+
 //------------
 // Task Related
 //------------
 TaskHandle_t _readerTaskHandle;
 TaskHandle_t _drawTaskHandle;
-TaskHandle_t _drawTaskShowLeds;
-TaskHandle_t _showLedsTaskHandle;
+// TaskHandle_t _drawTaskShowLeds;
+// TaskHandle_t _showLedsTaskHandle;
 TaskHandle_t _wifiReconnectTaskHandle;
+// TaskHandle_t _refrescarConsumTaskHandle;
 
 QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
 uint8_t _adc_i2s_event_queue_size = 1;
@@ -130,8 +143,20 @@ enum DRAW_STYLE {
     BARS_WITH_TOP = 1,
     VERT_FIRE = 2,
     HORIZ_FIRE = 3,
+    VISUAL_CURRENT = 4,
 
-    MAX_STYLE = HORIZ_FIRE
+    MAX_STYLE = VISUAL_CURRENT
 };
 
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+
+// consum electricitat
+#define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts
+#define DEFAULT_MAX_WH 3500 // per defecte es mostrara un rang vertical de 3.5 kWh
+uint16_t _AgrupaConsumsPerMinuts = DEFAULT_CONSUM_PER_MINUTS;
+uint16_t _MaxWhToShow = DEFAULT_MAX_WH;
+uint8_t _MapMaxWhToPixels = THE_PANEL_HEIGHT - 9 - 1; // 9 pixels pel clock, 1 per l'eix horitzontal
+struct LecturaConsum {
+    time_t horaConsum;
+    uint8_t valorEnLeds; // el valor de KWh mapejat a LEDS verticals a pintar
+};

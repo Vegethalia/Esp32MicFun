@@ -159,16 +159,18 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
     } else if (binRes == BinResolution::AUTO34) { // binRes==BinResolution::AUTO32
         uint16_t ind = 1;
         int32_t mag = 0;
-        const uint8_t* pBinIndexes = _Auto32Groups;
+        const uint8_t* pBinIndexes = _Auto33Groups_v4; //_Auto32Groups;
         uint8_t currInd = 0, upToInd = 0;
+        maxIndex = 32;
 
         if (binRes == BinResolution::AUTO34) {
             maxIndex = 34;
             pBinIndexes = _Auto33Groups_v4;
-        } else {
-            maxIndex = 32;
-            pBinIndexes = _Auto32Groups;
         }
+        // else {
+        //     maxIndex = 32;
+        //     pBinIndexes = _Auto32Groups;
+        // }
         currInd = pBinIndexes[0];
         do {
             pFreqPower[0] = 0;
@@ -191,7 +193,7 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
 
             if (pFreqPower[ind] > maxMag) {
                 maxMag = pFreqPower[ind];
-                maxBin = _Auto32Groups[ind - 1];
+                maxBin = pBinIndexes[ind - 1];
             }
             ind++;
         } while (ind < maxIndex);

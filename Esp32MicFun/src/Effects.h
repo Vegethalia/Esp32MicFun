@@ -142,42 +142,46 @@ void DrawLedBars(MsgAudio2Draw& mad)
     //_ThePanel.IncBaseHue();
 }
 
+DrawParametricData* __dpd = nullptr;
 void DrawParametric(MsgAudio2Draw& mad)
 {
-    static ParametricCurve s_TheCurrentCurve;
-    static DemoModeParams s_TheDemoParams;
-    static bool s_initialized = false;
-    static const uint16_t s_numCoords = 252;
-    static uint16_t s_frameNum = 0;
-    static float s_steps[s_numCoords];
-    static float s_delta = 0.0f;
-    // static float s_deltaRatio = 0.01f;
-    // static float s_deltaRatioTotal = 1.0f;
-    static uint8_t s_hue = 0;
-    static float xMag = 1.0;
-    static float yMag = 1.0;
-    static bool reachingMag = false;
-    static bool rotating = false;
-    static uint32_t shiftCount = 0;
-    static int16_t textPos = THE_PANEL_WIDTH - 2;
-    static int16_t inc = -1;
-    static std::string theIP;
+    // static ParametricCurve s_TheCurrentCurve;
+    // static DemoModeParams s_TheDemoParams;
+    // static bool s_initialized = false;
+    // static const uint16_t s_numCoords = 252;
+    // static uint16_t s_frameNum = 0;
+    // static float s_steps[s_numCoords];
+    // static float s_delta = 0.0f;
+    // // static float s_deltaRatio = 0.01f;
+    // // static float s_deltaRatioTotal = 1.0f;
+    // static uint8_t s_hue = 0;
+    // static float xMag = 1.0;
+    // static float yMag = 1.0;
+    // static bool reachingMag = false;
+    // static bool rotating = false;
+    // static uint32_t shiftCount = 0;
+    // static int16_t textPos = THE_PANEL_WIDTH - 2;
+    // static int16_t inc = -1;
+
+    if (!__dpd) {
+        __dpd = new DrawParametricData();
+    }
 
     bool newPhase = false;
-    static bool alreadyDrawedText = false;
+    // static bool alreadyDrawedText = false;
     // FastLED.clear();
 
-    if (!s_initialized) {
-        float every = (float)s_numCoords / MOVING_PARAMETRIC_POINTS;
+    if (!__dpd->initialized) {
+        float every = (float)MOVING_PARAMETRIC_STEPS / (float)MOVING_PARAMETRIC_POINTS;
         for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
-            s_TheCurrentCurve.initialPoints[i] = (uint16_t)(every * i);
+            __dpd->TheCurrentCurve.initialPoints[i] = (uint16_t)(every * i);
         }
         double menysPI = -PI;
-        for (uint16_t i = 0; i < s_numCoords; i++) {
-            s_steps[i] = menysPI + (i * 0.025); // 0.025=2Pi/252. 252 son el num d'steps
+        for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
+            __dpd->steps[i] = menysPI + (i * 0.025); // 0.025=2Pi/252. 252 son el num d'steps
             // s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
         }
-        s_initialized = true;
+        __dpd->initialized = true;
     }
 
     // Calculate max BASS power among first bars
@@ -192,45 +196,45 @@ void DrawParametric(MsgAudio2Draw& mad)
 
     if ((_DemoMode && _Connected2Wifi) || (_TheFrameNumber > 200)) {
         if (_DemoModeFrame == 0) {
-            s_TheDemoParams.currentPhase = 0;
-            s_TheDemoParams.numPhases = 3;
-            s_TheDemoParams.phaseMagsx[0] = 1.0;
-            s_TheDemoParams.phaseMagsx[1] = 1.0;
-            s_TheDemoParams.phaseMagsx[2] = 1.0;
-            s_TheDemoParams.phaseMagsx[3] = 2.0;
-            s_TheDemoParams.phaseMagsx[4] = 3.0;
-            s_TheDemoParams.phaseMagsy[0] = 1.0;
-            s_TheDemoParams.phaseMagsy[1] = 2.0;
-            s_TheDemoParams.phaseMagsy[2] = 3.0;
-            s_TheDemoParams.phaseMagsy[3] = 3.0;
-            s_TheDemoParams.phaseMagsy[4] = 4.0;
+            __dpd->TheDemoParams.currentPhase = 0;
+            __dpd->TheDemoParams.numPhases = 3;
+            __dpd->TheDemoParams.phaseMagsx[0] = 1.0;
+            __dpd->TheDemoParams.phaseMagsx[1] = 1.0;
+            __dpd->TheDemoParams.phaseMagsx[2] = 1.0;
+            __dpd->TheDemoParams.phaseMagsx[3] = 2.0;
+            __dpd->TheDemoParams.phaseMagsx[4] = 3.0;
+            __dpd->TheDemoParams.phaseMagsy[0] = 1.0;
+            __dpd->TheDemoParams.phaseMagsy[1] = 2.0;
+            __dpd->TheDemoParams.phaseMagsy[2] = 3.0;
+            __dpd->TheDemoParams.phaseMagsy[3] = 3.0;
+            __dpd->TheDemoParams.phaseMagsy[4] = 4.0;
 
-            xMag = s_TheDemoParams.phaseMagsx[0];
-            yMag = s_TheDemoParams.phaseMagsy[0];
-            reachingMag = false;
-            rotating = true;
+            __dpd->xMag = __dpd->TheDemoParams.phaseMagsx[0];
+            __dpd->yMag = __dpd->TheDemoParams.phaseMagsy[0];
+            __dpd->reachingMag = false;
+            __dpd->rotating = true;
         }
 
-        if (reachingMag) {
-            if (xMag < s_TheDemoParams.phaseMagsx[s_TheDemoParams.currentPhase]) {
-                xMag += 0.01;
+        if (__dpd->reachingMag) {
+            if (__dpd->xMag < __dpd->TheDemoParams.phaseMagsx[__dpd->TheDemoParams.currentPhase]) {
+                __dpd->xMag += 0.01;
             }
-            if (yMag < s_TheDemoParams.phaseMagsy[s_TheDemoParams.currentPhase]) {
-                yMag += 0.01;
+            if (__dpd->yMag < __dpd->TheDemoParams.phaseMagsy[__dpd->TheDemoParams.currentPhase]) {
+                __dpd->yMag += 0.01;
             }
-            if (xMag >= s_TheDemoParams.phaseMagsx[s_TheDemoParams.currentPhase] && yMag >= s_TheDemoParams.phaseMagsy[s_TheDemoParams.currentPhase]) {
-                reachingMag = false;
-                rotating = true;
+            if (__dpd->xMag >= __dpd->TheDemoParams.phaseMagsx[__dpd->TheDemoParams.currentPhase] && __dpd->yMag >= __dpd->TheDemoParams.phaseMagsy[__dpd->TheDemoParams.currentPhase]) {
+                __dpd->reachingMag = false;
+                __dpd->rotating = true;
             }
         }
-        if (rotating) {
-            if (_DemoModeFrame >= ((uint32_t)(s_TheDemoParams.currentPhase + 1) * 250)) {
-                s_TheDemoParams.currentPhase++;
+        if (__dpd->rotating) {
+            if (_DemoModeFrame >= ((uint32_t)(__dpd->TheDemoParams.currentPhase + 1) * 250)) {
+                __dpd->TheDemoParams.currentPhase++;
                 newPhase = true;
-                alreadyDrawedText = false;
-                if (s_TheDemoParams.currentPhase < MAX_DEMO_PHASES) {
-                    rotating = false;
-                    reachingMag = true;
+                __dpd->alreadyDrawedText = false;
+                if (__dpd->TheDemoParams.currentPhase < MAX_DEMO_PHASES) {
+                    __dpd->rotating = false;
+                    __dpd->reachingMag = true;
                 } else {
                     // _DemoModeFrame = 0;
                     // s_TheDemoParams.currentPhase = 0;
@@ -244,16 +248,16 @@ void DrawParametric(MsgAudio2Draw& mad)
         }
     }
 
-    if (s_frameNum == 0) {
+    if (__dpd->frameNum == 0) {
         /* x = 31.1*sin(3*step+pi/2)+32
            y = 15.1*sin(2*step)+16*/
-        for (uint16_t i = 0; i < s_numCoords; i++) {
-            s_TheCurrentCurve.xCoord[i] = 31.5f * sin(xMag * s_steps[i] + HALF_PI) + 32.0f;
-            s_TheCurrentCurve.yCoord[i] = 15.5f * sin(yMag * s_steps[i] + s_delta) + 16.0f;
+        for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
+            __dpd->TheCurrentCurve.xCoord[i] = 31.5f * sin(__dpd->xMag * __dpd->steps[i] + HALF_PI) + 32.0f;
+            __dpd->TheCurrentCurve.yCoord[i] = 15.5f * sin(__dpd->yMag * __dpd->steps[i] + __dpd->delta) + 16.0f;
         }
-        s_delta += 0.025;
-        if (s_delta >= TWO_PI) {
-            s_delta = 0.0f;
+        __dpd->delta += 0.025;
+        if (__dpd->delta >= TWO_PI) {
+            __dpd->delta = 0.0f;
         }
         // shiftCount = 0;
         //  if (s_deltaRatioTotal > 6.0 || s_deltaRatioTotal < 1.0) {
@@ -264,11 +268,11 @@ void DrawParametric(MsgAudio2Draw& mad)
     uint8_t intensity = std::max((uint8_t)(100), _1stBarValue);
 
     for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
-        if (rotating && (_DemoModeFrame % 2) == 0) {
+        if (__dpd->rotating && (_DemoModeFrame % 2) == 0) {
             // s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
             // shiftCount = (shiftCount + 1) % s_numCoords;
         }
-        uint16_t coord = s_TheCurrentCurve.initialPoints[i];
+        uint16_t coord = __dpd->TheCurrentCurve.initialPoints[i];
         // uint8_t intensity = max(DEFAULT_MILLIS, _1stBarValue);
         //  int value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
         //   int value = constrain(_1stBarValue, MIN_FFT_DB, MAX_FFT_DB);
@@ -282,7 +286,7 @@ void DrawParametric(MsgAudio2Draw& mad)
         //     intensity = intensity / 2;
         // }
 
-        _TheLeds[_TheMapping.XY(round(s_TheCurrentCurve.xCoord[coord]), round(s_TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity); //(uint8_t)value);
+        _TheLeds[_TheMapping.XY(round(__dpd->TheCurrentCurve.xCoord[coord]), round(__dpd->TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity); //(uint8_t)value);
     }
 
     // s_frameNum = 0;
@@ -291,24 +295,24 @@ void DrawParametric(MsgAudio2Draw& mad)
     // i ara pintem el text
     //_u8g2.clearBuffer();
     std::string test;
-    if (s_TheDemoParams.currentPhase == 0 && !_Connected2Wifi && !alreadyDrawedText) {
+    if (__dpd->TheDemoParams.currentPhase == 0 && !_Connected2Wifi && !__dpd->alreadyDrawedText) {
         _u8g2.setFont(u8g2_font_oskool_tr); // u8g2_font_tom_thumb_4x6_mn); u8g2_font_princess_tr
         test = "Iniciant FlipaLeds...";
         _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
-        alreadyDrawedText = true;
-    } else if (s_TheDemoParams.currentPhase < (MAX_DEMO_PHASES - 2) && _Connected2Wifi && !alreadyDrawedText) {
+        __dpd->alreadyDrawedText = true;
+    } else if (__dpd->TheDemoParams.currentPhase < (MAX_DEMO_PHASES - 2) && _Connected2Wifi && !__dpd->alreadyDrawedText) {
         _u8g2.clearBuffer();
         //_u8g2.setFont(u8g2_font_profont10_tr); // u8g2_font_tom_thumb_4x6_mn); //u8g2_font_unifont_t_emoticons big emoticons 14pix
         test = "Connectat a la wiFi!";
         _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
-        alreadyDrawedText = true;
-    } else if (s_TheDemoParams.currentPhase >= (MAX_DEMO_PHASES - 2)) {
-        if (_Connected2Wifi && !alreadyDrawedText) {
+        __dpd->alreadyDrawedText = true;
+    } else if (__dpd->TheDemoParams.currentPhase >= (MAX_DEMO_PHASES - 2)) {
+        if (_Connected2Wifi && !__dpd->alreadyDrawedText) {
             _u8g2.clearBuffer();
-            theIP = Utils::string_format("IP=[%s]", WiFi.localIP().toString().c_str());
+            test = Utils::string_format("IP=[%s]", WiFi.localIP().toString().c_str());
             //_u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_tom_thumb_4x6_mn);
-            _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, theIP.c_str());
-            alreadyDrawedText = true;
+            _u8g2.drawStr(0, (THE_PANEL_HEIGHT / 1) - 1, test.c_str());
+            __dpd->alreadyDrawedText = true;
         } else if (!_Connected2Wifi && newPhase) {
             _u8g2.clearBuffer();
             test = Utils::string_format("Sense WiFi...");
@@ -326,15 +330,20 @@ void DrawParametric(MsgAudio2Draw& mad)
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     //_ThePanel.SetBaseHue(HSVHue::HUE_YELLOW);
-    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, textPos, 0, s_hue, intensity);
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, __dpd->textPos, 0, __dpd->hue, intensity);
 
-    textPos += inc;
-    if (textPos < (-THE_PANEL_WIDTH * 2)) {
-        inc = 1;
-    } else if (textPos > THE_PANEL_WIDTH) {
-        inc = (-1);
+    __dpd->textPos += __dpd->inc;
+    if (__dpd->textPos < (-THE_PANEL_WIDTH * 2)) {
+        __dpd->inc = 1;
+    } else if (__dpd->textPos > THE_PANEL_WIDTH) {
+        __dpd->inc = (-1);
     }
-    s_hue++;
+    __dpd->hue++;
+
+    if (!_DemoMode && __dpd) {
+        delete __dpd;
+        __dpd = nullptr;
+    }
 }
 
 void DrawWave(MsgAudio2Draw& mad)
@@ -458,8 +467,7 @@ void DrawClock()
 
 // uint8_t thisSpeed = 3;
 // uint8_t initial = 1;
-int _delayFrame
-    = 100;
+int _delayFrame = 100;
 
 // void DrawParametricHardcoded()
 // {
@@ -506,6 +514,7 @@ int _delayFrame
 //     //   FastLED.show();
 // }
 
+/*
 void DrawImage()
 {
     static int pos = 0;
@@ -588,3 +597,4 @@ void DrawSparks()
     FastLED.show();
     // delay(5);
 }
+*/

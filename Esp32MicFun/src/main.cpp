@@ -4,8 +4,12 @@
 #include <PubSubClient.h>
 #include <U8g2lib.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <memory>
 #include <vector>
+
+// #include "wifiFix.h"
+#include <HTTPClient.h>
 
 #include "driver/adc.h"
 #include "driver/i2s.h"
@@ -97,6 +101,8 @@ void ConfigureNTP()
 // }
 
 // Task to read samples.
+// FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT);
+// uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
 void vTaskReader(void* pvParameters)
 {
     uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
@@ -212,7 +218,7 @@ void vTaskReader(void* pvParameters)
                         std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d",
                             now - recInit, totalSamples, numCalls, superMaxMag, missedFrames));
                         // log_d(msg.c_str());
-                        _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), true);
+                        _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
 
                         recInit = now;
                         totalSamples = 0;
@@ -230,25 +236,25 @@ void vTaskReader(void* pvParameters)
     vTaskDelete(NULL);
 }
 
-// Task to draw the LEDS
-void vTaskDrawLeds(void* pvParameters)
-{
-    log_d("In vTaskDrawLeds...");
-    MsgAudio2Draw mad;
+// // Task to draw the LEDS
+// void vTaskDrawLeds(void* pvParameters)
+// {
+//     log_d("In vTaskDrawLeds...");
+//     MsgAudio2Draw mad;
 
-    uint32_t lastShow = 0;
+//     uint32_t lastShow = 0;
 
-    while (true) {
-        if (xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY) && (millis() - lastShow) > 100) {
-            uint32_t init = millis();
-            DrawLedBars(mad);
-            lastShow = millis();
-            // log_d("ShowTime=%dms", millis()-init);
-        }
-    }
+//     while (true) {
+//         if (xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY) && (millis() - lastShow) > 100) {
+//             uint32_t init = millis();
+//             DrawLedBars(mad);
+//             lastShow = millis();
+//             // log_d("ShowTime=%dms", millis()-init);
+//         }
+//     }
 
-    vTaskDelete(NULL);
-}
+//     vTaskDelete(NULL);
+// }
 
 // Task to draw screen.
 void vTaskDrawer(void* pvParameters)
@@ -315,6 +321,10 @@ void vTaskDrawer(void* pvParameters)
                 case DRAW_STYLE::HORIZ_FIRE:
                     DrawHorizSpectrogram(mad);
                     break;
+                case DRAW_STYLE::VISUAL_CURRENT:
+
+                    DrawClock();
+                    break;
                 default:
                     FastLED.clear();
                     DrawWave(mad);
@@ -376,6 +386,14 @@ void vTaskWifiReconnect(void* pvParameters)
 {
     bool reconnected = false;
 
+    auto lastCheck = millis();
+    // WiFiClientFixed httpWifiClient;
+    // HTTPClient theHttpClient;
+    WiFiClientSecure* __httpWifiClient = new WiFiClientSecure();
+    HTTPClient* __theHttpClient = new HTTPClient();
+    std::string theUrl;
+    time_t now;
+
     sleep(20); // wait a bit...
 
     _OTA.Setup("MicFun", "", 3434);
@@ -420,9 +438,114 @@ void vTaskWifiReconnect(void* pvParameters)
                 }
             }
         }
+
+        if (WITH_VISUALCURRENT && _Connected2Wifi && (millis() - lastCheck) > UPDATE_CONSUM_ELECTRICITAT_CADA_MS) {
+            _ThePubSub.publish(TOPIC_DEBUG, "Trying SSL connection...", false);
+
+            lastCheck = millis();
+            now = time(nullptr);
+            uint8_t mapMax = 20;
+            if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 4000 || _MapMaxWhToPixels == 5000) {
+                mapMax = 20; // 20/10/8/5/4 leds per kWh
+            } else if (_MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 3500) {
+                mapMax = 21; // 14/7/6 leds per kWh
+            } else if (_MapMaxWhToPixels == 4500 || _MapMaxWhToPixels == 6000) {
+                mapMax = 18; // 4/3 leds per kWh
+            } else if (_MapMaxWhToPixels == 5500) {
+                mapMax = 22; // 4 leds per kWh
+            }
+            // construïm la url ?dataFi=1685583107&numValors=60&maxKWh=4,5&mapejarDe0a=20&agruparPer=2&code=
+            theUrl = Utils::string_format("%sdataFi=%lld&numValors=%d&maxWh=%d&mapejarDe0a=%d&agruparPer=%d&code=%s",
+                CONSUM_ELECTRICITAT_URL, (int64_t)now, THE_PANEL_WIDTH, _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
+
+            __httpWifiClient->setInsecure();
+
+            __theHttpClient->setConnectTimeout(2000);
+            //__theHttpClient->setReuse(false);
+            if (__theHttpClient->begin(*__httpWifiClient, theUrl.c_str())) {
+                __theHttpClient->setTimeout(20000);
+                // theHttpClient.addHeader("host", "visualcurrentapp.azurewebsites.net");
+                // theHttpClient.addHeader("Content-Type", "application/json");
+                __theHttpClient->addHeader("Accept", "*/*");
+                // theHttpClient.addHeader("Connection", "keep-alive");
+                int httpResponse = __theHttpClient->GET();
+                if (httpResponse > 0) {
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP GET ok! Code=[%d]", httpResponse).c_str(), false);
+                    std::string thePayload = __theHttpClient->getString().c_str();
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response length=[%d]", thePayload.length()).c_str(), false);
+                    log_i("Payload=[%s]", thePayload.c_str());
+                } else {
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("GET returned code [%d]", httpResponse).c_str(), false);
+                }
+            } else {
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Begin returned false :(").c_str(), false);
+            }
+            __theHttpClient->end();
+        }
         delay(2000);
     }
 }
+
+// void vTaskRefrescarConsumElectricitat(void* pvParameters)
+// {
+//     auto lastCheck = millis();
+//     // WiFiClientFixed httpWifiClient;
+//     // HTTPClient theHttpClient;
+//     WiFiClientSecure* __httpWifiClient = new WiFiClientSecure();
+//     HTTPClient* __theHttpClient = new HTTPClient();
+//     std::string theUrl;
+//     time_t now;
+
+//     while (true) {
+//         if (!_Connected2Wifi || (millis() - lastCheck) < UPDATE_CONSUM_ELECTRICITAT_CADA_MS) {
+//             delay(10000); // sense preses...
+//             continue;
+//         }
+//         lastCheck = millis();
+//         now = time(nullptr);
+//         uint8_t mapMax = 20;
+//         if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 4000 || _MapMaxWhToPixels == 5000) {
+//             mapMax = 20; // 20/10/8/5/4 leds per kWh
+//         } else if (_MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 3500) {
+//             mapMax = 21; // 14/7/6 leds per kWh
+//         } else if (_MapMaxWhToPixels == 4500 || _MapMaxWhToPixels == 6000) {
+//             mapMax = 18; // 4/3 leds per kWh
+//         } else if (_MapMaxWhToPixels == 5500) {
+//             mapMax = 22; // 4 leds per kWh
+//         }
+//         // construïm la url ?dataFi=1685583107&numValors=60&maxKWh=4,5&mapejarDe0a=20&agruparPer=2&code=
+//         theUrl = Utils::string_format("%sdataFi=%lld&numValors=%d&maxWh=%d&mapejarDe0a=%d&agruparPer=%d&code=%s",
+//             CONSUM_ELECTRICITAT_URL, (int64_t)now, THE_PANEL_WIDTH, _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
+//         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
+
+//         __httpWifiClient->setInsecure();
+
+//         log_d("Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+
+//         __theHttpClient->setConnectTimeout(2000);
+//         __theHttpClient->setReuse(false);
+//         if (__theHttpClient->begin(*__httpWifiClient, theUrl.c_str())) {
+//             __theHttpClient->setTimeout(20000);
+//             // theHttpClient.addHeader("host", "visualcurrentapp.azurewebsites.net");
+//             // theHttpClient.addHeader("Content-Type", "application/json");
+//             __theHttpClient->addHeader("Accept", "*/*");
+//             // theHttpClient.addHeader("Connection", "keep-alive");
+//             int httpResponse = __theHttpClient->GET();
+//             if (httpResponse > 0) {
+//                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP GET ok! Code=[%d]", httpResponse).c_str(), false);
+//                 std::string thePayload = __theHttpClient->getString().c_str();
+//                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response length=[%d]", thePayload.length()).c_str(), false);
+//                 log_i("Payload=[%s]", thePayload.c_str());
+//             } else {
+//                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("GET returned code [%d]", httpResponse).c_str(), false);
+//             }
+//         } else {
+//             _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Begin returned false :(").c_str(), false);
+//         }
+//         __theHttpClient->end();
+//     }
+// }
 
 void Connect2MQTT()
 {
@@ -550,17 +673,21 @@ void setup()
     _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
-    xTaskCreate(vTaskReader, "ReaderTask", 8192, (void*)&_TaskParams, 3, &_readerTaskHandle);
+    // xTaskCreate(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
+    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
-    //  xTaskCreate(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle);
-    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Screen", 4092, (void*)&_TaskParams, 2, &_drawTaskHandle, 1);
+    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle, 1);
     //    xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
     // // start task to draw leds
     // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
     // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 
-    xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 3072, nullptr, 3, &_wifiReconnectTaskHandle);
+    // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 4000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
+    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 6000, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
+
+    // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
+    //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
 }
 
 // PLAY WITH MATRIX
@@ -570,6 +697,7 @@ void setup()
 //  bool added = false;
 //  CLEDController* _MyTempController = nullptr;
 // END PLAY WITH MATRIX
+
 void loop()
 {
     // PLAY WITH MATRIX
@@ -604,9 +732,21 @@ void loop()
 
     //  DrawParametric();
     // DrawSparks();
-    delay(100);
+    delay(10000);
+    log_d("Main: Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+    if (_Connected2Wifi) {
+        _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", esp_get_free_heap_size()).c_str());
+        _ThePubSub.publish(TOPIC_BIGGESTFREEBLOCK, Utils::string_format("%d", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)).c_str());
+        _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());
+        _ThePubSub.publish(TOPIC_HIWATER_WIFI, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_wifiReconnectTaskHandle)).c_str());
+        _ThePubSub.publish(TOPIC_HIWATER_DRAWER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_drawTaskHandle)).c_str());
+    }
+
     //      if (_delayFrame) {
     //          delay(_delayFrame);
+    // ESP.getFreeHeap()
+    // esp_get_free_heap_size();
+    // heap_caps_get_largest_free_block
     //      }
 }
 

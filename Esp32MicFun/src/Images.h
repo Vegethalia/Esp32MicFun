@@ -1,3 +1,4 @@
+/*
 static CRGB __imgArlet[32][16] = { { { 181, 190, 178 }, { 218, 221, 213 }, { 243, 244, 239 }, { 195, 194, 182 }, { 190, 181, 167 }, { 220, 221, 203 }, { 221, 223, 204 }, { 194, 189, 168 }, { 215, 212, 192 }, { 192, 185, 164 }, { 210, 201, 184 }, { 211, 206, 187 }, { 192, 180, 165 }, { 146, 179, 142 }, { 117, 178, 140 }, { 153, 149, 134 } },
     { { 169, 176, 160 }, { 219, 222, 214 }, { 247, 249, 243 }, { 222, 219, 206 }, { 170, 157, 141 }, { 198, 192, 172 }, { 177, 170, 148 }, { 160, 153, 132 }, { 196, 191, 170 }, { 196, 187, 166 }, { 210, 198, 183 }, { 167, 154, 141 }, { 137, 117, 107 }, { 109, 116, 95 }, { 138, 149, 125 }, { 170, 145, 134 } },
     { { 149, 145, 130 }, { 209, 205, 197 }, { 232, 227, 219 }, { 196, 186, 172 }, { 155, 137, 122 }, { 153, 136, 116 }, { 155, 137, 115 }, { 160, 148, 127 }, { 182, 169, 148 }, { 176, 161, 145 }, { 147, 130, 119 }, { 139, 118, 110 }, { 121, 101, 93 }, { 161, 147, 129 }, { 221, 210, 185 }, { 149, 131, 120 } },
@@ -138,12 +139,13 @@ static CRGB __imgMontseJordi[33][16] = {
     { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 31, 19, 15 }, { 78, 60, 56 }, { 99, 90, 88 }, { 111, 102, 99 }, { 102, 88, 82 }, { 88, 75, 69 }, { 82, 70, 68 }, { 90, 73, 68 }, { 90, 63, 53 }, { 86, 57, 46 } },
     { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 1, 1, 1 }, { 23, 23, 23 }, { 83, 74, 72 }, { 101, 85, 82 }, { 100, 78, 69 }, { 98, 70, 57 }, { 93, 63, 50 }, { 86, 58, 46 } }
 };
-
+*/
 #define  MOVING_PARAMETRIC_POINTS 64
+#define  MOVING_PARAMETRIC_STEPS 252
 struct ParametricCurve {
     uint16_t initialPoints[MOVING_PARAMETRIC_POINTS];
-    float xCoord[252];
-    float yCoord[252];
+    float xCoord[MOVING_PARAMETRIC_STEPS];
+    float yCoord[MOVING_PARAMETRIC_STEPS];
 };
 
 // ParametricCurve __2to3PiHalf = {
@@ -161,4 +163,23 @@ struct DemoModeParams {
     uint16_t phaseChangeAtFrame[MAX_DEMO_PHASES];
     float phaseMagsx[MAX_DEMO_PHASES];
     float phaseMagsy[MAX_DEMO_PHASES];
+};
+
+struct DrawParametricData {
+    ParametricCurve TheCurrentCurve;
+    DemoModeParams TheDemoParams;
+    bool initialized = false;
+    //const uint16_t s_numCoords = 252;
+    uint16_t frameNum = 0;
+    float steps[MOVING_PARAMETRIC_STEPS];
+    float delta = 0.0f;
+    uint8_t hue = 0;
+    float xMag = 1.0;
+    float yMag = 1.0;
+    bool reachingMag = false;
+    bool rotating = false;
+    uint32_t shiftCount = 0;
+    int16_t textPos = THE_PANEL_WIDTH - 2;
+    int16_t inc = -1;
+    bool alreadyDrawedText = false;
 };
