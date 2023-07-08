@@ -95,6 +95,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_BASEHUE "caseta/spectrometre/basehue"
 #define TOPIC_RESET "caseta/spectrometre/reset"
 #define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
+#define TOPIC_GROUPMINUTS "caseta/spectrometre/groupbyminuts"
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
@@ -104,6 +105,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_CPU_WIFI "caseta/spectrometre/cpuwifi"
 #define TOPIC_CPU_READER "caseta/spectrometre/cpureader"
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
+#define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 
 //------------
 // Task Related
@@ -155,8 +157,34 @@ DRAW_STYLE _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
 #define DEFAULT_MAX_WH 3500 // per defecte es mostrara un rang vertical de 3.5 kWh
 uint16_t _AgrupaConsumsPerMinuts = DEFAULT_CONSUM_PER_MINUTS;
 uint16_t _MaxWhToShow = DEFAULT_MAX_WH;
-uint8_t _MapMaxWhToPixels = THE_PANEL_HEIGHT - 9 - 1; // 9 pixels pel clock, 1 per l'eix horitzontal
+uint16_t _MapMaxWhToPixels = 3000; // THE_PANEL_HEIGHT - 9 - 1; // 9 pixels pel clock, 1 per l'eix horitzontal
 struct LecturaConsum {
     time_t horaConsum;
-    uint8_t valorEnLeds; // el valor de KWh mapejat a LEDS verticals a pintar
+    uint16_t valorEnLeds; // el valor de KWh mapejat a LEDS verticals a pintar
 };
+
+time_t _lastCurrentTime = 0; // hora de l'últim valor de corrent publicat
+LecturaConsum* _pLectures = nullptr;
+bool _UpdateCurrentNow = false; //true if current must be updated ASAP
+
+uint8_t
+GetMapMaxPixels()
+{
+    uint8_t ret = 20;
+    if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 4000 || _MapMaxWhToPixels == 5000) {
+        ret = 20; // 20/10/8/5/4 leds per kWh
+    } else if (_MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 3500) {
+        ret = 21; // 14/7/6 leds per kWh
+    } else if (_MapMaxWhToPixels == 4500 || _MapMaxWhToPixels == 6000) {
+        ret = 18; // 4/3 leds per kWh
+    } else if (_MapMaxWhToPixels == 5500) {
+        ret = 22; // 4 leds per kWh
+    }
+    return ret;
+}
+
+uint8_t GetPixelsPerKwh(uint8_t maxPixels)
+{
+    uint16_t aux = maxPixels * 1000;
+    return (uint8_t)(aux / _MapMaxWhToPixels);
+}

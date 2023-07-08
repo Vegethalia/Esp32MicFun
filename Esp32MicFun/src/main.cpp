@@ -3,11 +3,11 @@
 // #include <NTPClient.h>
 #include <PubSubClient.h>
 #include <U8g2lib.h>
-#include <WiFi.h>
+// #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <memory>
+// #include <sstream>
 #include <vector>
-
 // #include "wifiFix.h"
 #include <HTTPClient.h>
 
@@ -44,10 +44,12 @@
 void Connect2MQTT();
 // PubSubClient callback for received messages
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dalaLength);
-// Draws an image
-void DrawImage();
-// Draw a parametric curve
-void DrawParametric();
+// // Draws an image
+// void DrawImage();
+// // Draw a parametric curve
+// void DrawParametric();
+// Processes the received http payload in csv form and populates the global VisualCurrentConsumption structures
+void ProcessCurrentPayload(std::string& thePayload);
 
 /// @brief Configures the NTP server. In this project the timezone and offsets are hardcoded to suit my needs
 void ConfigureNTP()
@@ -215,10 +217,10 @@ void vTaskReader(void* pvParameters)
                     // }
                     auto now = millis();
                     if ((now - recInit) >= 30000) {
-                        std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d",
-                            now - recInit, totalSamples, numCalls, superMaxMag, missedFrames));
+                        // std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d",
+                        //     now - recInit, totalSamples, numCalls, superMaxMag, missedFrames));
                         // log_d(msg.c_str());
-                        _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
+                        // _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
 
                         recInit = now;
                         totalSamples = 0;
@@ -318,17 +320,20 @@ void vTaskDrawer(void* pvParameters)
                     DrawLedBars(mad);
                     DrawClock();
                     break;
+                case DRAW_STYLE::VERT_FIRE:
+                    FastLED.clear();
+                    DrawWave(mad);
+                    DrawVertSpectrogram(mad);
+                    DrawClock();
+                    break;
                 case DRAW_STYLE::HORIZ_FIRE:
                     DrawHorizSpectrogram(mad);
                     break;
                 case DRAW_STYLE::VISUAL_CURRENT:
-
-                    DrawClock();
-                    break;
-                default:
+                    //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
                     FastLED.clear();
                     DrawWave(mad);
-                    DrawVertSpectrogram(mad);
+                    DrawCurrentGraph(mad);
                     DrawClock();
                     break;
                 }
@@ -432,6 +437,7 @@ void vTaskWifiReconnect(void* pvParameters)
             _OTA.Process();
             // _TheNTPClient.update();
             if (!_ThePubSub.connected()) {
+                _ThePubSub.setBufferSize(1024);
                 Connect2MQTT();
                 if (_ThePubSub.connected()) {
                     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), true);
@@ -439,24 +445,15 @@ void vTaskWifiReconnect(void* pvParameters)
             }
         }
 
-        if (WITH_VISUALCURRENT && _Connected2Wifi && (millis() - lastCheck) > UPDATE_CONSUM_ELECTRICITAT_CADA_MS) {
-            _ThePubSub.publish(TOPIC_DEBUG, "Trying SSL connection...", false);
-
+        if ((_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) && _Connected2Wifi && millis() > 120000 && (((millis() - lastCheck) > (max(_AgrupaConsumsPerMinuts / 2, 1) * 60000)) || _UpdateCurrentNow)) {
+            //_ThePubSub.publish(TOPIC_DEBUG, "Trying SSL connection...", false);
+            _UpdateCurrentNow = false;
             lastCheck = millis();
             now = time(nullptr);
-            uint8_t mapMax = 20;
-            if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 4000 || _MapMaxWhToPixels == 5000) {
-                mapMax = 20; // 20/10/8/5/4 leds per kWh
-            } else if (_MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 3500) {
-                mapMax = 21; // 14/7/6 leds per kWh
-            } else if (_MapMaxWhToPixels == 4500 || _MapMaxWhToPixels == 6000) {
-                mapMax = 18; // 4/3 leds per kWh
-            } else if (_MapMaxWhToPixels == 5500) {
-                mapMax = 22; // 4 leds per kWh
-            }
+            uint8_t mapMax = GetMapMaxPixels();
             // construïm la url ?dataFi=1685583107&numValors=60&maxKWh=4,5&mapejarDe0a=20&agruparPer=2&code=
-            theUrl = Utils::string_format("%sdataFi=%lld&numValors=%d&maxWh=%d&mapejarDe0a=%d&agruparPer=%d&code=%s",
-                CONSUM_ELECTRICITAT_URL, (int64_t)now, THE_PANEL_WIDTH, _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
+            theUrl = Utils::string_format("%sdataFi=%lld&numValors=%d&maxWh=%d&mapejarDe0a=%d&agruparPer=%d&csvOutput=1&code=%s",
+                CONSUM_ELECTRICITAT_URL, (int64_t)now, (THE_PANEL_WIDTH - 1), _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
             _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
 
             __httpWifiClient->setInsecure();
@@ -464,18 +461,18 @@ void vTaskWifiReconnect(void* pvParameters)
             __theHttpClient->setConnectTimeout(2000);
             //__theHttpClient->setReuse(false);
             if (__theHttpClient->begin(*__httpWifiClient, theUrl.c_str())) {
-                __theHttpClient->setTimeout(20000);
-                // theHttpClient.addHeader("host", "visualcurrentapp.azurewebsites.net");
-                // theHttpClient.addHeader("Content-Type", "application/json");
+                __theHttpClient->setConnectTimeout(2000);
                 __theHttpClient->addHeader("Accept", "*/*");
-                // theHttpClient.addHeader("Connection", "keep-alive");
                 int httpResponse = __theHttpClient->GET();
                 if (httpResponse > 0) {
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP GET ok! Code=[%d]", httpResponse).c_str(), false);
                     std::string thePayload = __theHttpClient->getString().c_str();
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response length=[%d]", thePayload.length()).c_str(), false);
-                    log_i("Payload=[%s]", thePayload.c_str());
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response [%d] length=[%d]", httpResponse, thePayload.length()).c_str(), false);
+                    if (httpResponse == HTTP_CODE_OK) {
+                        log_i("Payload=[%s]", thePayload.c_str());
+                        ProcessCurrentPayload(thePayload);
+                    }
                 } else {
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
                     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("GET returned code [%d]", httpResponse).c_str(), false);
                 }
             } else {
@@ -574,6 +571,9 @@ void Connect2MQTT()
             }
             if (!_ThePubSub.subscribe(TOPIC_NIGHTMODE)) {
                 log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_NIGHTMODE);
+            }
+            if (!_ThePubSub.subscribe(TOPIC_GROUPMINUTS)) {
+                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_GROUPMINUTS);
             }
             // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
             //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
@@ -784,10 +784,16 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     }
     if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
         _TheDrawStyle = (DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1);
+        if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
+            _UpdateCurrentNow = true;
+        }
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
     }
     if (theTopic.find(TOPIC_RESET) != std::string::npos) {
-        ESP.restart();
+        bool resetNow = std::atoi(theMsg.c_str()) != 0;
+        if (resetNow) {
+            ESP.restart();
+        }
     }
     if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
         byte nightOn = std::atoi(theMsg.c_str()) != 0;
@@ -800,5 +806,67 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
             _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
         }
     }
+    if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
+        int minuts = std::atoi(theMsg.c_str());
+        _AgrupaConsumsPerMinuts = max(min(minuts, (int)60), 1);
+        _UpdateCurrentNow = true;
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Electricitat agrupada per [%d] minuts", (int)_AgrupaConsumsPerMinuts).c_str(), true);
+    }
     // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
+}
+
+void ProcessCurrentPayload(std::string& theCsvPayload)
+{
+    std::string line;
+    //, swh;
+    // uint32_t epochTime, wh;
+
+    if (!_pLectures) {
+        _pLectures = new LecturaConsum[THE_PANEL_WIDTH];
+    }
+    memset(_pLectures, 0, sizeof(LecturaConsum) * THE_PANEL_WIDTH);
+    uint8_t nIndex = 0, nLastNonZero = 0;
+
+    size_t startPos = 0;
+    size_t endPos = theCsvPayload.find('\n');
+
+    while (endPos != std::string::npos) {
+        line = theCsvPayload.substr(startPos, endPos - startPos);
+        //_ThePubSub.publish(TOPIC_DEBUG, line.c_str());
+
+        size_t commaPos = line.find(',');
+        if (commaPos != std::string::npos) {
+            _pLectures[nIndex].horaConsum = atoi(line.substr(0, commaPos).c_str());
+            _pLectures[nIndex].valorEnLeds = atoi(line.substr(commaPos + 1).c_str());
+            // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("hora=%d valor=%d", _pLectures[nIndex].horaConsum, _pLectures[nIndex].valorEnLeds).c_str());
+            if (_pLectures[nIndex].horaConsum) {
+                nLastNonZero = nIndex;
+            }
+            nIndex++;
+        }
+
+        startPos = endPos + 1;
+        endPos = theCsvPayload.find('\n', startPos);
+    }
+
+    // Processar l'última línia (si n'hi ha)
+    if (startPos < theCsvPayload.length()) {
+        line = theCsvPayload.substr(startPos);
+
+        size_t commaPos = line.find(',');
+        if (commaPos != std::string::npos) {
+            _pLectures[nIndex].horaConsum = atoi(line.substr(0, commaPos).c_str());
+            _pLectures[nIndex].valorEnLeds = atoi(line.substr(commaPos + 1).c_str());
+            if (_pLectures[nIndex].horaConsum) {
+                nLastNonZero = nIndex;
+            }
+            nIndex++;
+        }
+    }
+    if (nIndex > 0 && _lastCurrentTime < _pLectures[nLastNonZero].horaConsum) {
+        _ThePubSub.publish(TOPIC_CURRENT_WH, Utils::string_format("%d", _pLectures[nLastNonZero].valorEnLeds).c_str());
+        _lastCurrentTime = _pLectures[nLastNonZero - 1].horaConsum;
+    } else {
+        _ThePubSub.publish(TOPIC_DEBUG, "NO DATA");
+    }
 }

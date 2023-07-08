@@ -92,7 +92,7 @@ namespace Vegethalia
         }
         dataIni = dataFi.AddMinutes(0.0 - (numValors * agruparPerMinuts));
 
-        _logger.LogInformation($"Processant petició: Valors={numValors} AgruparPer={agruparPerMinuts} MaxKWh={maxWh / 1000.0} DataIni={dataIni.ToString()}  DataFin={dataFi.ToString()}");
+        _logger.LogInformation($"Processant petició: Valors={numValors} AgruparPer={agruparPerMinuts} MaxKWh={maxWh / 1000.0} DataIni={dataIni.ToString()}  DataFin={dataFi.ToString()} CsvOutput={csvOutput}");
 
 
         int numElems = 0;
@@ -155,6 +155,7 @@ namespace Vegethalia
         {
           response.WriteString($"{item.TheDateFromEpoch}, {(uint)(Math.Round(item.TheValueInKWh * 1000))}{Environment.NewLine}");
         }
+        _logger.LogInformation($"[[{response.ToString()}]]:");
       }
       else
       {
