@@ -468,7 +468,7 @@ void vTaskWifiReconnect(void* pvParameters)
                     std::string thePayload = __theHttpClient->getString().c_str();
                     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response [%d] length=[%d]", httpResponse, thePayload.length()).c_str(), false);
                     if (httpResponse == HTTP_CODE_OK) {
-                        log_i("Payload=[%s]", thePayload.c_str());
+                        //log_i("Payload=[%s]", thePayload.c_str());
                         ProcessCurrentPayload(thePayload);
                     }
                 } else {
@@ -611,7 +611,7 @@ void setup()
     // range 0...4096
     adc1_config_width(ADC_WIDTH_BIT_12);
     // full voltage range
-    adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_DB_11);
+    adc1_config_channel_atten(PIN_AUDIO_IN, ADC_ATTEN_DB_11);
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, _adc_chars);
     // Check type of calibration value used to characterize ADC
     if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
@@ -684,7 +684,7 @@ void setup()
     // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 
     // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 4000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
-    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 6000, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
+    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 5000, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
 
     // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
     //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
@@ -800,10 +800,12 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
         if (nightOn) {
             _MAX_MILLIS = NIGHT_MILLIS;
             FastLED.setBrightness(_MAX_MILLIS);
+            _NightMode = true;
             _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
-        } else {
+        } else if (_NightMode) {
             FastLED.setBrightness(DEFAULT_MILLIS);
             _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+            _NightMode = false;
         }
     }
     if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {

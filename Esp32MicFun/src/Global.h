@@ -5,6 +5,7 @@
 #define PIN_DATA_LEDS2 4
 #define PIN_DATA_LEDS3 2
 #define PIN_DATA_LEDS4 15
+#define PIN_AUDIO_IN ADC1_CHANNEL_4 /*!< ADC1 channel 4 is GPIO32 */
 #define BUS_SPEED 800000
 
 #define WITH_VISUALCURRENT true
@@ -76,6 +77,7 @@ bool _Connected2Wifi = false;
 bool _WithClock = true;
 bool _pianoMode = true;
 bool _DemoMode = true; // when the device starts, execute a sequence of "demo" figures
+bool _NightMode = false; // true if night mode is ON --> dimm colors
 uint32_t _DemoModeFrame = 0; // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
 
 uint32_t _LastCheck4Wifi = 0;
@@ -165,7 +167,7 @@ struct LecturaConsum {
 
 time_t _lastCurrentTime = 0; // hora de l'últim valor de corrent publicat
 LecturaConsum* _pLectures = nullptr;
-bool _UpdateCurrentNow = false; //true if current must be updated ASAP
+bool _UpdateCurrentNow = false; // true if current must be updated ASAP
 
 uint8_t
 GetMapMaxPixels()

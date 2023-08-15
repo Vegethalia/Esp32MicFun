@@ -63,18 +63,22 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
     // float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
     _1stBarValue = 0;
     for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
-        int8_t decPower = 0;
-        if (i < 18) {
-            decPower = 14;
-        }
-        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB + (int)(_pianoMode ? 0 : 0) + decPower, MAX_FFT_DB);
+        // int8_t decPower = 0;
+        // if (i < 22) {
+        //     decPower = 16;
+        // } else if (i < 40) {
+        //     decPower = 10;
+        // } else if (i > (THE_PANEL_WIDTH - 10)) {
+        //     decPower = (-10);
+        // }
+        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
         //     value = (int)(value * boost);
         // }
 
         // value = constrain(mad.pFftMag[i], MIN_FFT_DB-5, MAX_FFT_DB);
-        value = map(value, (int)MIN_FFT_DB + (int)(_pianoMode ? 0 : 0) + decPower, MAX_FFT_DB, 0, 255);
+        value = map(value, (int)MIN_FFT_DB, MAX_FFT_DB, 0, 255);
         values[i] = (uint8_t)value;
         if (i <= 5 && _1stBarValue < value) {
             _1stBarValue = value;
@@ -269,7 +273,7 @@ void DrawParametric(MsgAudio2Draw& mad)
 
     for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
         if (__dpd->rotating && (_DemoModeFrame % 2) == 0) {
-            // s_TheCurrentCurve.initialPoints[i] = (s_TheCurrentCurve.initialPoints[i] + 1) % s_numCoords;
+            __dpd->TheCurrentCurve.initialPoints[i] = (__dpd->TheCurrentCurve.initialPoints[i] + 1) % MOVING_PARAMETRIC_STEPS;
             // shiftCount = (shiftCount + 1) % s_numCoords;
         }
         uint16_t coord = __dpd->TheCurrentCurve.initialPoints[i];
@@ -500,7 +504,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
             intensityBar = constrain(mad.pFftMag[i], MIN_FFT_DB + 5, MAX_FFT_DB);
             intensityBar = map(intensityBar, MIN_FFT_DB + 5, MAX_FFT_DB, 0, 140);
             for (uint8_t j = 1; j < mapValue; j++) {
-                _TheLeds[_TheMapping.XY(i + 1, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
+                _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
             }
 
             // pintem "top pixel"
@@ -527,6 +531,10 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
 void DrawClock()
 {
     static int baseHue = 0;
+
+    // if (_NightMode && (_TheFrameNumber % 2) == 0) {
+    //     return;
+    // }
 
     struct tm timeinfo;
     if (_Connected2Wifi) {
