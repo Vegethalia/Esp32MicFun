@@ -71,6 +71,10 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
         // } else if (i > (THE_PANEL_WIDTH - 10)) {
         //     decPower = (-10);
         // }
+
+        if (i > (THE_PANEL_WIDTH - 20)) {
+            value = (int16_t)((float)value * (1.25 + (i / 10.0)));
+        }
         value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
@@ -100,6 +104,8 @@ void DrawLedBars(MsgAudio2Draw& mad)
     const auto numItems = _TheMapping.GetWidth();
     uint8_t maxBassValue = 0;
     int16_t value = 0;
+    uint8_t maxHeight = min(18, BAR_HEIGHT);
+    uint8_t maxHeightScaled = (maxHeight * 10) + 9;
 
     assert(BAR_HEIGHT > 1);
     uint8_t minBoostBin = (uint8_t)(numItems * 0.33); // the first 13 bars in 33 width panel
@@ -107,8 +113,8 @@ void DrawLedBars(MsgAudio2Draw& mad)
     constexpr float minBassBoost = 1.0;
     float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
 
-    FastLED.clear();
-    // DrawImage();
+    // FastLED.clear();
+    //  DrawImage();
     //_ThePanel.SetBaseHue();
     _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
     for (uint16_t i = 0; i < numItems; i++) {
@@ -118,13 +124,14 @@ void DrawLedBars(MsgAudio2Draw& mad)
         // }
 
         value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, (BAR_HEIGHT * 10) + 9); // fins a 89
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled); // fins a 89 // 169
 
         _ThePanel.DrawBar(i, value, 200);
-        if (i <= 5 && _1stBarValue < value) {
+        if (i > 3 && i < (THE_PANEL_WIDTH / 5) && _1stBarValue < value) {
             _1stBarValue = value;
         }
     }
+    _1stBarValue = _1stBarValue / 10;
     /*    for (uint16_t i = 0; i < maxIndex; i++) {
             uint8_t bin = binByPow[i].binNum;
             if(bin==0) {
@@ -356,7 +363,7 @@ void DrawWave(MsgAudio2Draw& mad)
         uint16_t ledIndex;
         CHSV thePixel;
     };
-    static WavePoint _WaveBuffer[NUM_FADING_WAVES][THE_PANEL_WIDTH]; // circular buffer of waves
+    static WavePoint _WaveBuffer[MAX_FADING_WAVES][THE_PANEL_WIDTH]; // circular buffer of waves
     static uint8_t _LasttWaveIndex = 0; // index of the circular buffer, apunta a la wave que toca pintar
 
     uint8_t height = _TheMapping.GetHeight() - 1;
@@ -382,7 +389,13 @@ void DrawWave(MsgAudio2Draw& mad)
     }
 
     CHSV myValue;
-    myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+    myValue.setHSV(HSVHue::HUE_PURPLE, 255, 80);
+
+    uint8_t numFadingWaves = 1;
+    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
+        numFadingWaves = 2;
+        myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+    }
 
     for (i = 0; i < width; i++) {
         value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
@@ -403,10 +416,10 @@ void DrawWave(MsgAudio2Draw& mad)
         //.setHSV(CHSV.setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
 
-    if (NUM_FADING_WAVES > 1) { // fem desapareixer la 1era wave, que serà la última ara
+    if (numFadingWaves > 1) { // fem desapareixer la 1era wave, que serà la última ara
         // pintem les n waves anteriors
-        for (uint8_t numWave = 1; numWave < NUM_FADING_WAVES; numWave++) {
-            uint8_t currentWaveIndex = (_LasttWaveIndex + numWave) % NUM_FADING_WAVES;
+        for (uint8_t numWave = 1; numWave < numFadingWaves; numWave++) {
+            uint8_t currentWaveIndex = (_LasttWaveIndex + numWave) % numFadingWaves;
             for (i = 0; i < width; i++) {
                 CHSV currColor = _WaveBuffer[currentWaveIndex][i].thePixel;
                 // currColor.v = currColor.v / (numWave + 1);
@@ -423,8 +436,8 @@ void DrawWave(MsgAudio2Draw& mad)
         _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = _WaveBuffer[_LasttWaveIndex][i].thePixel;
     }
 
-    if (NUM_FADING_WAVES > 1) { // fem desapareixer la 1era wave, que serà la última ara
-        _LasttWaveIndex = (_LasttWaveIndex + 1) % NUM_FADING_WAVES;
+    if (numFadingWaves > 1) { // fem desapareixer la 1era wave, que serà la última ara
+        _LasttWaveIndex = (_LasttWaveIndex + 1) % numFadingWaves;
     }
 
     //_ThePanel.IncBaseHue();
@@ -562,8 +575,15 @@ void DrawClock()
     _u8g2.drawStr(THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
-    _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber / 4));
-    _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, max((int)164, (int)_1stBarValue));
+    uint8_t intensity;
+    if (_NightMode) {
+        _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
+        intensity = 164;
+    } else {
+        _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber / 4));
+        intensity = max((int)164, (int)_1stBarValue);
+    }
+    _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, intensity);
     //        FastLED.show();
 }
 

@@ -151,6 +151,7 @@ void vTaskReader(void* pvParameters)
                     if (bytesRead != buffSizeOrig) {
                         log_w("bytesRead=%d expected=%d", (int)bytesRead, (int)buffSizeOrig);
                     }
+
                     uint16_t samplesRead = bytesRead / sizeof(uint16_t);
                     totalSamples += samplesRead;
                     numCalls++;
@@ -185,9 +186,10 @@ void vTaskReader(void* pvParameters)
                     //                    if (!_Drawing) {
                     uint16_t maxMagI = 0;
                     mad.pAudio = pDest;
+                    mad.audioLenInSamples = samplesRead / OVERSAMPLING;
                     mad.pFftMag = _TaskParams.fftMag;
                     // auto inTime = esp_timer_get_time();
-                    if (theFFT.Execute(true)) {
+                    if (theFFT.Execute(true, INPUT_0_VALUE)) {
                         // auto totalTime = esp_timer_get_time() - inTime;
                         // log_d("FFT time=%lldus!!", totalTime);
                         if (!_Drawing) {
@@ -279,6 +281,8 @@ void vTaskDrawer(void* pvParameters)
     uint32_t samplesDrawn = 0;
     uint16_t missedFrames = 0;
     MsgAudio2Draw mad;
+    WiFiUDP myUdp;
+    // WiFiClient myTcp;
 
     while (true) {
         if (xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY)) {
@@ -316,7 +320,8 @@ void vTaskDrawer(void* pvParameters)
 
                 switch (_TheDrawStyle) {
                 case DRAW_STYLE::BARS_WITH_TOP:
-                    //                FastLED.clear();
+                    FastLED.clear();
+                    DrawWave(mad);
                     DrawLedBars(mad);
                     DrawClock();
                     break;
@@ -328,6 +333,28 @@ void vTaskDrawer(void* pvParameters)
                     break;
                 case DRAW_STYLE::HORIZ_FIRE:
                     DrawHorizSpectrogram(mad);
+                    {
+                        std::vector<int16_t> maped;
+                        maped.resize(mad.audioLenInSamples);
+                        //
+                        if (_Connected2Wifi) {
+                            // if (!myTcp.connected()) {
+                            //     myTcp.connect(IPAddress(192, 168, 1, 141), 4444);
+                            // }
+                            int16_t mapValue;
+                            int err = myUdp.beginPacket(IPAddress(192, 168, 1, 141), 4444);
+                            for (int i = 0; i < mad.audioLenInSamples; i++) {
+                                mapValue = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
+                                // maped[i] = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
+                                myUdp.write((uint8_t*)&mapValue, sizeof(int16_t));
+                            }
+                            // myTcp.write((uint8_t*)maped.data(), maped.size() * sizeof(int16_t));
+                            myUdp.endPacket();
+                        }
+                        // _ThePubSub.publish(TOPIC_LIVEAUDIO, reinterpret_cast<uint8_t*>(maped.data()), mad.audioLenInSamples * sizeof(uint16_t));
+                        // uint16_t ff = 0xffff;
+                        // _ThePubSub.publish(TOPIC_LIVEAUDIO, reinterpret_cast<uint8_t*>(&ff), sizeof(uint16_t));
+                    }
                     break;
                 case DRAW_STYLE::VISUAL_CURRENT:
                     //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
@@ -468,7 +495,7 @@ void vTaskWifiReconnect(void* pvParameters)
                     std::string thePayload = __theHttpClient->getString().c_str();
                     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response [%d] length=[%d]", httpResponse, thePayload.length()).c_str(), false);
                     if (httpResponse == HTTP_CODE_OK) {
-                        //log_i("Payload=[%s]", thePayload.c_str());
+                        // log_i("Payload=[%s]", thePayload.c_str());
                         ProcessCurrentPayload(thePayload);
                     }
                 } else {
@@ -635,7 +662,7 @@ void setup()
         .sample_rate = SAMPLE_RATE, // samplerate configured are the number of samples returned if channel=Left+Right, not frequency. So we need to multiply*2.
         .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
         .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-        .communication_format = I2S_COMM_FORMAT_I2S_MSB, // I2S_COMM_FORMAT_STAND_MSB,
+        .communication_format = I2S_COMM_FORMAT_STAND_MSB, // I2S_COMM_FORMAT_STAND_MSB, I2S_COMM_FORMAT_I2S_MSB
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, // Interrupt level 1, default 0
         .dma_buf_count = 2, // 8,
         .dma_buf_len = (AUDIO_DATA_OUT * OVERSAMPLING), // AUDIO_DATA_OUT*OVERSAMPLING, //these are the number of samples we will read from i2s_read
@@ -674,7 +701,7 @@ void setup()
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
     // xTaskCreate(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
-    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
+    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 6500, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
     xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle, 1);
@@ -741,13 +768,6 @@ void loop()
         _ThePubSub.publish(TOPIC_HIWATER_WIFI, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_wifiReconnectTaskHandle)).c_str());
         _ThePubSub.publish(TOPIC_HIWATER_DRAWER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_drawTaskHandle)).c_str());
     }
-
-    //      if (_delayFrame) {
-    //          delay(_delayFrame);
-    // ESP.getFreeHeap()
-    // esp_get_free_heap_size();
-    // heap_caps_get_largest_free_block
-    //      }
 }
 
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)

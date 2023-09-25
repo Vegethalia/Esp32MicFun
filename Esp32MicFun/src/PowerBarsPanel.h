@@ -25,6 +25,8 @@ public:
     virtual uint16_t GetHeight() { return PANEL_HEIGHT; }
 };
 
+extern bool _NightMode;
+
 // Mapping implementation for the 33x9 panel
 class PanelMapping33x9 : public IPanelMapping<PANEL_WIDTH_33, PANEL_HEIGHT_9> {
 public:
@@ -319,9 +321,9 @@ public:
     }
 
     // Draws the n-th bar (0 based) with the value passed. Value must be scaled from 0 to PANEL_HEIGHT*10
-    void DrawBar(uint8_t numBar, uint8_t value, uint8_t brightness)
+    void DrawBar(uint8_t numBar, uint8_t value, uint8_t brightness, uint16_t maxheight = PANEL_HEIGHT - 1)
     {
-        constexpr uint16_t maxheight = PANEL_HEIGHT - 1;
+        // constexpr uint16_t maxheight = PANEL_HEIGHT - 1;
         if (!_pTheLeds || !_pTheMapping || numBar >= PANEL_WIDTH) {
             return;
         }
@@ -384,7 +386,7 @@ public:
                     break;
                 case COLOR_SCHEME::CS1: {
                     // auto bright2 = (y)*10;
-                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 5); //(y + 2) * 15); // CRGB(bright, bright, bright);
+                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 12); //(y + 2) * 15); // CRGB(bright, bright, bright);
                     break;
                 }
                 default: {
@@ -516,7 +518,9 @@ public:
                         (*_pTheLeds)[_pTheMapping->XY(x, (tileRow * 8) + xbit)] = CHSV(pixColor, 255, intensity);
                     }
                     mask = mask << 1;
-                    pixColor++;
+                    if (!_NightMode) {
+                        pixColor++;
+                    }
                 }
             }
             pTheScreenBuffer += bufferWidthInTiles * 8; // advance to the next tileRow
@@ -546,7 +550,7 @@ public:
             }
 
             for (; x < totalPixels; x++) {
-                pixColor+=2;
+                pixColor += 2;
                 if ((drawXPos + x) < 0) {
                     continue;
                 }
@@ -557,7 +561,7 @@ public:
                 // see https://github.com/olikraus/u8g2/wiki/u8g2reference#memory-structure-for-controller-with-u8x8-support
                 uint8_t mask = 0x01;
                 uint8_t pixelCol = pTheScreenBuffer[x];
-                if(!pixelCol) {
+                if (!pixelCol) {
                     continue;
                 }
                 for (uint8_t xbit = 0; xbit < 8; xbit++) {

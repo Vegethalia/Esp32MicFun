@@ -24,10 +24,10 @@ FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples)
     //              a3 = 0.0106411,
     //              f = (2.0f * PI) / (float)(numSamples - 1);
 
-    const double a0 = 0.355768,
-                 a1 = 0.487396,
-                 a2 = 0.144232,
-                 a3 = 0.012604,
+    const double a0 = 0.35875,
+                 a1 = 0.48829,
+                 a2 = 0.14128,
+                 a3 = 0.01168,
                  // f = (2.0f * PI) / (float)(numSamples - 1);
         f = (2.0f * PI) / (float)(numSamples);
 
@@ -84,7 +84,7 @@ void FftPower::AddSamples(const uint16_t* pTheRawSamples, uint16_t numSamples)
 
 // Executes the FFT plan. Call after setting numsamples of data GetInputBuffer().
 // Call GetFreqPower after this call
-bool FftPower::Execute(bool applyHanning)
+bool FftPower::Execute(bool applyHanning, uint16_t zeroValue)
 {
     if (_samplesSinceLastExecution < _executeEverySamples) {
         // log_d("Execute Called. Not enought new samples: [%d/%d]. ", _samplesSinceLastExecution, _executeEverySamples);
@@ -96,12 +96,12 @@ bool FftPower::Execute(bool applyHanning)
     if (applyHanning) {
         for (uint16_t i = 0; i < _numSamples; i++) {
             pos = (_buffPos + i) % _numSamples;
-            _pRealFftPlan->input[i] = _HanningPrecalc[i] * (float)_TheSamplesBuffer[pos];
+            _pRealFftPlan->input[i] = _HanningPrecalc[i] * (float)_TheSamplesBuffer[pos] - (float)zeroValue;
         }
     } else {
         for (uint16_t i = 0; i < _numSamples; i++) {
             pos = (_buffPos + i) % _numSamples;
-            _pRealFftPlan->input[i] = (float)_TheSamplesBuffer[pos];
+            _pRealFftPlan->input[i] = (float)_TheSamplesBuffer[pos] - (float)zeroValue;
         }
     }
     fft_execute(_pRealFftPlan);
@@ -197,7 +197,41 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
             }
             ind++;
         } while (ind < maxIndex);
-    } else if (binRes == BinResolution::AUTO5hz || binRes == BinResolution::AUTO64_3Hz || binRes == BinResolution::PIANO33_3Hz || binRes == BinResolution::PIANO64_3Hz || binRes == BinResolution::PIANO64_6Hz) { // BinResolution::AUTO5hz
+    } else if (binRes == BinResolution::AUTO64_3Hz) {
+        const uint16_t* pBinsNew = nullptr;
+        uint8_t numBins = 32;
+        if (binRes == BinResolution::AUTO64_3Hz) {
+            pBinsNew = _Auto64Bands_v3_6Hz;
+            numBins = 64;
+        }
+        int maxBinPow = -100;
+        maxBin = 0;
+        uint32_t fromBin = 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved. ENs saltem el 1er.
+        uint32_t toBin = 0;
+        for (uint16_t ind = 0; ind < numBins; ind++) {
+            fromBin = (pBinsNew[ind] - 3) * 2;
+            toBin = pBinsNew[ind] * 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved
+
+            int32_t sumBin = 0;
+            uint16_t numBins = (toBin - fromBin) / 2;
+            for (uint16_t subInd = fromBin; subInd < toBin; subInd += 2) {
+                int32_t auxSum = (int32_t)(pow(_pRealFftPlan->output[subInd], 2) + pow(_pRealFftPlan->output[subInd + 1], 2));
+                // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
+                sumBin += auxSum;
+            }
+            sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
+            pFreqPower[ind] = sumBin; // mitjana del powers de tots els bins fins aquesta freq.
+
+            if (pFreqPower[ind] > maxBinPow) {
+                maxBinPow = pFreqPower[ind];
+                maxBin = ind;
+            }
+            // if(ind<10) {
+            //     log_d("Bin [%02d] - %02d", ind, pFreqPower[ind]);
+            // }
+            fromBin = toBin;
+        }
+    } else if (binRes == BinResolution::AUTO5hz || binRes == BinResolution::PIANO33_3Hz || binRes == BinResolution::PIANO64_3Hz || binRes == BinResolution::PIANO64_6Hz) { // BinResolution::AUTO5hz
         const FreqBins* pBins = nullptr;
         uint8_t numBins = 32;
         if (binRes == BinResolution::AUTO5hz) {
@@ -210,10 +244,13 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
         } else if (binRes == BinResolution::PIANO64_3Hz) {
             pBins = _64PianoKeys_3Hz;
             numBins = 64;
-        } else if (binRes == BinResolution::AUTO64_3Hz) {
-            pBins = _Auto64Bands_v3;
-            numBins = 64;
-        } else if (binRes == BinResolution::PIANO64_6Hz) {
+        }
+        // else if (binRes == BinResolution::AUTO64_3Hz) {
+        //     // pBins = _Auto64Bands_v3;
+        //     pBinsNew = _Auto64Bands_v3_6Hz;
+        //     numBins = 64;
+        // }
+        else if (binRes == BinResolution::PIANO64_6Hz) {
             pBins = _64PianoKeys_6Hz;
             numBins = 64;
         }

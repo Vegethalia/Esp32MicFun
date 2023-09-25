@@ -17,14 +17,14 @@
 
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
-#define VOLTATGE_DRAW_RANGE 900 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define VOLTATGE_DRAW_RANGE 950 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
-#define MIN_FFT_DB -55 // a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_DB 5 // a magnitude greater than this value will be considered Max Power
+#define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 
 #define FFT_SIZE 2048
 #define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
-#define OVERSAMPLING 1 // we will oversample by this amount
+#define OVERSAMPLING 4 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
@@ -55,7 +55,7 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 
-#define NUM_FADING_WAVES 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
+#define MAX_FADING_WAVES 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
 
 CRGBArray<NUM_LEDS> _TheLeds;
 // PanelMapping33x16 _TheMapping;
@@ -75,7 +75,7 @@ uint32_t _TheFrameNumber = 0;
 float _fps = 0.0f;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
-bool _pianoMode = true;
+bool _pianoMode = false; // true;
 bool _DemoMode = true; // when the device starts, execute a sequence of "demo" figures
 bool _NightMode = false; // true if night mode is ON --> dimm colors
 uint32_t _DemoModeFrame = 0; // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
@@ -108,6 +108,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_CPU_READER "caseta/spectrometre/cpureader"
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
+#define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
 
 //------------
 // Task Related
@@ -139,6 +140,7 @@ TaskParams _TaskParams;
 
 struct MsgAudio2Draw {
     uint16_t* pAudio;
+    uint32_t audioLenInSamples;
     int32_t* pFftMag;
     uint16_t max_freq;
 };

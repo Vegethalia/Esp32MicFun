@@ -42,7 +42,7 @@ public:
     // If the FFT is performed, returns true, false otherwise (in that case more samples need to be feed).
     // If applyHanning is true, a Hanning window is preapplied before calculating the FFT.
     // Call GetFreqPower after this call to get the filtered results.
-    bool Execute(bool applyHanning = true);
+    bool Execute(bool applyHanning = true, uint16_t zeroValue=1225);
 
     // Call after Execute. Returns the frequency power for each bin. The array must be (numSamples/2)+1 long.
     // values are escaled according to maxFftMagnitude (depends on input levels... 70k is ok)
@@ -209,7 +209,7 @@ private:
     // 3300, 3360, 3420, 3480, 3540, 3600, 3660, 3720,
     // 3780, 3840, 3900, 4000, 4100, 4200, 4300, 4400
     // as v1, but only checking indiviual freqs.
-    FreqBins _Auto64Bands_v3[64] = {
+    FreqBins _Auto64Bands_v3_3Hz[64] = {
         { 15, 15 }, { 22, 22 }, { 30, 30 }, { 38, 38 }, { 46, 46 }, { 60, 66 }, { 73, 73 }, { 87, 87 }, { 103, 103 }, { 117, 117 },
         { 130, 130 }, { 147, 147 }, { 160, 160 }, { 175, 175 }, { 188, 188 }, { 203, 203 }, { 217, 217 }, { 230, 230 },
         { 245, 245 }, { 260, 260 }, { 273, 273 }, { 292, 292 }, { 307, 307 }, { 317, 317 }, { 333, 333 }, { 350, 350 },
@@ -218,5 +218,15 @@ private:
         { 769, 771 }, { 841, 843 }, { 920, 922 }, { 999, 1001 }, { 1019, 1021 }, { 1049, 1051 }, { 1079, 1081 },
         { 1119, 1121 }, { 1139, 1141 }, { 1159, 1161 }, { 1179, 1181 }, { 1199, 1201 }, { 1219, 1221 }, { 1239, 1241 },
         { 1259, 1261 }, { 1279, 1281 }, { 1299, 1301 }, { 1332, 1334 }, { 1366, 1368 }, { 1399, 1401 }, { 1432, 1434 }, { 1466, 1468 }
+    };
+    uint16_t _Auto64Bands_v3_6Hz[64] = { // from 36hz to 3000hz
+        7, 11, 15, 19, 23, 27, 31, 36,
+        40, 45, 50, 55, 60, 65, 70, 75,
+        81, 86, 92, 97, 103, 109, 115, 121,
+        128, 134, 141, 147, 154, 161, 168, 176,
+        183, 190, 198, 206, 214, 222, 230, 239,
+        248, 256, 265, 275, 284, 294, 303, 313,
+        323, 334, 344, 355, 366, 377, 389, 400,
+        412, 424, 437, 449, 462, 475, 489, 502
     };
 };
