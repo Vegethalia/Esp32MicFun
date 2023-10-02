@@ -189,7 +189,7 @@ void vTaskReader(void* pvParameters)
                     mad.audioLenInSamples = samplesRead / OVERSAMPLING;
                     mad.pFftMag = _TaskParams.fftMag;
                     // auto inTime = esp_timer_get_time();
-                    if (theFFT.Execute(true, INPUT_0_VALUE)) {
+                    if (theFFT.Execute(false, INPUT_0_VALUE)) {
                         // auto totalTime = esp_timer_get_time() - inTime;
                         // log_d("FFT time=%lldus!!", totalTime);
                         if (!_Drawing) {
@@ -342,7 +342,7 @@ void vTaskDrawer(void* pvParameters)
                             //     myTcp.connect(IPAddress(192, 168, 1, 141), 4444);
                             // }
                             int16_t mapValue;
-                            int err = myUdp.beginPacket(IPAddress(192, 168, 1, 141), 4444);
+                            int err = myUdp.beginPacket(IPAddress(192, 168, 1, 140), 4444);
                             for (int i = 0; i < mad.audioLenInSamples; i++) {
                                 mapValue = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
                                 // maped[i] = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
@@ -616,11 +616,12 @@ void setup()
     while (!Serial)
         ;
 
-    pinMode(PIN_BASS_LED, OUTPUT);
+    // pinMode(PIN_BASS_LED, OUTPUT);
     pinMode(PIN_DATA_LEDS1, OUTPUT);
     pinMode(PIN_DATA_LEDS2, OUTPUT);
     pinMode(PIN_DATA_LEDS3, OUTPUT);
     pinMode(PIN_DATA_LEDS4, OUTPUT);
+    pinMode(PIN_AUDIO_IN, INPUT);
 
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS1, GRB>(_TheLeds, 0, THE_PANEL_WIDTH * 8);
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, THE_PANEL_WIDTH * 8, THE_PANEL_WIDTH * 8);
@@ -682,14 +683,14 @@ void setup()
         .bck_io_num = I2S_PIN_NO_CHANGE, // Sample f(Hz) (= sample f * 2)  on this pin (optional).
         .ws_io_num = I2S_PIN_NO_CHANGE, // Left/Right   (= sample f)      on this pin (optional).
         .data_out_num = I2S_PIN_NO_CHANGE,
-        .data_in_num = RTCIO_CHANNEL_4_GPIO_NUM // ADC1_CHANNEL_4_GPIO_NUM// RTCIO_CHANNEL_4_GPIO_NUM
+        .data_in_num = PIN_AUDIO_IN // RTCIO_CHANNEL_4_GPIO_NUM // ADC1_CHANNEL_4_GPIO_NUM// RTCIO_CHANNEL_4_GPIO_NUM
     };
     err = i2s_set_pin(I2S_NUM_0, &pin_config);
     if (err != ESP_OK) {
         log_e("i2s_set_pin failed");
     }
     // init ADC pad
-    err = i2s_set_adc_mode(ADC_UNIT_1, ADC1_CHANNEL_4);
+    err = i2s_set_adc_mode(ADC_UNIT_1, PIN_AUDIO_IN); // ADC1_CHANNEL_4
     if (err != ESP_OK) {
         log_e("set_adc_mode failed");
     }
@@ -701,17 +702,17 @@ void setup()
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
     // xTaskCreate(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
-    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 6500, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
+    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
     // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     // start task to draw screen
-    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle, 1);
+    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 2500, (void*)&_TaskParams, 3, &_drawTaskHandle, 1);
     //    xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
     // // start task to draw leds
     // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
     // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 
     // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 4000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
-    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 5000, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
+    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 4500, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
 
     // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
     //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);

@@ -3,6 +3,8 @@
 #include "fft.h"
 #include <vector>
 
+constexpr int DEFAULT_FFTSIZE = 4096;
+
 // Utility class used to get the FFT Power spectrum of an audio signal
 class FftPower {
 private:

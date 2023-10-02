@@ -1,6 +1,6 @@
 #define PIN_I2C_SDA 21
 #define PIN_I2C_SCL 22
-#define PIN_BASS_LED 33
+// #define PIN_BASS_LED 33
 #define PIN_DATA_LEDS1 16
 #define PIN_DATA_LEDS2 4
 #define PIN_DATA_LEDS3 2
@@ -17,14 +17,14 @@
 
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1225 // input is biased towards 1.5V
-#define VOLTATGE_DRAW_RANGE 950 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define VOLTATGE_DRAW_RANGE 300 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
 #define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
-#define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
+#define MIN_FFT_DB -70 // a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_DB -5 // a magnitude greater than this value will be considered Max Power
 
 #define FFT_SIZE 2048
 #define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
-#define OVERSAMPLING 4 // we will oversample by this amount
+#define OVERSAMPLING 2 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
@@ -55,7 +55,7 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 
-#define MAX_FADING_WAVES 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
+#define MAX_FADING_WAVES 1 //2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
 
 CRGBArray<NUM_LEDS> _TheLeds;
 // PanelMapping33x16 _TheMapping;

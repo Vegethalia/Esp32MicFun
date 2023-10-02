@@ -393,14 +393,16 @@ void DrawWave(MsgAudio2Draw& mad)
 
     uint8_t numFadingWaves = 1;
     if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
-        numFadingWaves = 2;
-        myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+        // numFadingWaves = 2;
+        myValue.setHSV(HSVHue::HUE_AQUA, 128, 80);
     }
 
     for (i = 0; i < width; i++) {
-        value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        value = map(value / 2, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+        // value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - 50), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE - 50);
+        // value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - 50), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE - 50);
+        value = mad.pAudio[pas0 + (i * 2)];
+        value += mad.pAudio[pas0 + (i * 2) + 1];
+        value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
 
         // value = constrain(mad.pAudio[pas0 + (i * 3)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         // value += constrain(mad.pAudio[pas0 + (i * 3) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
@@ -492,7 +494,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
     // if ((_TheFrameNumber % 8) == 0) {
     //     _incBoleta = (_incBoleta + 1) % 4;
     // }
-    if (_1stBarValue > 160) {
+    if (_1stBarValue > 175) {
         _incBoleta = (_incBoleta + 1) % 4;
     }
     for (uint8_t j = everyKwh; j < maxV; j += everyKwh) {
@@ -514,8 +516,8 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
             mapValue = map(_pLectures[i].valorEnLeds, 0, _MapMaxWhToPixels, 0, maxV);
 
             // pintem "barres"
-            intensityBar = constrain(mad.pFftMag[i], MIN_FFT_DB + 5, MAX_FFT_DB);
-            intensityBar = map(intensityBar, MIN_FFT_DB + 5, MAX_FFT_DB, 0, 140);
+            intensityBar = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+            intensityBar = map(intensityBar, MIN_FFT_DB, MAX_FFT_DB + 5, 0, 140);
             for (uint8_t j = 1; j < mapValue; j++) {
                 _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
             }

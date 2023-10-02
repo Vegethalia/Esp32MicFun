@@ -11,6 +11,7 @@ FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples)
     _numSamples = numSamples;
     _TheSamplesBuffer.resize(numSamples);
 
+    //int fftSize = max(numSamples, DEFAULT_FFTSIZE);
     _pRealFftPlan = fft_init(numSamples, FFT_REAL, FFT_FORWARD, nullptr, nullptr);
 
     _HanningPrecalc.resize(numSamples);
@@ -24,26 +25,26 @@ FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples)
     //              a3 = 0.0106411,
     //              f = (2.0f * PI) / (float)(numSamples - 1);
 
-    const double a0 = 0.35875,
-                 a1 = 0.48829,
-                 a2 = 0.14128,
-                 a3 = 0.01168,
-                 // f = (2.0f * PI) / (float)(numSamples - 1);
-        f = (2.0f * PI) / (float)(numSamples);
+    // const double a0 = 0.35875,
+    //              a1 = 0.48829,
+    //              a2 = 0.14128,
+    //              a3 = 0.01168;
+    // const double f = (2.0f * PI) / (float)(numSamples);
 
-    for (uint16_t i = 0; i < numSamples; i++) {
-        float nutt = a0 - a1 * cos((float)i * f) + a2 * cos(2 * (float)i * f) - a3 * cos(3 * (float)i * f);
-        _HanningPrecalc[i] = nutt;
-    }
+    // for (uint16_t i = 0; i < numSamples; i++) {
+    //     float nutt = a0 - a1 * cos((float)i * f) + a2 * cos(2 * (float)i * f) - a3 * cos(3 * (float)i * f);
+    //     _HanningPrecalc[i] = nutt;
+    // }
 
     // HANN WINDOW
-    // for (uint16_t i = 0; i < numSamples; i++) {
-    //     // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
-    //     // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
-    //     float hann = 0.5f * (1.0f - cos((2.0f * PI * (float)i) / (float)(numSamples - 1)));
-    //     _HanningPrecalc[i] = hann;
-    //     //     *0.25 * sin((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1));
-    // }
+    const double f = (2.0f * PI) / (float)(numSamples - 1);
+    for (uint16_t i = 0; i < numSamples; i++) {
+        // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
+        // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
+        float hann = 0.5f * (1.0f - cos(((float)i * f)));
+        _HanningPrecalc[i] = hann;
+        //     *0.25 * sin((2.0f * PI * (float)i) / (float)(AUDIO_DATA_OUT - 1));
+    }
 }
 
 FftPower::~FftPower()
