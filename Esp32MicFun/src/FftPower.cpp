@@ -2,6 +2,23 @@
 
 #include "FftPower.h"
 
+float q_rsqrt(float number)
+{
+    long i;
+    float x2, y;
+    const float threehalfs = 1.5F;
+
+    x2 = number * 0.5F;
+    y = number;
+    i = *(long*)&y; // evil floating point bit level hacking
+    i = 0x5f3759df - (i >> 1); // what the fuck?
+    y = *(float*)&i;
+    y = y * (threehalfs - (x2 * y * y)); // 1st iteration
+    // y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+    return y;
+}
+
 FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples)
 {
 
@@ -11,7 +28,7 @@ FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples)
     _numSamples = numSamples;
     _TheSamplesBuffer.resize(numSamples);
 
-    //int fftSize = max(numSamples, DEFAULT_FFTSIZE);
+    // int fftSize = max(numSamples, DEFAULT_FFTSIZE);
     _pRealFftPlan = fft_init(numSamples, FFT_REAL, FFT_FORWARD, nullptr, nullptr);
 
     _HanningPrecalc.resize(numSamples);
@@ -61,21 +78,21 @@ float* FftPower::GetInputBuffer()
 
 // Adds a pack of audio samples to the internal circular buffer.
 // Oldest samples are automatically replaced when the internal buffer is filled.
-void FftPower::AddSamples(const uint16_t* pTheRawSamples, uint16_t numSamples)
+void FftPower::AddSamples(const int16_t* pTheRawSamples, uint16_t numSamples)
 {
     // cap tot?
     if (_buffPos + numSamples < _numSamples) {
         //  log_d("FullCopy Adding [%d] samples at pos [%d]", numSamples, _buffPos);
-        memcpy(_TheSamplesBuffer.data() + _buffPos, pTheRawSamples, numSamples * sizeof(uint16_t));
+        memcpy(_TheSamplesBuffer.data() + _buffPos, pTheRawSamples, numSamples * sizeof(int16_t));
         _buffPos += numSamples;
     } else { // no hi cap tot, primer copiem al final del buffer i despres el que queda al principi
         uint16_t endBuffSamples = min((int)_numSamples - (int)_buffPos, (int)numSamples);
         uint16_t startBuffSamples = numSamples - endBuffSamples;
-        memcpy(_TheSamplesBuffer.data() + _buffPos, pTheRawSamples, endBuffSamples * sizeof(uint16_t));
+        memcpy(_TheSamplesBuffer.data() + _buffPos, pTheRawSamples, endBuffSamples * sizeof(int16_t));
         //  log_d("PartialCopy Adding [%d] samples at pos [%d].", endBuffSamples, _buffPos);
         if (startBuffSamples) {
             log_d("And PartialCopy Adding [%d] samples at pos 0. ", startBuffSamples);
-            memcpy(_TheSamplesBuffer.data(), pTheRawSamples + endBuffSamples, startBuffSamples * sizeof(uint16_t));
+            memcpy(_TheSamplesBuffer.data(), pTheRawSamples + endBuffSamples, startBuffSamples * sizeof(int16_t));
         }
         _buffPos = (_buffPos + numSamples) % _numSamples;
         // log_d("New pos [%d]", _buffPos);
@@ -116,7 +133,8 @@ bool FftPower::Execute(bool applyHanning, uint16_t zeroValue)
 // Call after Execute. Returns the frequency power for each bin. The array must be (numSamples/2)+1 long.
 // values are escaled according to maxFftMagnitude (depends on input levels... 70k is ok)
 // Returns the bin index with the higher power
-void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t& maxMag)
+// numFreqsOut => size of pFreqPower array, or max number of values to return
+void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t& maxMag)
 {
     uint16_t maxIndex = _TheSamplesBuffer.size() / 2;
 
@@ -205,27 +223,37 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
             pBinsNew = _Auto64Bands_v3_6Hz;
             numBins = 64;
         }
-        int maxBinPow = -100;
         maxBin = 0;
         uint32_t fromBin = 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved. ENs saltem el 1er.
         uint32_t toBin = 0;
         for (uint16_t ind = 0; ind < numBins; ind++) {
-            fromBin = (pBinsNew[ind] - 3) * 2;
-            toBin = pBinsNew[ind] * 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved
+            if (ind > 0) {
+                fromBin = (pBinsNew[ind - 1]) * 2;
+            }
+            toBin = (pBinsNew[ind]) * 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved
 
-            int32_t sumBin = 0;
+            // int32_t sumBin = 0;
+            float sumBin = 0;
             uint16_t numBins = (toBin - fromBin) / 2;
             for (uint16_t subInd = fromBin; subInd < toBin; subInd += 2) {
-                int32_t auxSum = (int32_t)(pow(_pRealFftPlan->output[subInd], 2) + pow(_pRealFftPlan->output[subInd + 1], 2));
+                float auxSum = (float)(pow(_pRealFftPlan->output[subInd], 2) + pow(_pRealFftPlan->output[subInd + 1], 2));
                 // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
-                sumBin += auxSum;
+
+                if (auxSum > sumBin) {
+                    sumBin = auxSum;
+                }
+                // sumBin += auxSum;
             }
-            sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
+            // sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin) / (float)maxFftMagnitude)); // max energy of all bins
+            //  sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
+            //  sumBin = (int32_t)(10.0 * log(1.0f / (q_rsqrt(sumBin / numBins) * (float)maxFftMagnitude))); //avg energy of all bins
+            float mag = 1.0f / q_rsqrt(sumBin);
+            sumBin = (float)(10.0f * log(mag / (float)maxFftMagnitude)); // max energy of all bins
             pFreqPower[ind] = sumBin; // mitjana del powers de tots els bins fins aquesta freq.
 
-            if (pFreqPower[ind] > maxBinPow) {
-                maxBinPow = pFreqPower[ind];
-                maxBin = ind;
+            if (mag > maxMag) {
+                maxMag = mag;
+                maxBin = (fromBin + 2) / 2;
             }
             // if(ind<10) {
             //     log_d("Bin [%02d] - %02d", ind, pFreqPower[ind]);
@@ -301,7 +329,8 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
                     pFreqPower[ind] = aux;
                 }
             }
-            pFreqPower[ind] = (int32_t)(10.0 * log((float)sqrt(pFreqPower[ind]) / (float)maxFftMagnitude));
+            // pFreqPower[ind] = (int32_t)(10.0 * log((float)sqrt(pFreqPower[ind]) / (float)maxFftMagnitude));
+            pFreqPower[ind] = (int32_t)(10.0f * log(1.0f / (q_rsqrt(pFreqPower[ind]) * (float)maxFftMagnitude)));
 
             if (pFreqPower[ind] > maxBinPow) {
                 maxBinPow = pFreqPower[ind];
@@ -312,6 +341,29 @@ void FftPower::GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinRe
             // }
         }
         // log_d("MaxBin %02d - Pow %02d - Freq %4.2fHz", maxBin, pFreqPower[maxBin], (pBins[maxBin].fromBin + pBins[maxBin].toBin) / 2.0 * 3.0);
+    } else if (binRes == BinResolution::MATRIX) {
+        int16_t numBins = min((int16_t)numFreqsOut, (int16_t)(_numSamples / 2));
+        int16_t currentBin = 1;
+        int16_t everyBin = (_numSamples / 2) / numBins;
+
+        for (uint32_t ind = 0; ind < numBins; ind++, currentBin += everyBin) {
+            //  log_d("FromBin [%04d] ToBin [%02d]", fromBin, toBin);
+            auto aux = (float)(pow(_pRealFftPlan->output[currentBin], 2) + pow(_pRealFftPlan->output[currentBin + 1], 2));
+            // pFreqPower[ind] = (int32_t)(10.0 * log((float)sqrt(aux) / (float)maxFftMagnitude));
+            float mag = 1.0f / q_rsqrt(aux);
+            pFreqPower[ind] = (float)(10.0f * log(mag / (float)maxFftMagnitude));
+
+            if (mag > maxMag) {
+                maxMag = mag;
+                maxBin = ind;
+            }
+            // if (ind < 10) {
+            //     log_d("Bin [%02d] - %02d", ind, pFreqPower[ind]);
+            // }
+            // if (ind < 200) {
+            //     log_d("Bin [%02d] - Mag=%6.2f Dbs=%02d", ind, mag, pFreqPower[ind]);
+            // }
+        }
     }
 }
 // void NewAudio(uint16_t *pAudioIn, uint16_t samplesIn)

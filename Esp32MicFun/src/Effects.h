@@ -253,6 +253,7 @@ void DrawParametric(MsgAudio2Draw& mad)
                     // yMag = s_TheDemoParams.phaseMagsy[0];
                     _DemoMode = false;
                     _u8g2.setFont(u8g2_font_princess_tr);
+                    log_d("DeMo MoDe FINISH");
                 }
             }
             _DemoModeFrame++;
@@ -365,18 +366,36 @@ void DrawWave(MsgAudio2Draw& mad)
     };
     static WavePoint _WaveBuffer[MAX_FADING_WAVES][THE_PANEL_WIDTH]; // circular buffer of waves
     static uint8_t _LasttWaveIndex = 0; // index of the circular buffer, apunta a la wave que toca pintar
+    static int16_t _OffsetMv = 0; // adjust wave scale so it does not appears to flat or clipping
+    static auto _lastIncrease = millis();
+    static uint16_t _maxValueVeryHi = 0; // max value drawn since _lastIncrease
+    static uint16_t _maxValueHi = 0; // max value drawn since _lastIncrease
 
     uint8_t height = _TheMapping.GetHeight() - 1;
     uint16_t width = _TheMapping.GetWidth();
     uint16_t i;
     int16_t value;
 
+    if (WITH_MEMS_MIC) { // Escalem la ona a "mic analògic 9814"
+        int16_t valueOrig;
+        for (i = 0; i < mad.audioLenInSamples; i++) {
+            valueOrig = mad.pAudio[i];
+            if (valueOrig < INT16_MIN / 6) {
+                valueOrig = INT16_MIN / 6;
+            } else if (valueOrig > INT16_MAX / 6) {
+                valueOrig = INT16_MAX / 6;
+            }
+
+            mad.pAudio[i] = map(valueOrig, INT16_MIN / 6, INT16_MAX / 6, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+        }
+    }
+
     // busquem el pass per "0" després de la muntanya més gran
     uint16_t pas0 = 0;
     uint16_t maxAmp = INPUT_0_VALUE;
     uint16_t iMaxAmp = 0;
     for (i = 0; i < (width / 2); i++) {
-        if (mad.pAudio[i] > (maxAmp + 100)) {
+        if (mad.pAudio[i] > maxAmp) {
             maxAmp = mad.pAudio[i];
             iMaxAmp = i;
         }
@@ -396,27 +415,67 @@ void DrawWave(MsgAudio2Draw& mad)
         // numFadingWaves = 2;
         myValue.setHSV(HSVHue::HUE_AQUA, 128, 80);
     }
-
+    int16_t numValuesHi = 0;
+    int16_t numValuesVeryHi = 0;
     for (i = 0; i < width; i++) {
-        // value = constrain(mad.pAudio[pas0 + (i * 2)], INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - 50), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE - 50);
-        // value += constrain(mad.pAudio[pas0 + (i * 2) + 1], INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - 50), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE - 50);
-        value = mad.pAudio[pas0 + (i * 2)];
-        value += mad.pAudio[pas0 + (i * 2) + 1];
-        value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
+        // value = mad.pAudio[pas0 + (i * 3)];
+        // value += mad.pAudio[pas0 + (i * 3) + 1];
+        // value += mad.pAudio[pas0 + (i * 3) + 2];
+        // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));
+        value = mad.pAudio[pas0 + i];
+        value = map(value, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
+        // if (value > height / 2) {
+        //     sumValues += value;
+        //     numValues++;
+        // };
+        if (value >= height - 5) {
+            numValuesVeryHi++;
+        } else if (value >= height - 10) {
+            numValuesHi++;
+        }
 
-        // value = constrain(mad.pAudio[pas0 + (i * 3)], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        // value += constrain(mad.pAudio[pas0 + (i * 3) + 1], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        // value += constrain(mad.pAudio[pas0 + (i * 3) + 2], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        // value = map(value / 3, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-
-        // value = constrain(mad.pAudio[pas0 + i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
-        // value = map(value, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, height);
-        // myValue.setHSV(HSVHue::HUE_BLUE, 148, 48);
+        // value = min((int16_t)max(value, (int16_t)0), (int16_t)height);
         _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
         _WaveBuffer[_LasttWaveIndex][i].thePixel = myValue;
-        //_TheLeds[_TheMapping.XY(i, value)] += myValue;
-        //.setHSV(CHSV.setHSV(HSVHue::HUE_BLUE, 148, 48);
     }
+    if (numValuesHi > _maxValueHi) {
+        _maxValueHi = numValuesHi;
+    }
+    if (numValuesVeryHi > _maxValueVeryHi) {
+        _maxValueVeryHi = numValuesVeryHi;
+    }
+    // sumValues = sumValues / numValues;
+    // if (sumValues > _maxValue) {
+    //     _maxValue = sumValues;
+    // }
+
+    if ((millis() - _lastIncrease) > (10 * 1000)) {
+        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 10) && _OffsetMv > 0) {
+            _OffsetMv -= 25;
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < (VOLTATGE_DRAW_RANGE - 150)) {
+            _OffsetMv += 25;
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        } else {
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("STAY --> Offset=%d ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        }
+
+        _maxValueVeryHi = 0;
+        _maxValueHi = 0;
+        _lastIncrease = millis();
+    }
+
+    // if (_maxValue < (height - 6) && _OffsetMv < 250 && (millis() - _lastIncrease) > (10 * 1000)) {
+    //     _lastIncrease = millis();
+    //     _OffsetMv += 25;
+    //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("OffsetDbs=%d, maxValue=%d", _OffsetMv, _maxValue).c_str());
+    //     _maxValue = 0;
+    // } else if (_maxValue >= (height - 2)) {
+    //     _lastIncrease = millis();
+    //     _OffsetMv -= 25;
+    //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("OffsetDbs=%d, maxValue=%d", _OffsetMv, _maxValue).c_str());
+    //     _maxValue = 0;
+    // }
 
     if (numFadingWaves > 1) { // fem desapareixer la 1era wave, que serà la última ara
         // pintem les n waves anteriors
@@ -443,6 +502,34 @@ void DrawWave(MsgAudio2Draw& mad)
     }
 
     //_ThePanel.IncBaseHue();
+}
+
+void DrawMatrixFFT(MsgAudio2Draw& mad)
+{
+    const uint8_t numLines = mad.sizeFftMagVector / THE_PANEL_WIDTH;
+    uint8_t currentLine = THE_PANEL_HEIGHT - 1;
+    uint16_t currentBin = 0;
+    uint8_t x;
+
+    for (uint8_t iLine = 0; iLine < numLines; iLine++) {
+        for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
+            auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
+            value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
+            if (value < 25) {
+                value = 0;
+            } else {
+                value -= 25;
+            }
+
+            if (iLine % 2 == 0) {
+                x = xPix;
+            } else {
+                x = THE_PANEL_WIDTH - xPix - 1;
+            }
+            _TheLeds[_TheMapping.XY(x, currentLine)] = CHSV(HSVHue::HUE_PURPLE + (value / 2), 255, (uint8_t)value);
+        }
+        currentLine--;
+    }
 }
 
 void DrawCurrentGraph(MsgAudio2Draw& mad)

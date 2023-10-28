@@ -107,7 +107,8 @@ void ConfigureNTP()
 // uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
 void vTaskReader(void* pvParameters)
 {
-    uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
+    const uint8_t REAL_BYTES_X_SAMPLE = BYTES_X_SAMPLE == 3 ? 4 : BYTES_X_SAMPLE;
+    uint8_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING * REAL_BYTES_X_SAMPLE];
     size_t buffSize = sizeof(_TaskParams.data1);
     size_t buffSizeOrig = sizeof(dataOrig);
     size_t bytesRead = 0;
@@ -118,10 +119,12 @@ void vTaskReader(void* pvParameters)
     uint16_t numCalls = 0;
     uint16_t missedFrames = 0;
     int32_t superMaxMag = -10000;
+    uint16_t superMaxBin = 0;
     MsgAudio2Draw mad;
     // uint16_t THE_FFT_SIZE = AUDIO_DATA_OUT * 16;
     FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT); // AUDIO_DATA_OUT  * 2
     float* pInputFft = theFFT.GetInputBuffer();
+    bool skipNext = false;
     // float hanningPreCalc[REAL_SIZE_TEMP]; // AUDIO_DATA_OUT
 
     // for (uint16_t i = 0; i < REAL_SIZE_TEMP; i++) {
@@ -141,7 +144,7 @@ void vTaskReader(void* pvParameters)
     for (;;) {
         if (xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
             if (adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
-                uint16_t* pDest = _TaskParams.data1;
+                int16_t* pDest = _TaskParams.data1;
 
                 //_TaskParams.lastBuffSet = _TaskParams.lastBuffSet == 2 ? 1 : 2;
                 auto err = i2s_read(I2S_NUM_0, (void*)dataOrig, buffSizeOrig, &bytesRead, portMAX_DELAY);
@@ -152,23 +155,58 @@ void vTaskReader(void* pvParameters)
                         log_w("bytesRead=%d expected=%d", (int)bytesRead, (int)buffSizeOrig);
                     }
 
-                    uint16_t samplesRead = bytesRead / sizeof(uint16_t);
+                    uint16_t samplesRead = bytesRead / REAL_BYTES_X_SAMPLE; // BYTES_X_SAMPLE sizeof(uint16_t);
                     totalSamples += samplesRead;
                     numCalls++;
                     if (_OTA.Status() == OtaUpdater::OtaStatus::UPDATING) {
                         continue;
                     }
+
+                    // log_d("-----");
+                    // for (int iRaw = 0; iRaw < bytesRead - 12; iRaw += 12) {
+                    //     log_d("%2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
+                    //         dataOrig[iRaw + 0], dataOrig[iRaw + 1], dataOrig[iRaw + 2], dataOrig[iRaw + 3],
+                    //         dataOrig[iRaw + 4], dataOrig[iRaw + 5], dataOrig[iRaw + 6], dataOrig[iRaw + 7],
+                    //         dataOrig[iRaw + 8], dataOrig[iRaw + 9], dataOrig[iRaw + 10], dataOrig[iRaw + 11]);
+
+                    //     if (iRaw > 100) {
+                    //         break;
+                    //     }
+                    // }
                     //_TaskParams.buffNumber++;
                     // now we convert the values to mv from 1V to 3V
                     // int k=0;
                     // log_d("BytesRead=%d buzzSizeOrig=%d SamplesRead=%d TotalSamples=%d", bytesRead, buffSizeOrig, samplesRead, totalSamples);
                     // for (int i = 0, k = 0; i < samplesRead; i += 1, k++) {
+                    int byteIndex = 0;
+                    int32_t fastValue;
+                    int32_t overValue;
                     for (int i = 0, k = 0; i < samplesRead; i += OVERSAMPLING, k++) {
-                        pDest[k] = 0;
-                        for (uint8_t ov = 0; ov < OVERSAMPLING; ov++) {
-                            pDest[k] += (uint16_t)(esp_adc_cal_raw_to_voltage(dataOrig[i + ov] & MASK_12BIT, _adc_chars));
+                        byteIndex = i * REAL_BYTES_X_SAMPLE;
+                        // if (WITH_MEMS_MIC) { // escalem a mateix rang que MAX9814 analog mic
+                        //     fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 12; //>>8 to get a 24 bit value, >>3 to scale down the value to 1/8
+                        //                                                              // map(dataOrig[i + ov], 0 - MEMS_MIC_MAXVALUE, MEMS_MIC_MAXVALUE,
+                        //                                                              //  INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+                        //                                                              // log_d("Bytes=%2X %2X %2X %2X bitOr=%8X sum=%08d dest=%08d fast=%8X",
+                        //                                                              //     dataOrig[byteIndex + 3], dataOrig[byteIndex + 2], dataOrig[byteIndex + 1], dataOrig[byteIndex + 0], value24b, value24b,
+                        //                                                              //     pDest[k], fastValue);
+                        //     pDest[k] = (int16_t)(fastValue);
+                        // } else {
+                        // pDest[k] = 0;
+                        overValue = 0;
+                        for (uint8_t ov = 0; ov < OVERSAMPLING; ov++, byteIndex += REAL_BYTES_X_SAMPLE) {
+                            if (WITH_MEMS_MIC) { // escalem a mateix rang que MAX9814 analog mic
+                                int32_t fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 12; //>>8 to get a 24 bit value, >>4 to scale down the value to 1/8
+
+                                // pDest[k] += (int16_t)(fastValue); // >> 2 to scale down the value to 1 / 4
+                                overValue += fastValue;
+                            } else {
+                                // pDest[k] += (int16_t)(esp_adc_cal_raw_to_voltage(dataOrig[i + ov] & MASK_12BIT, _adc_chars));
+                                overValue += esp_adc_cal_raw_to_voltage(dataOrig[i + ov] & MASK_12BIT, _adc_chars);
+                            }
                         }
-                        pDest[k] = pDest[k] / OVERSAMPLING;
+                        // }
+                        pDest[k] = (int16_t)((overValue / OVERSAMPLING));
 
                         // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
                         // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
@@ -182,52 +220,58 @@ void vTaskReader(void* pvParameters)
                         //     pDest[k] = map(pDest[k], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, 0, SCREEN_HEIGHT - 1);
                         // }
                     }
+
                     theFFT.AddSamples(pDest, samplesRead / OVERSAMPLING);
                     //                    if (!_Drawing) {
-                    uint16_t maxMagI = 0;
                     mad.pAudio = pDest;
                     mad.audioLenInSamples = samplesRead / OVERSAMPLING;
                     mad.pFftMag = _TaskParams.fftMag;
+                    mad.sizeFftMagVector = sizeof(_TaskParams.fftMag);
+
                     // auto inTime = esp_timer_get_time();
-                    if (theFFT.Execute(false, INPUT_0_VALUE)) {
+                    if (theFFT.Execute(false, WITH_MEMS_MIC ? 0 : INPUT_0_VALUE)) { // WITH_MEMS_MIC ? 0 : INPUT_0_VALUE
                         // auto totalTime = esp_timer_get_time() - inTime;
                         // log_d("FFT time=%lldus!!", totalTime);
-                        if (!_Drawing) {
-                            // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
-                            theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE,
-                                _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_3Hz,
-                                maxMagI, superMaxMag);
-                            mad.max_freq = (uint16_t)(maxMagI * freqs_x_bin);
-
-                            if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
-                                missedFrames++;
-                            }
-                        } else {
-                            log_d("MISSED!!");
-                            missedFrames++;
+                        //                        if (!_Drawing) {
+                        // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
+                        auto mode = _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_3Hz;
+                        if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT) {
+                            mode = FftPower::BinResolution::MATRIX;
                         }
-                    }
-                    //                  } else {
-                    //                     log_d("MISSED!!");
-                    //                     missedFrames++;
-                    //                }
-                    // DrawLedBars(mad);
-                    //  DrawLeds(mad);
+                        int32_t maxMag = -1000;
+                        uint16_t maxBin = 0;
+                        theFFT.GetFreqPower(mad.pFftMag, mad.sizeFftMagVector, MAX_FFT_MAGNITUDE, mode, maxBin, maxMag);
+                        mad.max_freq = (uint16_t)(maxBin * freqs_x_bin);
+                        if (superMaxMag < maxMag) {
+                            superMaxMag = maxMag;
+                            superMaxBin = maxBin;
+                        }
 
+                        if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
+                            missedFrames++;
+                            log_d("Send2Drawer error!");
+                        }
+                        //     } else {
+                        //         // log_d("MISSED!!");
+                        //         missedFrames++;
+                        //     }
+                    }
                     // if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
                     // 	log_d("ShowLeds Queue FULL!!");
                     // }
+
                     auto now = millis();
                     if ((now - recInit) >= 30000) {
-                        // std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d missedFrames=%d",
-                        //     now - recInit, totalSamples, numCalls, superMaxMag, missedFrames));
-                        // log_d(msg.c_str());
-                        // _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
+                        std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxBin=%d maxFreq=%dHz missedFrames=%d",
+                            now - recInit, totalSamples, numCalls, superMaxMag, superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));
+                        log_d("%s", msg.c_str());
+                        _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
 
                         recInit = now;
                         totalSamples = 0;
                         numCalls = 0;
                         superMaxMag = -10000;
+                        superMaxBin = 0;
                         missedFrames = 0;
                     }
                 }
@@ -286,7 +330,7 @@ void vTaskDrawer(void* pvParameters)
 
     while (true) {
         if (xQueueReceive(_xQueSendAudio2Drawer, &mad, (portTickType)portMAX_DELAY)) {
-            uint16_t* pDest = mad.pAudio;
+            int16_t* pDest = mad.pAudio;
 
             if (_numFrames == 0) {
                 _InitTime = millis();
@@ -307,6 +351,9 @@ void vTaskDrawer(void* pvParameters)
             // if(!xQueueSendToBack(_xQueSendFft2Led, &mad, 0)) {
             // 	log_d("ShowLeds Queue FULL!!");
             // }
+            if (_Drawing) {
+                continue;
+            }
             _Drawing = true;
             _TheFrameNumber++;
 
@@ -317,7 +364,6 @@ void vTaskDrawer(void* pvParameters)
                     //_DemoMode = false;
                 }
             } else {
-
                 switch (_TheDrawStyle) {
                 case DRAW_STYLE::BARS_WITH_TOP:
                     FastLED.clear();
@@ -333,27 +379,27 @@ void vTaskDrawer(void* pvParameters)
                     break;
                 case DRAW_STYLE::HORIZ_FIRE:
                     DrawHorizSpectrogram(mad);
-                    {
-                        std::vector<int16_t> maped;
-                        maped.resize(mad.audioLenInSamples);
-                        //
-                        if (_Connected2Wifi) {
-                            // if (!myTcp.connected()) {
-                            //     myTcp.connect(IPAddress(192, 168, 1, 141), 4444);
-                            // }
+                    if (_Connected2Wifi) {
+                        // if (!myTcp.connected()) {
+                        //     myTcp.connect(IPAddress(192, 168, 1, 141), 4444);
+                        // }
+                        int err = myUdp.beginPacket(IPAddress(192, 168, 1, 140), 4444);
+
+                        if (WITH_MEMS_MIC) {
+                            myUdp.write((uint8_t*)mad.pAudio, mad.audioLenInSamples * sizeof(int16_t));
+                        } else {
                             int16_t mapValue;
-                            int err = myUdp.beginPacket(IPAddress(192, 168, 1, 140), 4444);
+                            // std::vector<int16_t> maped;
+                            // maped.resize(mad.audioLenInSamples);
+
                             for (int i = 0; i < mad.audioLenInSamples; i++) {
                                 mapValue = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
                                 // maped[i] = (int16_t)map(mad.pAudio[i], INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE, -32000, 32000);
                                 myUdp.write((uint8_t*)&mapValue, sizeof(int16_t));
                             }
-                            // myTcp.write((uint8_t*)maped.data(), maped.size() * sizeof(int16_t));
-                            myUdp.endPacket();
                         }
-                        // _ThePubSub.publish(TOPIC_LIVEAUDIO, reinterpret_cast<uint8_t*>(maped.data()), mad.audioLenInSamples * sizeof(uint16_t));
-                        // uint16_t ff = 0xffff;
-                        // _ThePubSub.publish(TOPIC_LIVEAUDIO, reinterpret_cast<uint8_t*>(&ff), sizeof(uint16_t));
+                        // myTcp.write((uint8_t*)maped.data(), maped.size() * sizeof(int16_t));
+                        myUdp.endPacket();
                     }
                     break;
                 case DRAW_STYLE::VISUAL_CURRENT:
@@ -361,6 +407,13 @@ void vTaskDrawer(void* pvParameters)
                     FastLED.clear();
                     DrawWave(mad);
                     DrawCurrentGraph(mad);
+                    DrawClock();
+                    break;
+                case DRAW_STYLE::MATRIX_FFT:
+                    //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
+                    FastLED.clear();
+                    DrawWave(mad);
+                    DrawMatrixFFT(mad);
                     DrawClock();
                     break;
                 }
@@ -373,7 +426,7 @@ void vTaskDrawer(void* pvParameters)
 
             auto now = millis();
             if (_numFrames && (now - _InitTime) >= 30000) {
-                _fps = 1000.0f / ((now - _InitTime) / _numFrames);
+                _fps = 1000.0f / ((float)(now - _InitTime) / (float)_numFrames);
                 log_d("time=%d frames=%d fps=%3.2f samplesDrawn=%d missedFrames=%d", now - _InitTime, _numFrames, _fps, samplesDrawn, missedFrames);
                 samplesDrawn = 0;
                 _numFrames = 0;
@@ -467,7 +520,8 @@ void vTaskWifiReconnect(void* pvParameters)
                 _ThePubSub.setBufferSize(1024);
                 Connect2MQTT();
                 if (_ThePubSub.connected()) {
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), true);
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), false);
+                    _ThePubSub.publish(TOPIC_LASTIP, Utils::string_format("%s", WiFi.localIP().toString().c_str()).c_str(), true);
                 }
             }
         }
@@ -622,6 +676,9 @@ void setup()
     pinMode(PIN_DATA_LEDS3, OUTPUT);
     pinMode(PIN_DATA_LEDS4, OUTPUT);
     pinMode(PIN_AUDIO_IN, INPUT);
+    pinMode(PIN_MIC_I2S_SCK, OUTPUT);
+    pinMode(PIN_MIC_I2S_WS, OUTPUT);
+    pinMode(PIN_MIC_I2S_SD, INPUT);
 
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS1, GRB>(_TheLeds, 0, THE_PANEL_WIDTH * 8);
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, THE_PANEL_WIDTH * 8, THE_PANEL_WIDTH * 8);
@@ -636,20 +693,21 @@ void setup()
 
     //_TheLeds.fill_rainbow(HSVHue::HUE_YELLOW);
 
-    // range 0...4096
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    // full voltage range
-    adc1_config_channel_atten(PIN_AUDIO_IN, ADC_ATTEN_DB_11);
-    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, _adc_chars);
-    // Check type of calibration value used to characterize ADC
-    if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        log_d("calibration=eFuse Vref");
-    } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-        log_d("calibration=Two Point");
-    } else {
-        log_d("calibration=Default");
+    if (!WITH_MEMS_MIC) {
+        // range 0...4096
+        adc1_config_width(ADC_WIDTH_BIT_12);
+        // full voltage range
+        adc1_config_channel_atten(PIN_AUDIO_IN, ADC_ATTEN_DB_11);
+        esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, _adc_chars);
+        // Check type of calibration value used to characterize ADC
+        if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
+            log_d("calibration=eFuse Vref");
+        } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
+            log_d("calibration=Two Point");
+        } else {
+            log_d("calibration=Default");
+        }
     }
-
     // esp_err_t status = adc_vref_to_gpio(ADC_UNIT_1, ADC1_CHANNEL_4_GPIO_NUM);
     // if(status == ESP_OK) {
     // 	printf("v_ref routed to GPIO\n");
@@ -659,13 +717,15 @@ void setup()
     // }
     log_d("Installing Driver...");
     i2s_config_t i2s_config = {
-        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
+        .mode = WITH_MEMS_MIC ? (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX)
+                              : (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
         .sample_rate = SAMPLE_RATE, // samplerate configured are the number of samples returned if channel=Left+Right, not frequency. So we need to multiply*2.
-        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-        .communication_format = I2S_COMM_FORMAT_STAND_MSB, // I2S_COMM_FORMAT_STAND_MSB, I2S_COMM_FORMAT_I2S_MSB
+        .bits_per_sample = WITH_MEMS_MIC ? (i2s_bits_per_sample_t)(BYTES_X_SAMPLE * 8) : I2S_BITS_PER_SAMPLE_16BIT,
+        .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+        .communication_format
+        = WITH_MEMS_MIC ? I2S_COMM_FORMAT_STAND_I2S : I2S_COMM_FORMAT_STAND_MSB, // I2S_COMM_FORMAT_STAND_MSB, I2S_COMM_FORMAT_I2S_MSB
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, // Interrupt level 1, default 0
-        .dma_buf_count = 2, // 8,
+        .dma_buf_count = 2, // 8, //the length of an internal real DMA buffer shouldn’t be greater than 4092.
         .dma_buf_len = (AUDIO_DATA_OUT * OVERSAMPLING), // AUDIO_DATA_OUT*OVERSAMPLING, //these are the number of samples we will read from i2s_read
         .use_apll = false,
         .tx_desc_auto_clear = false,
@@ -680,39 +740,41 @@ void setup()
     }
     // i2s_set_clk(I2S_NUM_0, SAMPLE_RATE, I2S_BITS_PER_SAMPLE_16BIT, I2S_CHANNEL_MONO);
     static const i2s_pin_config_t pin_config = {
-        .bck_io_num = I2S_PIN_NO_CHANGE, // Sample f(Hz) (= sample f * 2)  on this pin (optional).
-        .ws_io_num = I2S_PIN_NO_CHANGE, // Left/Right   (= sample f)      on this pin (optional).
+        .bck_io_num = WITH_MEMS_MIC ? PIN_MIC_I2S_SCK : I2S_PIN_NO_CHANGE, // Sample f(Hz) (= sample f * 2)  on this pin (optional).
+        .ws_io_num = WITH_MEMS_MIC ? PIN_MIC_I2S_WS : I2S_PIN_NO_CHANGE, // Left/Right   (= sample f)      on this pin (optional).
         .data_out_num = I2S_PIN_NO_CHANGE,
-        .data_in_num = PIN_AUDIO_IN // RTCIO_CHANNEL_4_GPIO_NUM // ADC1_CHANNEL_4_GPIO_NUM// RTCIO_CHANNEL_4_GPIO_NUM
+        .data_in_num = WITH_MEMS_MIC ? PIN_MIC_I2S_SD : PIN_AUDIO_IN // RTCIO_CHANNEL_4_GPIO_NUM // ADC1_CHANNEL_4_GPIO_NUM// RTCIO_CHANNEL_4_GPIO_NUM
     };
     err = i2s_set_pin(I2S_NUM_0, &pin_config);
     if (err != ESP_OK) {
         log_e("i2s_set_pin failed");
     }
     // init ADC pad
-    err = i2s_set_adc_mode(ADC_UNIT_1, PIN_AUDIO_IN); // ADC1_CHANNEL_4
-    if (err != ESP_OK) {
-        log_e("set_adc_mode failed");
+    if (!WITH_MEMS_MIC) {
+        err = i2s_set_adc_mode(ADC_UNIT_1, PIN_AUDIO_IN); // ADC1_CHANNEL_4
+        if (err != ESP_OK) {
+            log_e("set_adc_mode failed");
+        }
+        // //enable de ADC
+        err = i2s_adc_enable(I2S_NUM_0);
     }
-    // //enable de ADC
-    err = i2s_adc_enable(I2S_NUM_0);
-
     // Create queue to communicate reader & drawer
     _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
     _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
     // start task to read samples from I2S
-    // xTaskCreate(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
-    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 5000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
-    // // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
-    // start task to draw screen
-    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 2500, (void*)&_TaskParams, 3, &_drawTaskHandle, 1);
-    //    xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
-    // // start task to draw leds
-    // // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
-    // //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
+    xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 9000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0); // 7000
+    // xTaskCreate(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
+    //  // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
+    //  start task to draw screen
+    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 2, &_drawTaskHandle, 1); // 3
+    // xTaskCreate(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle);
+    //     xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
+    //  // start task to draw leds
+    //  // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
+    //  //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 
-    // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 4000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
-    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 4500, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
+    xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 5000, nullptr, 4, &_wifiReconnectTaskHandle, 1); // 4096
+    // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 5000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
 
     // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
     //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);

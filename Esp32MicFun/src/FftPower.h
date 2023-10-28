@@ -25,7 +25,8 @@ public:
         PIANO64_3Hz = 7, // return 64 bins representing 64 piano keys from full 2nd octave to low 7th octave
         AUTO64_3Hz = 8,
         PIANO64_6Hz = 9, // return 64 bins representing 64 piano keys from full 2nd octave to mid 7th octave
-        AUTO64_6Hz = 10
+        AUTO64_6Hz = 10,
+        MATRIX = 11 // Calc FFT of no more than THE_PANEL_WIDTH*10
     };
 
     // Constructor. Pass the size of the desired FFT.
@@ -38,23 +39,24 @@ public:
 
     // Adds a pack of audio samples to the internal circular buffer.
     // Oldest samples are automatically replaced when the internal buffer is filled.
-    void AddSamples(const uint16_t* pTheRawSamples, uint16_t numSamples);
+    void AddSamples(const int16_t* pTheRawSamples, uint16_t numSamples);
 
     // Executes the FFT plan with the samples present in the internal buffer, if enought samples have been feed since last Execute.
     // If the FFT is performed, returns true, false otherwise (in that case more samples need to be feed).
     // If applyHanning is true, a Hanning window is preapplied before calculating the FFT.
     // Call GetFreqPower after this call to get the filtered results.
-    bool Execute(bool applyHanning = true, uint16_t zeroValue=1225);
+    bool Execute(bool applyHanning = true, uint16_t zeroValue = 1225);
 
-    // Call after Execute. Returns the frequency power for each bin. The array must be (numSamples/2)+1 long.
+    // Call after Execute. Returns the frequency power for each bin.
+    // numFreqsOut => size of pFreqPower array, or max number of values to return
     // values are escaled according to maxFftMagnitude (depends on input levels... 70k is ok)
     // Returns the bin index with the higher power
-    void GetFreqPower(int32_t* pFreqPower, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t& maxMag);
+    void GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t& maxMag);
 
 private:
     fft_config_t* _pRealFftPlan;
     // we use 2 sample buffer to make the copy of the new samples + hanning easier
-    std::vector<uint16_t> _TheSamplesBuffer;
+    std::vector<int16_t> _TheSamplesBuffer;
     std::vector<float> _HanningPrecalc;
 
     uint16_t _buffPos; // The last position of the _TheSamplesBuffer
@@ -221,7 +223,7 @@ private:
         { 1119, 1121 }, { 1139, 1141 }, { 1159, 1161 }, { 1179, 1181 }, { 1199, 1201 }, { 1219, 1221 }, { 1239, 1241 },
         { 1259, 1261 }, { 1279, 1281 }, { 1299, 1301 }, { 1332, 1334 }, { 1366, 1368 }, { 1399, 1401 }, { 1432, 1434 }, { 1466, 1468 }
     };
-    uint16_t _Auto64Bands_v3_6Hz[64] = { // from 36hz to 3000hz
+    uint16_t _Auto64Bands_v3_6Hz[64] = { // from 36hz to 3000hz. fftSize=2048. sampleRate=12288. 6hz per bin. MaxBin 1024=6144Hz
         7, 11, 15, 19, 23, 27, 31, 36,
         40, 45, 50, 55, 60, 65, 70, 75,
         81, 86, 92, 97, 103, 109, 115, 121,

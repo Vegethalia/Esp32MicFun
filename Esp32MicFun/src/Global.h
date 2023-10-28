@@ -8,24 +8,30 @@
 #define PIN_AUDIO_IN ADC1_CHANNEL_4 /*!< ADC1 channel 4 is GPIO32 */
 #define BUS_SPEED 800000
 
-#define WITH_VISUALCURRENT true
+#define PIN_MIC_I2S_WS 5
+#define PIN_MIC_I2S_SD 33
+#define PIN_MIC_I2S_SCK 25
 
-#define INIT_SCREEN true
+#define WITH_VISUALCURRENT true
+#define WITH_MEMS_MIC true
+
+#define INIT_SCREEN false // true
 #define USE_SCREEN false
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
-#define INPUT_0_VALUE 1225 // input is biased towards 1.5V
-#define VOLTATGE_DRAW_RANGE 300 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE 100000 // 75000 // a magnitude greater than this value will be considered Max Power
-#define MIN_FFT_DB -70 // a magnitude under this value will be considered 0 (noise)
-#define MAX_FFT_DB -5 // a magnitude greater than this value will be considered Max Power
+#define INPUT_0_VALUE 1240 // input is biased towards 1.5V
+#define VOLTATGE_DRAW_RANGE 400 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
+#define MAX_FFT_MAGNITUDE 1500000 // 75000 // a magnitude greater than this value will be considered Max Power
+#define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
+#define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 
 #define FFT_SIZE 2048
 #define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
-#define OVERSAMPLING 2 // we will oversample by this amount
+#define OVERSAMPLING 4 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
+#define BYTES_X_SAMPLE 4
 
 #define AUDIO_DATA_OUT (SCREEN_WIDTH * 2)
 // #define VISUALIZATION FftPower::AUTO34
@@ -55,7 +61,7 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1) // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 
-#define MAX_FADING_WAVES 1 //2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
+#define MAX_FADING_WAVES 1 // 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
 
 CRGBArray<NUM_LEDS> _TheLeds;
 // PanelMapping33x16 _TheMapping;
@@ -98,6 +104,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_RESET "caseta/spectrometre/reset"
 #define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
 #define TOPIC_GROUPMINUTS "caseta/spectrometre/groupbyminuts"
+#define TOPIC_LASTIP "caseta/spectrometre/lastip"
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
@@ -123,11 +130,11 @@ TaskHandle_t _wifiReconnectTaskHandle;
 QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
 uint8_t _adc_i2s_event_queue_size = 1;
 
-bool _Drawing = false;
+volatile bool _Drawing = false;
 struct TaskParams {
-    uint16_t data1[AUDIO_DATA_OUT * 4];
+    int16_t data1[AUDIO_DATA_OUT * 4];
     // uint16_t data2[AUDIO_DATA_OUT];
-    int32_t fftMag[AUDIO_DATA_OUT / 2];
+    int8_t fftMag[FFT_SIZE / 4]; // fftMag[AUDIO_DATA_OUT / 2];
     // uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
     // uint8_t lastBuffSet; // 0=none, 1=data1, 2=data2
 
@@ -139,9 +146,10 @@ struct TaskParams {
 TaskParams _TaskParams;
 
 struct MsgAudio2Draw {
-    uint16_t* pAudio;
+    int16_t* pAudio;
     uint32_t audioLenInSamples;
-    int32_t* pFftMag;
+    int8_t* pFftMag;
+    uint16_t sizeFftMagVector;
     uint16_t max_freq;
 };
 
@@ -150,8 +158,9 @@ enum DRAW_STYLE {
     VERT_FIRE = 2,
     HORIZ_FIRE = 3,
     VISUAL_CURRENT = 4,
+    MATRIX_FFT = 5,
 
-    MAX_STYLE = VISUAL_CURRENT
+    MAX_STYLE = MATRIX_FFT
 };
 
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
