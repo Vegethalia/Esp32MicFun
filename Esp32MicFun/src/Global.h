@@ -23,7 +23,7 @@
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1240 // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 400 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE 1500000 // 75000 // a magnitude greater than this value will be considered Max Power
+#define MAX_FFT_MAGNITUDE 1750000 // 75000 // a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 

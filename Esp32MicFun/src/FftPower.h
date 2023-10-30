@@ -45,7 +45,7 @@ public:
     // If the FFT is performed, returns true, false otherwise (in that case more samples need to be feed).
     // If applyHanning is true, a Hanning window is preapplied before calculating the FFT.
     // Call GetFreqPower after this call to get the filtered results.
-    bool Execute(bool applyHanning = true, uint16_t zeroValue = 1225);
+    bool Execute(bool applyHanning = true, uint16_t zeroValue = 0); //=1225
 
     // Call after Execute. Returns the frequency power for each bin.
     // numFreqsOut => size of pFreqPower array, or max number of values to return
@@ -223,7 +223,7 @@ private:
         { 1119, 1121 }, { 1139, 1141 }, { 1159, 1161 }, { 1179, 1181 }, { 1199, 1201 }, { 1219, 1221 }, { 1239, 1241 },
         { 1259, 1261 }, { 1279, 1281 }, { 1299, 1301 }, { 1332, 1334 }, { 1366, 1368 }, { 1399, 1401 }, { 1432, 1434 }, { 1466, 1468 }
     };
-    uint16_t _Auto64Bands_v3_6Hz[64] = { // from 36hz to 3000hz. fftSize=2048. sampleRate=12288. 6hz per bin. MaxBin 1024=6144Hz
+    uint16_t _Auto64Bands_v3_6Hz[64] = { // from 42hz to 3000hz. fftSize=2048. sampleRate=12288. 6hz per bin. MaxBin 1024=6144Hz
         7, 11, 15, 19, 23, 27, 31, 36,
         40, 45, 50, 55, 60, 65, 70, 75,
         81, 86, 92, 97, 103, 109, 115, 121,
@@ -232,5 +232,16 @@ private:
         248, 256, 265, 275, 284, 294, 303, 313,
         323, 334, 344, 355, 366, 377, 389, 400,
         412, 424, 437, 449, 462, 475, 489, 502
+    };
+
+    uint16_t _Auto64Bands_v4_6Hz[64] = { // from 42hz to 6121hz. fftSize=2048. sampleRate=12288. 6hz per bin. MaxBin 1024=6144Hz
+        7, 10, 13, 16, 20, 23, 27, 31,
+        35, 39, 44, 49, 53, 59, 64, 69,
+        75, 81, 88, 94, 101, 109, 116, 124,
+        133, 141, 150, 160, 170, 180, 191, 202,
+        214, 227, 239, 253, 267, 282, 297, 314,
+        330, 348, 367, 386, 406, 427, 449, 472,
+        496, 521, 548, 575, 604, 634, 665, 698,
+        732, 768, 806, 845, 886, 929, 973, 1020
     };
 };

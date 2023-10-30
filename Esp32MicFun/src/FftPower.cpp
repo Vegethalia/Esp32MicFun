@@ -364,6 +364,45 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
             //     log_d("Bin [%02d] - Mag=%6.2f Dbs=%02d", ind, mag, pFreqPower[ind]);
             // }
         }
+    } else if (binRes == BinResolution::AUTO64_6Hz) {
+        const uint16_t* pBinsNew = _Auto64Bands_v4_6Hz;
+        uint8_t numBins = 64;
+        maxBin = 0;
+        uint32_t fromBin = 4*2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved. ENs saltem els 4 1ers bins (low precission on mic).
+        uint32_t toBin = 0;
+        for (uint16_t ind = 0; ind < numBins; ind++) {
+            if (ind > 0) {
+                fromBin = (pBinsNew[ind - 1]) * 2;
+            }
+            toBin = (pBinsNew[ind]) * 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved
+
+            float sumBin = 0;
+            uint16_t numBins = (toBin - fromBin) / 2;
+            for (uint16_t subInd = fromBin; subInd < toBin; subInd += 2) {
+                float auxSum = (float)(pow(_pRealFftPlan->output[subInd], 2) + pow(_pRealFftPlan->output[subInd + 1], 2));
+                // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
+
+                if (auxSum > sumBin) {
+                    sumBin = auxSum;
+                }
+                // sumBin += auxSum;
+            }
+            // sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin) / (float)maxFftMagnitude)); // max energy of all bins
+            //  sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
+            //  sumBin = (int32_t)(10.0 * log(1.0f / (q_rsqrt(sumBin / numBins) * (float)maxFftMagnitude))); //avg energy of all bins
+            float mag = 1.0f / q_rsqrt(sumBin);
+            sumBin = (float)(10.0f * log(mag / (float)maxFftMagnitude)); // max energy of all bins
+            pFreqPower[ind] = sumBin; // mitjana del powers de tots els bins fins aquesta freq.
+
+            if (mag > maxMag) {
+                maxMag = mag;
+                maxBin = (fromBin + 2) / 2;
+            }
+            // if(ind<10) {
+            //     log_d("Bin [%02d] - %02d", ind, pFreqPower[ind]);
+            // }
+            fromBin = toBin;
+        }
     }
 }
 // void NewAudio(uint16_t *pAudioIn, uint16_t samplesIn)

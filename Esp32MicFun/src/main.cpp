@@ -62,7 +62,7 @@ void ConfigureNTP()
     //    if (timeinfo.tm_year < (2020 - 1900)) {
     //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
     if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
-        configTime(3600, 3600, "pool.ntp.org");
+        configTime(3600, 0, "pool.ntp.org");
         sntp_set_sync_interval(60000);
         sntp_restart();
     }
@@ -229,12 +229,12 @@ void vTaskReader(void* pvParameters)
                     mad.sizeFftMagVector = sizeof(_TaskParams.fftMag);
 
                     // auto inTime = esp_timer_get_time();
-                    if (theFFT.Execute(false, WITH_MEMS_MIC ? 0 : INPUT_0_VALUE)) { // WITH_MEMS_MIC ? 0 : INPUT_0_VALUE
+                    if (theFFT.Execute(true, WITH_MEMS_MIC ? 0 : INPUT_0_VALUE)) { // WITH_MEMS_MIC ? 0 : INPUT_0_VALUE
                         // auto totalTime = esp_timer_get_time() - inTime;
                         // log_d("FFT time=%lldus!!", totalTime);
                         //                        if (!_Drawing) {
                         // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
-                        auto mode = _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_3Hz;
+                        auto mode = _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_6Hz; // FftPower::BinResolution::AUTO64_3Hz;
                         if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT) {
                             mode = FftPower::BinResolution::MATRIX;
                         }
