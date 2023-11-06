@@ -19,6 +19,10 @@
 #include "freertos/task.h"
 // #include <components/freertos/FreeRTOS-Kernel/include/freertos/queue.h>
 
+#include <IRrecv.h>
+#include <IRremoteESP8266.h>
+#include <IRutils.h>
+
 #include "mykeys.h"
 
 #include "FftPower.h"
@@ -565,6 +569,126 @@ void vTaskWifiReconnect(void* pvParameters)
     }
 }
 
+void vTaskReceiveIR(void* pvParameters)
+{
+    // As this program is a special purpose capture/decoder, let us use a larger
+    // than normal buffer so we can handle Air Conditioner remote codes.
+    const uint16_t kCaptureBufferSize = 256;
+    const uint8_t kTimeout = 50;
+    // Set higher if you get lots of random short UNKNOWN messages when nothing
+    // should be sending a message.
+    // Set lower if you are sure your setup is working, but it doesn't see messages
+    // from your device. (e.g. Other IR remotes work.)
+    // NOTE: Set this value very high to effectively turn off UNKNOWN detection.
+    const uint16_t kMinUnknownSize = 25; // 12;
+    // How much percentage lee way do we give to incoming signals in order to match
+    // it?
+    // e.g. +/- 25% (default) to an expected value of 500 would mean matching a
+    //      value between 375 & 625 inclusive.
+    // Note: Default is 25(%). Going to a value >= 50(%) will cause some protocols
+    //       to no longer match correctly. In normal situations you probably do not
+    //       need to adjust this value. Typically that's when the library detects
+    //       your remote's message some of the time, but not all of the time.
+    const uint8_t kTolerancePercentage = 40; // kTolerance is normally 25%
+
+    // Use turn on the save buffer feature for more complete capture coverage.
+    IRrecv irrecv(PIN_RECEIVE_IR, kCaptureBufferSize, kTimeout, true);
+    decode_results results; // Somewhere to store the results
+
+    irrecv.setUnknownThreshold(kMinUnknownSize);
+    irrecv.setTolerance(kTolerancePercentage); // Override the default tolerance.
+    irrecv.enableIRIn(); // Start the receiver
+
+    while (true) {
+        if (irrecv.decode(&results)) {
+            int32_t command = 0;
+            if (results.repeat && results.command == 0) {
+                command = _lastCommandIR;
+            } else {
+                command = results.command;
+                _lastCommandIR = 0;
+            }
+            log_d("IR Decode:0x%2X IsRepeat=%d", results.command, results.repeat ? 1 : 0);
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR: Value=%d Command=0x%2X IsRepeat=%d", (uint32_t)results.value, results.command, results.repeat ? 1 : 0).c_str(), false);
+
+            switch (command) {
+            case IR_KEY_POWER:
+                ESP.restart();
+                break;
+            case IR_KEY_STEP:
+                _MAX_MILLIS
+                    = DEFAULT_MILLIS;
+                _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_INCBRIGHTNESS:
+                _lastCommandIR = IR_KEY_INCBRIGHTNESS;
+                if (_MAX_MILLIS < 20) {
+                    _MAX_MILLIS++;
+                } else if (_MAX_MILLIS < 50) {
+                    _MAX_MILLIS += 5;
+                } else if (_MAX_MILLIS < 100) {
+                    _MAX_MILLIS += 10;
+                } else if (_MAX_MILLIS < 225) {
+                    _MAX_MILLIS += 25;
+                } else {
+                    _MAX_MILLIS = 255;
+                }
+
+                FastLED.setBrightness(_MAX_MILLIS);
+                log_d("IR: INC BRIGHTNESS");
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d", _MAX_MILLIS).c_str(), true);
+                break;
+            case IR_KEY_DECBRIGHTNESS:
+                _lastCommandIR = IR_KEY_DECBRIGHTNESS;
+                if (_MAX_MILLIS > 225) {
+                    _MAX_MILLIS = 225;
+                } else if (_MAX_MILLIS > 100) {
+                    _MAX_MILLIS -= 25;
+                } else if (_MAX_MILLIS > 50) {
+                    _MAX_MILLIS -= 10;
+                } else if (_MAX_MILLIS > 20) {
+                    _MAX_MILLIS -= 5;
+                } else if (_MAX_MILLIS > 3) {
+                    _MAX_MILLIS--;
+                }
+
+                FastLED.setBrightness(_MAX_MILLIS);
+                log_d("IR: DEC BRIGHTNESS");
+
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), true);
+                break;
+            case IR_KEY_EFFECT1:
+                _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_EFFECT2:
+                _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_EFFECT3:
+                _TheDrawStyle = DRAW_STYLE::HORIZ_FIRE;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_EFFECT4:
+                _TheDrawStyle = DRAW_STYLE::VISUAL_CURRENT;
+                _UpdateCurrentNow = true;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_EFFECT5:
+                _TheDrawStyle = DRAW_STYLE::MATRIX_FFT;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            case IR_KEY_EFFECT6:
+                _TheDrawStyle = DRAW_STYLE::DISCO_LIGTHS;
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                break;
+            }
+        }
+        sleep(0);
+    }
+}
+
 // void vTaskRefrescarConsumElectricitat(void* pvParameters)
 // {
 //     auto lastCheck = millis();
@@ -766,7 +890,7 @@ void setup()
     // xTaskCreate(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
     //  // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
     //  start task to draw screen
-    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 2, &_drawTaskHandle, 1); // 3
+    xTaskCreatePinnedToCore(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle, 1); // 3
     // xTaskCreate(vTaskDrawer, "Draw Leds", 3000, (void*)&_TaskParams, 3, &_drawTaskHandle);
     //     xTaskCreatePinnedToCore(vTaskShowLeds, "vTaskShowLeds", 2048, (void*)&_TaskParams, 2, &_drawTaskShowLeds, 1);
     //  // start task to draw leds
@@ -778,6 +902,7 @@ void setup()
 
     // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
     //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
+    xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 3000, nullptr, 2, &_receiveIRTaskHandle, 1);
 }
 
 // PLAY WITH MATRIX
@@ -830,6 +955,7 @@ void loop()
         _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());
         _ThePubSub.publish(TOPIC_HIWATER_WIFI, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_wifiReconnectTaskHandle)).c_str());
         _ThePubSub.publish(TOPIC_HIWATER_DRAWER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_drawTaskHandle)).c_str());
+        _ThePubSub.publish(TOPIC_HIWATER_IRDECO, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_receiveIRTaskHandle)).c_str());
     }
 }
 

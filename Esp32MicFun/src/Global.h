@@ -5,6 +5,7 @@
 #define PIN_DATA_LEDS2 4
 #define PIN_DATA_LEDS3 2
 #define PIN_DATA_LEDS4 15
+#define PIN_RECEIVE_IR GPIO_NUM_34
 #define PIN_AUDIO_IN ADC1_CHANNEL_4 /*!< ADC1 channel 4 is GPIO32 */
 #define BUS_SPEED 800000
 
@@ -23,7 +24,7 @@
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1240 // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 400 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE 1750000 // 75000 // a magnitude greater than this value will be considered Max Power
+#define MAX_FFT_MAGNITUDE 2500000 // 75000 // a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 
@@ -111,11 +112,58 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_HIWATER_READER "caseta/spectrometre/hiwreader"
 #define TOPIC_HIWATER_DRAWER "caseta/spectrometre/hiwdrawer"
 #define TOPIC_HIWATER_WIFI "caseta/spectrometre/hiwWIFI"
+#define TOPIC_HIWATER_IRDECO "caseta/spectrometre/hiwIRdeco"
 #define TOPIC_CPU_WIFI "caseta/spectrometre/cpuwifi"
 #define TOPIC_CPU_READER "caseta/spectrometre/cpureader"
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
+
+//------------
+// IR Related
+//------------
+//Mems mic inmp441
+//gnd --> gnd
+//vdd --> 3.3v
+//sd  --> gpio33
+//sck --> gpio25
+//ws  --> gpio5
+//l/r --> gnd (left)
+#define IR_KEY_INCBRIGHTNESS 0x5C
+#define IR_KEY_DECBRIGHTNESS 0x5D
+#define IR_KEY_STEP 0x41
+#define IR_KEY_POWER 0x40
+#define IR_KEY_RED 0x58
+#define IR_KEY_GREEN 0x59
+#define IR_KEY_BLUE 0x45
+#define IR_KEY_WHITE 0x44
+#define IR_KEY_LIGHTRED 0x54
+#define IR_KEY_LIGHTGREEN 0x55
+#define IR_KEY_LIGHTBLUE 0x49
+#define IR_KEY_PINK 0x48
+#define IR_KEY_ORANGE 0x50
+#define IR_KEY_AQUA 0x52
+#define IR_KEY_PURPLE 0x4D
+#define IR_KEY_YELLOW 0x18
+#define IR_KEY_FUCSIA 0x1A
+#define IR_KEY_LIGHTAQUA 0x1B
+#define IR_KEY_INCRED 0x14
+#define IR_KEY_DECRED 0x10
+#define IR_KEY_INCGREEN 0x15
+#define IR_KEY_DECGREEN 0x11
+#define IR_KEY_INCBLUE 0x16
+#define IR_KEY_DECBLUE 0x12
+#define IR_KEY_QUICK 0x17
+#define IR_KEY_SLOW 0x13
+#define IR_KEY_EFFECT1 0x0C
+#define IR_KEY_EFFECT2 0x0D
+#define IR_KEY_EFFECT3 0x0E
+#define IR_KEY_EFFECT4 0x08
+#define IR_KEY_EFFECT5 0x09
+#define IR_KEY_EFFECT6 0x0A
+#define IR_KEY_FADE 0x07
+
+int32_t _lastCommandIR = -1;
 
 //------------
 // Task Related
@@ -126,6 +174,7 @@ TaskHandle_t _drawTaskHandle;
 // TaskHandle_t _showLedsTaskHandle;
 TaskHandle_t _wifiReconnectTaskHandle;
 // TaskHandle_t _refrescarConsumTaskHandle;
+TaskHandle_t _receiveIRTaskHandle;
 
 QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
 uint8_t _adc_i2s_event_queue_size = 1;
@@ -159,11 +208,12 @@ enum DRAW_STYLE {
     HORIZ_FIRE = 3,
     VISUAL_CURRENT = 4,
     MATRIX_FFT = 5,
+    DISCO_LIGTHS = 6,
 
-    MAX_STYLE = MATRIX_FFT
+    MAX_STYLE = DISCO_LIGTHS,
+    DEFAULT_STYLE = MATRIX_FFT
 };
-
-DRAW_STYLE _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
 
 // consum electricitat
 #define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts

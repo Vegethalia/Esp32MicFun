@@ -380,13 +380,13 @@ void DrawWave(MsgAudio2Draw& mad)
         int16_t valueOrig;
         for (i = 0; i < mad.audioLenInSamples; i++) {
             valueOrig = mad.pAudio[i];
-            if (valueOrig < INT16_MIN / 6) {
-                valueOrig = INT16_MIN / 6;
-            } else if (valueOrig > INT16_MAX / 6) {
-                valueOrig = INT16_MAX / 6;
+            if (valueOrig < INT16_MIN / 8) {
+                valueOrig = INT16_MIN / 8;
+            } else if (valueOrig > INT16_MAX / 8) {
+                valueOrig = INT16_MAX / 8;
             }
 
-            mad.pAudio[i] = map(valueOrig, INT16_MIN / 6, INT16_MAX / 6, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+            mad.pAudio[i] = map(valueOrig, INT16_MIN / 8, INT16_MAX / 8, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         }
     }
 
@@ -418,12 +418,12 @@ void DrawWave(MsgAudio2Draw& mad)
     int16_t numValuesHi = 0;
     int16_t numValuesVeryHi = 0;
     for (i = 0; i < width; i++) {
-        // value = mad.pAudio[pas0 + (i * 3)];
-        // value += mad.pAudio[pas0 + (i * 3) + 1];
+         value = mad.pAudio[pas0 + (i * 2)];
+         value += mad.pAudio[pas0 + (i * 2) + 1];
         // value += mad.pAudio[pas0 + (i * 3) + 2];
         // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));
-        value = mad.pAudio[pas0 + i];
-        value = map(value, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
+        //value = mad.pAudio[pas0 + i];
+        value = map(value/2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
         // if (value > height / 2) {
         //     sumValues += value;
         //     numValues++;
@@ -449,33 +449,22 @@ void DrawWave(MsgAudio2Draw& mad)
     //     _maxValue = sumValues;
     // }
 
-    if ((millis() - _lastIncrease) > (10 * 1000)) {
-        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 10) && _OffsetMv > 0) {
+    if ((millis() - _lastIncrease) > (15 * 1000)) {
+        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 10) && _OffsetMv > (-250)) {
             _OffsetMv -= 25;
             _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < (VOLTATGE_DRAW_RANGE - 150)) {
+        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < (250)) {
             _OffsetMv += 25;
             _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        } else {
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("STAY --> Offset=%d ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        }
+        } 
+        // else {
+        //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("STAY --> Offset=%d ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        // }
 
         _maxValueVeryHi = 0;
         _maxValueHi = 0;
         _lastIncrease = millis();
     }
-
-    // if (_maxValue < (height - 6) && _OffsetMv < 250 && (millis() - _lastIncrease) > (10 * 1000)) {
-    //     _lastIncrease = millis();
-    //     _OffsetMv += 25;
-    //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("OffsetDbs=%d, maxValue=%d", _OffsetMv, _maxValue).c_str());
-    //     _maxValue = 0;
-    // } else if (_maxValue >= (height - 2)) {
-    //     _lastIncrease = millis();
-    //     _OffsetMv -= 25;
-    //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("OffsetDbs=%d, maxValue=%d", _OffsetMv, _maxValue).c_str());
-    //     _maxValue = 0;
-    // }
 
     if (numFadingWaves > 1) { // fem desapareixer la 1era wave, que serà la última ara
         // pintem les n waves anteriors
@@ -515,11 +504,11 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
         for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
             auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
             value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-            if (value < 25) {
-                value = 0;
-            } else {
-                value -= 25;
-            }
+            // if (value < 25) {
+            //     value = 0;
+            // } else {
+            //     value -= 25;
+            // }
 
             if (iLine % 2 == 0) {
                 x = xPix;
