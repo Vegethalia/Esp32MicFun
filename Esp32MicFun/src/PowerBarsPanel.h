@@ -2,6 +2,9 @@
 
 #include <FastLED.h>
 #include <string>
+
+#include "PreDrawnCircle.h"
+
 constexpr uint16_t PANEL_WIDTH_33 = 33; // from 1 to 33
 constexpr uint16_t PANEL_WIDTH_64 = 64; // from 1 to 64
 constexpr uint16_t PANEL_HEIGHT_8 = 8; // from 1 to 8
@@ -26,6 +29,10 @@ public:
 };
 
 extern bool _NightMode;
+
+#include "SharedUtils\Utils.h"
+extern PubSubClient _ThePubSub;
+#define TOPIC_DEBUG "caseta/spectrometre/debug"
 
 // Mapping implementation for the 33x9 panel
 class PanelMapping33x9 : public IPanelMapping<PANEL_WIDTH_33, PANEL_HEIGHT_9> {
@@ -576,6 +583,34 @@ public:
         }
     }
 
+    void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, CHSV color)
+    {
+        if (_TheCircles.size() == 0) { // lets create the circles!!
+            _TheCircles.push_back(new PreDrawmCircle(1));
+            _TheCircles.push_back(new PreDrawmCircle(2));
+            _TheCircles.push_back(new PreDrawmCircle(3));
+            //            _ThePubSub.publish(TOPIC_DEBUG, "Before Pushback", false);
+            _TheCircles.push_back(new PreDrawmCircle(4));
+            //            _ThePubSub.publish(TOPIC_DEBUG, "After Pushback", false);
+            _TheCircles.push_back(new PreDrawmCircle(5));
+            _TheCircles.push_back(new PreDrawmCircle(6));
+            _TheCircles.push_back(new PreDrawmCircle(7));
+            _TheCircles.push_back(new PreDrawmCircle(8));
+        }
+        if (radius > 0) {
+            auto r = min((uint8_t)(radius - 1), (uint8_t)(_TheCircles.size() - 1));
+            auto pBuff = _TheCircles[r]->GetCircleBuffer();
+
+            for (int i = 0; i < pBuff->size(); i++) {
+                for (int j = 0; j < (*pBuff)[i].size(); j++) {
+                    if ((*pBuff)[i][j] != 0) {
+                        (*_pTheLeds)[_pTheMapping->XY(i + x - radius, j + y - radius)] = color;
+                    }
+                }
+            }
+        }
+    }
+
 private:
     CRGBArray<TOTAL_LEDS>* _pTheLeds; // The FastLed object
     CRGBArray<TOTAL_LEDS> _AuxLeds; // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
@@ -586,4 +621,6 @@ private:
 
     uint8_t _CurrentBaseHue;
     uint8_t _SubCounter;
+
+    std::vector<PreDrawmCircle*> _TheCircles;
 };

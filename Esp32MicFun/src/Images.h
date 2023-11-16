@@ -140,8 +140,8 @@ static CRGB __imgMontseJordi[33][16] = {
     { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 1, 1, 1 }, { 23, 23, 23 }, { 83, 74, 72 }, { 101, 85, 82 }, { 100, 78, 69 }, { 98, 70, 57 }, { 93, 63, 50 }, { 86, 58, 46 } }
 };
 */
-#define  MOVING_PARAMETRIC_POINTS 64
-#define  MOVING_PARAMETRIC_STEPS 252
+#define MOVING_PARAMETRIC_POINTS 64
+#define MOVING_PARAMETRIC_STEPS 252
 struct ParametricCurve {
     uint16_t initialPoints[MOVING_PARAMETRIC_POINTS];
     float xCoord[MOVING_PARAMETRIC_STEPS];
@@ -169,7 +169,7 @@ struct DrawParametricData {
     ParametricCurve TheCurrentCurve;
     DemoModeParams TheDemoParams;
     bool initialized = false;
-    //const uint16_t s_numCoords = 252;
+    // const uint16_t s_numCoords = 252;
     uint16_t frameNum = 0;
     float steps[MOVING_PARAMETRIC_STEPS];
     float delta = 0.0f;

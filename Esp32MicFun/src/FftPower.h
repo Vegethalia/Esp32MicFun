@@ -15,12 +15,7 @@ private:
 
 public:
     enum BinResolution {
-        ALL = 0, // return all bins (numSamples/2)
-        HALF = 1, // combine bins in groups of 2 (numsamples/4)
-        QUARTER = 2, // combine bins in groups of 4 (numsamples/8)
-        AUTO32 = 3, // return 32 bins "in a intelligent way"
         AUTO34 = 4, // return 33 bins "in a intelligent way"
-        AUTO5hz = 5, // return 33 bins "in a intelligent way"
         PIANO33_3Hz = 6, // return 33 bins representing 33 piano keys from hi 2nd octave to low 5th octave
         PIANO64_3Hz = 7, // return 64 bins representing 64 piano keys from full 2nd octave to low 7th octave
         AUTO64_3Hz = 8,
@@ -243,5 +238,16 @@ private:
         330, 348, 367, 386, 406, 427, 449, 472,
         496, 521, 548, 575, 604, 634, 665, 698,
         732, 768, 806, 845, 886, 929, 973, 1020
+    };
+
+    uint16_t _64PianoKeys_v2_6Hz[64] = { // from 54hz (A1) to 2489hz (D#7). fftSize=2048. sampleRate=12288. 6hz per bin. MaxBin 1024=6144Hz. 1st 5 notes are not exact.
+        9, 10, 11, 12, 13, 14, 15, 16,
+        17, 18, 19, 21, 22, 23, 24, 26,
+        27, 29, 31, 33, 35, 37, 39, 41,
+        44, 46, 49, 52, 55, 58, 62, 65,
+        69, 73, 78, 82, 87, 92, 98, 104,
+        110, 116, 123, 131, 138, 147, 155, 165,
+        174, 185, 196, 207, 220, 233, 247, 261,
+        277, 293, 311, 329, 349, 370, 392, 415
     };
 };

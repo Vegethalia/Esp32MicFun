@@ -72,9 +72,9 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
         //     decPower = (-10);
         // }
 
-        if (i > (THE_PANEL_WIDTH - 20)) {
-            value = (int16_t)((float)value * (1.25 + (i / 10.0)));
-        }
+        // if (i > (THE_PANEL_WIDTH - 20)) {
+        //     value = (int16_t)((float)value * (1.25 + (i / 10.0)));
+        // }
         value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
@@ -366,7 +366,7 @@ void DrawWave(MsgAudio2Draw& mad)
     };
     static WavePoint _WaveBuffer[MAX_FADING_WAVES][THE_PANEL_WIDTH]; // circular buffer of waves
     static uint8_t _LasttWaveIndex = 0; // index of the circular buffer, apunta a la wave que toca pintar
-    static int16_t _OffsetMv = 0; // adjust wave scale so it does not appears to flat or clipping
+    static int16_t _OffsetMv = -5; // adjust wave scale so it does not appears to flat or clipping
     static auto _lastIncrease = millis();
     static uint16_t _maxValueVeryHi = 0; // max value drawn since _lastIncrease
     static uint16_t _maxValueHi = 0; // max value drawn since _lastIncrease
@@ -378,15 +378,19 @@ void DrawWave(MsgAudio2Draw& mad)
 
     if (WITH_MEMS_MIC) { // Escalem la ona a "mic analògic 9814"
         int16_t valueOrig;
+        int16_t scale = 10 + _OffsetMv; // max value of _OffsetMv=(-9)
         for (i = 0; i < mad.audioLenInSamples; i++) {
             valueOrig = mad.pAudio[i];
-            if (valueOrig < INT16_MIN / 8) {
-                valueOrig = INT16_MIN / 8;
-            } else if (valueOrig > INT16_MAX / 8) {
-                valueOrig = INT16_MAX / 8;
+            // if (valueOrig < INT16_MIN / scale) {
+            //     valueOrig = INT16_MIN / scale;
+            // } else if (valueOrig > INT16_MAX / scale) {
+            //     valueOrig = INT16_MAX / scale;
+            // }
+            if (valueOrig > INT16_MAX / scale) {
+                valueOrig = INT16_MAX / scale;
             }
 
-            mad.pAudio[i] = map(valueOrig, INT16_MIN / 8, INT16_MAX / 8, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
+            mad.pAudio[i] = map(valueOrig, INT16_MIN / scale, INT16_MAX / scale, INPUT_0_VALUE - VOLTATGE_DRAW_RANGE, INPUT_0_VALUE + VOLTATGE_DRAW_RANGE);
         }
     }
 
@@ -408,29 +412,30 @@ void DrawWave(MsgAudio2Draw& mad)
     }
 
     CHSV myValue;
-    myValue.setHSV(HSVHue::HUE_PURPLE, 255, 80);
+    myValue.setHSV(HSVHue::HUE_PURPLE, 255, 70);
 
     uint8_t numFadingWaves = 1;
     if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
         // numFadingWaves = 2;
-        myValue.setHSV(HSVHue::HUE_AQUA, 128, 80);
+        myValue.setHSV(HSVHue::HUE_AQUA, 128, 70);
     }
     int16_t numValuesHi = 0;
     int16_t numValuesVeryHi = 0;
     for (i = 0; i < width; i++) {
-         value = mad.pAudio[pas0 + (i * 2)];
-         value += mad.pAudio[pas0 + (i * 2) + 1];
+        value = mad.pAudio[pas0 + (i * 2)];
+        value += mad.pAudio[pas0 + (i * 2) + 1];
         // value += mad.pAudio[pas0 + (i * 3) + 2];
         // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));
-        //value = mad.pAudio[pas0 + i];
-        value = map(value/2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
+        // value = mad.pAudio[pas0 + i];
+        // value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
+        value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE), 0, height);
         // if (value > height / 2) {
         //     sumValues += value;
         //     numValues++;
         // };
-        if (value >= height - 5) {
+        if (value >= height - 4) {
             numValuesVeryHi++;
-        } else if (value >= height - 10) {
+        } else if (value >= height - 8) {
             numValuesHi++;
         }
 
@@ -450,13 +455,13 @@ void DrawWave(MsgAudio2Draw& mad)
     // }
 
     if ((millis() - _lastIncrease) > (15 * 1000)) {
-        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 10) && _OffsetMv > (-250)) {
-            _OffsetMv -= 25;
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < (250)) {
-            _OffsetMv += 25;
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC OffsetDbs=%d, ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        } 
+        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 6) && _OffsetMv > (-9)) {
+            _OffsetMv = _OffsetMv - ((_OffsetMv > (-5)) ? 2 : 1);
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", 10 + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < 7) {
+            _OffsetMv++;
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", 10 + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        }
         // else {
         //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("STAY --> Offset=%d ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
         // }
@@ -509,6 +514,9 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
             // } else {
             //     value -= 25;
             // }
+            if (value < 3) { // black? el fem transparent :)
+                continue;
+            }
 
             if (iLine % 2 == 0) {
                 x = xPix;
@@ -518,6 +526,47 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
             _TheLeds[_TheMapping.XY(x, currentLine)] = CHSV(HSVHue::HUE_PURPLE + (value / 2), 255, (uint8_t)value);
         }
         currentLine--;
+    }
+}
+
+void DrawDiscoLights(MsgAudio2Draw& mad)
+{
+    // 32-64-128-256-512  --> 192Hz 384Hz 768Hz 1536Hz 3072Hz
+    const uint16_t bins[] = { 110 / HZ_PER_BIN, 240 / HZ_PER_BIN, 500 / HZ_PER_BIN, 1500 / HZ_PER_BIN, mad.sizeFftMagVector };
+    const uint8_t max_circle = 6;
+    const uint8_t totalLights = sizeof(bins) / sizeof(uint16_t);
+    const HSVHue hues[totalLights] = { HSVHue::HUE_RED, HSVHue::HUE_BLUE, HSVHue::HUE_GREEN, HSVHue::HUE_PINK, HSVHue::HUE_YELLOW };
+    const uint8_t intensityOff[totalLights] = { 40, 45, 40, 50, 50 };
+    uint8_t dbRange = abs((MAX_FFT_DB - MIN_FFT_DB));
+    const uint8_t dbs_x_circle = abs((MAX_FFT_DB - MIN_FFT_DB) / (int)(max_circle));
+    uint16_t currentBin = 0;
+    // uint8_t numLight = 0;
+
+    // Calculate max BASS power among first bars
+    _1stBarValue = 0;
+    for (uint16_t i = 0; i < THE_PANEL_WIDTH / 5; i++) {
+        auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
+        if (_1stBarValue < value) {
+            _1stBarValue = value;
+        }
+    }
+
+    for (uint8_t numLight = 0; numLight < totalLights; numLight++) {
+        int8_t maxDb = -100;
+        while (currentBin < bins[numLight]) {
+            if (mad.pFftMag[currentBin] > maxDb) {
+                maxDb = mad.pFftMag[currentBin];
+            }
+            currentBin++;
+        }
+        for (int8_t currDbs = MIN_FFT_DB, nCircle = 0; nCircle < max_circle; currDbs += dbs_x_circle, nCircle++) {
+            if (currDbs > (MIN_FFT_DB + 5) && currDbs <= maxDb) {
+                _ThePanel.DrawCircle((numLight * 12) + max_circle + 1, 17, nCircle, CHSV(hues[numLight], 255, (nCircle * 10) + 70)); // 255/6 circles= 42
+            } else {
+                _ThePanel.DrawCircle((numLight * 12) + max_circle + 1, 17, nCircle, CHSV(hues[numLight], 160, intensityOff[numLight])); // 255/6 circles= 42
+            }
+        }
     }
 }
 

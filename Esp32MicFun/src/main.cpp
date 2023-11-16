@@ -126,7 +126,7 @@ void vTaskReader(void* pvParameters)
     uint16_t superMaxBin = 0;
     MsgAudio2Draw mad;
     // uint16_t THE_FFT_SIZE = AUDIO_DATA_OUT * 16;
-    FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT); // AUDIO_DATA_OUT  * 2
+    FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT); // FFT_SIZE, AUDIO_DATA_OUT  * 2
     float* pInputFft = theFFT.GetInputBuffer();
     bool skipNext = false;
     // float hanningPreCalc[REAL_SIZE_TEMP]; // AUDIO_DATA_OUT
@@ -239,7 +239,7 @@ void vTaskReader(void* pvParameters)
                         //                        if (!_Drawing) {
                         // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
                         auto mode = _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_6Hz; // FftPower::BinResolution::AUTO64_3Hz;
-                        if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT) {
+                        if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT || _TheDrawStyle == DRAW_STYLE::DISCO_LIGTHS) {
                             mode = FftPower::BinResolution::MATRIX;
                         }
                         int32_t maxMag = -1000;
@@ -266,8 +266,22 @@ void vTaskReader(void* pvParameters)
 
                     auto now = millis();
                     if ((now - recInit) >= 30000) {
-                        std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxBin=%d maxFreq=%dHz missedFrames=%d",
-                            now - recInit, totalSamples, numCalls, superMaxMag, superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));
+                        if (superMaxMag > 2500000) {
+                            MAX_FFT_MAGNITUDE = 3000000;
+                        } else if (superMaxMag > 2000000) {
+                            MAX_FFT_MAGNITUDE = 2500000;
+                        } else if (superMaxMag > 1500000) {
+                            MAX_FFT_MAGNITUDE = 2000000;
+                        } else if (superMaxMag > 1000000) {
+                            MAX_FFT_MAGNITUDE = 1500000;
+                        } else if (superMaxMag > 700000) {
+                            MAX_FFT_MAGNITUDE = 1000000;
+                        } else {
+                            MAX_FFT_MAGNITUDE = 750000;
+                        }
+
+                        std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxFftMag=%dk maxBin=%d maxFreq=%dHz missedFrames=%d",
+                            now - recInit, totalSamples, numCalls, superMaxMag, (uint32_t)(MAX_FFT_MAGNITUDE / 1000), superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));
                         log_d("%s", msg.c_str());
                         _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
 
@@ -418,6 +432,14 @@ void vTaskDrawer(void* pvParameters)
                     FastLED.clear();
                     DrawWave(mad);
                     DrawMatrixFFT(mad);
+                    DrawClock();
+                    break;
+                case DRAW_STYLE::DISCO_LIGTHS:
+                    //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
+                    FastLED.clear();
+                    // DrawWave(mad);
+                    DrawMatrixFFT(mad);
+                    DrawDiscoLights(mad);
                     DrawClock();
                     break;
                 }
@@ -656,36 +678,44 @@ void vTaskReceiveIR(void* pvParameters)
                 FastLED.setBrightness(_MAX_MILLIS);
                 log_d("IR: DEC BRIGHTNESS");
 
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), false);
                 break;
             case IR_KEY_EFFECT1:
                 _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT2:
                 _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT3:
                 _TheDrawStyle = DRAW_STYLE::HORIZ_FIRE;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT4:
                 _TheDrawStyle = DRAW_STYLE::VISUAL_CURRENT;
                 _UpdateCurrentNow = true;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT5:
                 _TheDrawStyle = DRAW_STYLE::MATRIX_FFT;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT6:
                 _TheDrawStyle = DRAW_STYLE::DISCO_LIGTHS;
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
+                break;
+            case IR_KEY_JUMP1:
+                _pianoMode = true;
+                _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE ON", false);
+                break;
+            case IR_KEY_JUMP2:
+                _pianoMode = false;
+                _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE OFF", false);
                 break;
             }
         }
-        sleep(0);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 

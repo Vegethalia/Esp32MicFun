@@ -24,12 +24,13 @@
 #define DEFAULT_VREF 1100 // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1240 // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 400 // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
-#define MAX_FFT_MAGNITUDE 2500000 // 75000 // a magnitude greater than this value will be considered Max Power
+uint32_t MAX_FFT_MAGNITUDE = 2500000; // 75000 // a magnitude greater than this value will be considered Max Power
 #define MIN_FFT_DB -60 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 0 // a magnitude greater than this value will be considered Max Power
 
 #define FFT_SIZE 2048
-#define TARGET_SAMPLE_RATE (FFT_SIZE * 6) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
+#define HZ_PER_BIN 6
+#define TARGET_SAMPLE_RATE (FFT_SIZE * HZ_PER_BIN) // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING 4 // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING) // we will oversample by 2. We can only draw up to 5kpixels per second
 #define BYTES_X_SAMPLE 4
@@ -122,13 +123,13 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 //------------
 // IR Related
 //------------
-//Mems mic inmp441
-//gnd --> gnd
-//vdd --> 3.3v
-//sd  --> gpio33
-//sck --> gpio25
-//ws  --> gpio5
-//l/r --> gnd (left)
+// Mems mic inmp441
+// gnd --> gnd
+// vdd --> 3.3v
+// sd  --> gpio33
+// sck --> gpio25
+// ws  --> gpio5
+// l/r --> gnd (left)
 #define IR_KEY_INCBRIGHTNESS 0x5C
 #define IR_KEY_DECBRIGHTNESS 0x5D
 #define IR_KEY_STEP 0x41
@@ -161,7 +162,10 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define IR_KEY_EFFECT4 0x08
 #define IR_KEY_EFFECT5 0x09
 #define IR_KEY_EFFECT6 0x0A
-#define IR_KEY_FADE 0x07
+#define IR_KEY_JUMP1 0x04
+#define IR_KEY_JUMP2 0x05
+#define IR_KEY_FADE1 0x06
+#define IR_KEY_FADE2 0x07
 
 int32_t _lastCommandIR = -1;
 
