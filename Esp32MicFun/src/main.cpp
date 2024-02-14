@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <FastLED.h>
+#include <Preferences.h>
 // #include <NTPClient.h>
 #include <PubSubClient.h>
 #include <U8g2lib.h>
@@ -44,16 +45,27 @@
 // Tries to reconnect to wifi (if disconnected), or nothing if WiFi is already connected or if last try was before RETRY_WIFI_EVERY_SECS
 // Returns true if WiFi is NOW connected and before was not.
 // bool Connect2WiFi();
-// Connects to the MQTT broquer if not connected.
+/// @brief  Connects to the MQTT broquer if not connected.
 void Connect2MQTT();
-// PubSubClient callback for received messages
+/// @brief  PubSubClient callback for received messages
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dalaLength);
 // // Draws an image
 // void DrawImage();
 // // Draw a parametric curve
 // void DrawParametric();
-// Processes the received http payload in csv form and populates the global VisualCurrentConsumption structures
+/// @brief  Processes the received http payload in csv form and populates the global VisualCurrentConsumption structures
 void ProcessCurrentPayload(std::string& thePayload);
+
+enum Prefs {
+    PR_INTENSITY, // uses _MAX_MILLIS
+    PR_STYLE, // uses _TheDrawStyle
+    PR_GROUPMINS, // uses  _AgrupaConsumsPerMinuts
+    PR_NIGHTMODE, // uses _NightMode
+    PR_PIANOMODE, // uses _pianoMode
+    PR_CUSTOM_HUE // uses _TheDesiredHue
+};
+/// @brief Persists a given preference value.
+void UpdatePref(Prefs thePref);
 
 /// @brief Configures the NTP server. In this project the timezone and offsets are hardcoded to suit my needs
 void ConfigureNTP()
@@ -79,32 +91,6 @@ void ConfigureNTP()
     //     tzset();
     // }
 }
-
-// bool Connect2WiFi()
-// {
-//     if (WiFi.isConnected()) {
-//         return false; // false because was already connected
-//     }
-//     auto temps = millis() / 1000;
-
-//     if ((temps >= RETRY_WIFI_EVERY_SECS / 2 && temps < RETRY_WIFI_EVERY_SECS * 2) || (temps - _LastCheck4Wifi) >= RETRY_WIFI_EVERY_SECS * 5) {
-//         _LastCheck4Wifi = temps;
-//         log_d("[%d] Trying WiFi connection to [%s]", millis(), WIFI_SSID);
-//         auto err = WiFi.begin(WIFI_SSID, WIFI_PASS); // FROM mykeys.h
-//         err = (wl_status_t)WiFi.waitForConnectResult();
-//         if (err != wl_status_t::WL_CONNECTED) {
-//             log_d("WiFi connection FAILED! Error=[%d]. Will retry later", err);
-//             return false;
-//         } else {
-//             log_d("WiFi CONNECTED!");
-//             // _TheNTPClient.begin();
-//             // _TheNTPClient.setTimeOffset(7200); // 3600
-//             ConfigureNTP();
-//             return true;
-//         }
-//     }
-//     return false; // Too soon to retry, wait.
-// }
 
 // Task to read samples.
 // FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT);
@@ -591,6 +577,39 @@ void vTaskWifiReconnect(void* pvParameters)
     }
 }
 
+void vTaskResetWhenHung(void* pvParameters)
+{
+    delay(60000);
+    uint32_t lastFrameNum = _TheFrameNumber;
+
+    int numChecks = 0;
+
+    while (true) {
+        delay(2000);
+        numChecks++;
+        if (numChecks > 30) {
+            auto cc = _ThePrefs.getUShort(PREF_CURRENT_BY_MINUTES, 33);
+            _ThePubSub.publish(TOPIC_DEBUG,
+                Utils::string_format("** ResetCheck. CurrentFrame=%d OldFrame=%d. GroupByMinuts=%d **",
+                    _TheFrameNumber, lastFrameNum, (int)cc)
+                    .c_str(),
+                true);
+            numChecks = 0;
+        }
+
+        if (_OTA.Status() == OtaUpdater::OtaStatus::UPDATING) {
+            continue;
+        }
+
+        if (_TheFrameNumber == lastFrameNum) {
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HUNG DETECTED!! Reseting :(").c_str(), false);
+            delay(2000);
+            ESP.restart();
+        }
+        lastFrameNum = _TheFrameNumber;
+    }
+}
+
 void vTaskReceiveIR(void* pvParameters)
 {
     // As this program is a special purpose capture/decoder, let us use a larger
@@ -635,12 +654,18 @@ void vTaskReceiveIR(void* pvParameters)
 
             switch (command) {
             case IR_KEY_POWER:
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR RESTART").c_str(), false);
+                delay(500);
                 ESP.restart();
                 break;
             case IR_KEY_STEP:
-                _MAX_MILLIS
-                    = DEFAULT_MILLIS;
+                _MAX_MILLIS = DEFAULT_MILLIS;
                 _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
+                FastLED.setBrightness(_MAX_MILLIS);
+
+                UpdatePref(Prefs::PR_STYLE);
+                UpdatePref(Prefs::PR_INTENSITY);
+
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str(), true);
                 break;
             case IR_KEY_INCBRIGHTNESS:
@@ -658,6 +683,8 @@ void vTaskReceiveIR(void* pvParameters)
                 }
 
                 FastLED.setBrightness(_MAX_MILLIS);
+                UpdatePref(Prefs::PR_INTENSITY);
+
                 log_d("IR: INC BRIGHTNESS");
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d", _MAX_MILLIS).c_str(), true);
                 break;
@@ -676,42 +703,107 @@ void vTaskReceiveIR(void* pvParameters)
                 }
 
                 FastLED.setBrightness(_MAX_MILLIS);
+                UpdatePref(Prefs::PR_INTENSITY);
                 log_d("IR: DEC BRIGHTNESS");
 
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), false);
                 break;
             case IR_KEY_EFFECT1:
                 _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT2:
                 _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT3:
                 _TheDrawStyle = DRAW_STYLE::HORIZ_FIRE;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT4:
                 _TheDrawStyle = DRAW_STYLE::VISUAL_CURRENT;
                 _UpdateCurrentNow = true;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT5:
                 _TheDrawStyle = DRAW_STYLE::MATRIX_FFT;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_EFFECT6:
                 _TheDrawStyle = DRAW_STYLE::DISCO_LIGTHS;
+                UpdatePref(Prefs::PR_STYLE);
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 break;
             case IR_KEY_JUMP1:
                 _pianoMode = true;
+                UpdatePref(Prefs::PR_PIANOMODE);
                 _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE ON", false);
                 break;
             case IR_KEY_JUMP2:
                 _pianoMode = false;
+                UpdatePref(Prefs::PR_PIANOMODE);
                 _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE OFF", false);
+                break;
+            case IR_KEY_INCRED:
+                _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts + 1, (int)60), 1);
+                UpdatePref(Prefs::PR_GROUPMINS);
+                break;
+            case IR_KEY_DECRED:
+                _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts - 1, (int)60), 1);
+                UpdatePref(Prefs::PR_GROUPMINS);
+                break;
+            case IR_KEY_RED:
+                _TheDesiredHue = HSVHue::HUE_RED;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_GREEN:
+                _TheDesiredHue = HSVHue::HUE_GREEN;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_BLUE:
+                _TheDesiredHue = HSVHue::HUE_BLUE;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_LIGHTRED:
+                _TheDesiredHue = (HSVHue::HUE_RED + HSVHue::HUE_ORANGE) / 2;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_LIGHTGREEN:
+                _TheDesiredHue = (HSVHue::HUE_GREEN + HSVHue::HUE_AQUA) / 2;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_LIGHTBLUE:
+                _TheDesiredHue = HSVHue::HUE_AQUA;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_ORANGE:
+                _TheDesiredHue = HSVHue::HUE_ORANGE;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_PURPLE:
+                _TheDesiredHue = HSVHue::HUE_PURPLE;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_PINK:
+                _TheDesiredHue = HSVHue::HUE_PINK;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_FUCSIA:
+                _TheDesiredHue = (HSVHue::HUE_PURPLE + HSVHue::HUE_PINK) / 2;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_YELLOW:
+                _TheDesiredHue = HSVHue::HUE_YELLOW;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
+                break;
+            case IR_KEY_WHITE:
+                _TheDesiredHue = -1;
+                UpdatePref(Prefs::PR_CUSTOM_HUE);
                 break;
             }
         }
@@ -838,12 +930,21 @@ void setup()
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, THE_PANEL_WIDTH * 8, THE_PANEL_WIDTH * 8);
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS3, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 2, THE_PANEL_WIDTH * 8);
     FastLED.addLeds<WS2812B, PIN_DATA_LEDS4, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 3, THE_PANEL_WIDTH * 8);
+
+    _ThePanel.SetParams(&_TheLeds, &_TheMapping);
+
+    _ThePrefs.begin("FlipaLeds", false); // false=read+write
+    _TheDrawStyle = (DRAW_STYLE)(_ThePrefs.getUChar(PREF_STYLE, DRAW_STYLE::DEFAULT_STYLE));
+    _MAX_MILLIS = _ThePrefs.getUShort(PREF_INTENSITY, _MAX_MILLIS);
+    _AgrupaConsumsPerMinuts = _ThePrefs.getUShort(PREF_CURRENT_BY_MINUTES, DEFAULT_CONSUM_PER_MINUTS);
+    _NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode);
+    _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
+    _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
+
     // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
     FastLED.setTemperature(Halogen);
     FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
     FastLED.setBrightness(_MAX_MILLIS);
-
-    _ThePanel.SetParams(&_TheLeds, &_TheMapping);
 
     //_TheLeds.fill_rainbow(HSVHue::HUE_YELLOW);
 
@@ -933,6 +1034,8 @@ void setup()
     // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
     //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
     xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 3000, nullptr, 2, &_receiveIRTaskHandle, 1);
+
+    xTaskCreatePinnedToCore(vTaskResetWhenHung, "Reset When Hung", 2048, nullptr, 2, &_resetWhenHungTaskHandle, 1);
 }
 
 // PLAY WITH MATRIX
@@ -1007,6 +1110,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
         if (newIntensity != origIntensity) {
             // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
             FastLED.setBrightness(_MAX_MILLIS);
+            UpdatePref(Prefs::PR_INTENSITY);
 
             //     // log_d("Changing led intensity=%d", newIntensity);
             //     _Intensity = newIntensity;
@@ -1023,6 +1127,8 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     }
     if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
         _TheDrawStyle = (DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1);
+        UpdatePref(Prefs::PR_STYLE);
+
         if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
             _UpdateCurrentNow = true;
         }
@@ -1036,20 +1142,26 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     }
     if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
         byte nightOn = std::atoi(theMsg.c_str()) != 0;
+        _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
         if (nightOn) {
             _MAX_MILLIS = NIGHT_MILLIS;
             FastLED.setBrightness(_MAX_MILLIS);
             _NightMode = true;
             _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+            UpdatePref(Prefs::PR_NIGHTMODE);
         } else if (_NightMode) {
             FastLED.setBrightness(DEFAULT_MILLIS);
             _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
             _NightMode = false;
+            UpdatePref(Prefs::PR_NIGHTMODE);
         }
+        UpdatePref(Prefs::PR_STYLE);
     }
     if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
         int minuts = std::atoi(theMsg.c_str());
-        _AgrupaConsumsPerMinuts = max(min(minuts, (int)60), 1);
+        _AgrupaConsumsPerMinuts = (uint16_t)max(min(minuts, (int)60), 1);
+        UpdatePref(Prefs::PR_GROUPMINS);
+
         _UpdateCurrentNow = true;
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Electricitat agrupada per [%d] minuts", (int)_AgrupaConsumsPerMinuts).c_str(), true);
     }
@@ -1109,5 +1221,30 @@ void ProcessCurrentPayload(std::string& theCsvPayload)
         _lastCurrentTime = _pLectures[nLastNonZero - 1].horaConsum;
     } else {
         _ThePubSub.publish(TOPIC_DEBUG, "NO DATA");
+    }
+}
+
+// Updates a given preference value. Each Pref uses a concrete Global value.
+void UpdatePref(Prefs thePref)
+{
+    switch (thePref) {
+    case Prefs::PR_INTENSITY:
+        _ThePrefs.putUShort(PREF_INTENSITY, _MAX_MILLIS);
+        break;
+    case Prefs::PR_STYLE:
+        _ThePrefs.putUChar(PREF_STYLE, (uint8_t)_TheDrawStyle);
+        break;
+    case Prefs::PR_GROUPMINS:
+        _ThePrefs.putUShort(PREF_CURRENT_BY_MINUTES, _AgrupaConsumsPerMinuts);
+        break;
+    case Prefs::PR_PIANOMODE:
+        _ThePrefs.putBool(PREF_PIANOMODE, _pianoMode);
+        break;
+    case Prefs::PR_NIGHTMODE:
+        _ThePrefs.putBool(PREF_NIGHTMODE, _NightMode);
+        break;
+    case Prefs::PR_CUSTOM_HUE:
+        _ThePrefs.putInt(PREF_CUSTOM_HUE, _TheDesiredHue);
+        break;
     }
 }

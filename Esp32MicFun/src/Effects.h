@@ -49,7 +49,11 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
 
     // actualInc = random8(32);
 
-    _ThePanel.SetBaseHue((HSVHue::HUE_ORANGE - (MAX_INC / 3)) + actualInc);
+    if (_TheDesiredHue < 0) {
+        _ThePanel.SetBaseHue((HSVHue::HUE_ORANGE - (MAX_INC / 3)) + actualInc);
+    } else {
+        _ThePanel.SetBaseHue((_TheDesiredHue - (MAX_INC / 3)) + actualInc);
+    }
     //_ThePanel.IncBaseHue();
 
     assert(THE_PANEL_WIDTH > 1);
@@ -116,7 +120,11 @@ void DrawLedBars(MsgAudio2Draw& mad)
     // FastLED.clear();
     //  DrawImage();
     //_ThePanel.SetBaseHue();
-    _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
+    if (_TheDesiredHue < 0) {
+        _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
+    } else {
+        _ThePanel.SetBaseHue((HSVHue)_TheDesiredHue);
+    }
     for (uint16_t i = 0; i < numItems; i++) {
         // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
         //     auto boost = 1.0f + (i * freqBoost);
@@ -254,6 +262,9 @@ void DrawParametric(MsgAudio2Draw& mad)
                     _DemoMode = false;
                     _u8g2.setFont(u8g2_font_princess_tr);
                     log_d("DeMo MoDe FINISH");
+                    if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
+                        _UpdateCurrentNow = true;
+                    }
                 }
             }
             _DemoModeFrame++;

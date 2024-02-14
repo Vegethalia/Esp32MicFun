@@ -120,6 +120,16 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
 
+// Preferences related
+Preferences _ThePrefs;
+
+#define PREF_STYLE "Style"
+#define PREF_INTENSITY "Intensity"
+#define PREF_PIANOMODE "PianoMode"
+#define PREF_NIGHTMODE "NightMode"
+#define PREF_CURRENT_BY_MINUTES "CurrentByMins"
+#define PREF_CUSTOM_HUE "CustomHue"
+
 //------------
 // IR Related
 //------------
@@ -179,6 +189,7 @@ TaskHandle_t _drawTaskHandle;
 TaskHandle_t _wifiReconnectTaskHandle;
 // TaskHandle_t _refrescarConsumTaskHandle;
 TaskHandle_t _receiveIRTaskHandle;
+TaskHandle_t _resetWhenHungTaskHandle;
 
 QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
 uint8_t _adc_i2s_event_queue_size = 1;
@@ -218,6 +229,7 @@ enum DRAW_STYLE {
     DEFAULT_STYLE = MATRIX_FFT
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
+int16_t _TheDesiredHue = -1; // el custom color a aplicar. -1 -> color per defecte.
 
 // consum electricitat
 #define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts

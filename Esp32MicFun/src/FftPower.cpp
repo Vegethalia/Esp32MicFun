@@ -227,8 +227,9 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
             }
         }
     } else if (binRes == BinResolution::AUTO64_6Hz) {
-        const uint16_t* pBinsNew = _Auto64Bands_v4_6Hz;
-        uint8_t numBins = 64;
+        const uint16_t* pBinsNew = _Auto64Bands_v4_6Hz; //_Auto64Bands_v4_6Hz;
+        uint8_t numBins
+            = 64;
         maxBin = 0;
         uint32_t fromBin = 4 * 2; //*2 pq _pRealFftPlan->output contains real,img parts interleaved. ENs saltem els 4 1ers bins (low precission on mic).
         uint32_t toBin = 0;
