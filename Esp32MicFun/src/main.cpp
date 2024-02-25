@@ -55,6 +55,9 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dalaLength);
 // void DrawParametric();
 /// @brief  Processes the received http payload in csv form and populates the global VisualCurrentConsumption structures
 void ProcessCurrentPayload(std::string& thePayload);
+/// @brief Sets default parameters for night mode on/off
+/// @param nightOn
+void SetNightMode(bool nightOn);
 
 enum Prefs {
     PR_INTENSITY, // uses _MAX_MILLIS
@@ -668,6 +671,13 @@ void vTaskReceiveIR(void* pvParameters)
 
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str(), true);
                 break;
+            case IR_KEY_FADE2:
+                SetNightMode(!_NightMode);
+                UpdatePref(Prefs::PR_STYLE);
+                UpdatePref(Prefs::PR_NIGHTMODE);
+
+                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str(), true);
+                break;
             case IR_KEY_INCBRIGHTNESS:
                 _lastCommandIR = IR_KEY_INCBRIGHTNESS;
                 if (_MAX_MILLIS < 20) {
@@ -946,6 +956,10 @@ void setup()
     FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
     FastLED.setBrightness(_MAX_MILLIS);
 
+    if (_NightMode) {
+        SetNightMode(true);
+    }
+
     //_TheLeds.fill_rainbow(HSVHue::HUE_YELLOW);
 
     if (!WITH_MEMS_MIC) {
@@ -1143,19 +1157,9 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
         byte nightOn = std::atoi(theMsg.c_str()) != 0;
         _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
-        if (nightOn) {
-            _MAX_MILLIS = NIGHT_MILLIS;
-            FastLED.setBrightness(_MAX_MILLIS);
-            _NightMode = true;
-            _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
-            UpdatePref(Prefs::PR_NIGHTMODE);
-        } else if (_NightMode) {
-            FastLED.setBrightness(DEFAULT_MILLIS);
-            _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
-            _NightMode = false;
-            UpdatePref(Prefs::PR_NIGHTMODE);
-        }
+        SetNightMode(nightOn);
         UpdatePref(Prefs::PR_STYLE);
+        UpdatePref(Prefs::PR_NIGHTMODE);
     }
     if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
         int minuts = std::atoi(theMsg.c_str());
@@ -1247,4 +1251,17 @@ void UpdatePref(Prefs thePref)
         _ThePrefs.putInt(PREF_CUSTOM_HUE, _TheDesiredHue);
         break;
     }
+}
+
+void SetNightMode(bool nightOn)
+{
+    _NightMode = nightOn;
+    if (nightOn) {
+        _MAX_MILLIS = NIGHT_MILLIS;
+        _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+    } else if (!nightOn) {
+        _MAX_MILLIS = DEFAULT_MILLIS;
+        _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+    }
+    FastLED.setBrightness(_MAX_MILLIS);
 }

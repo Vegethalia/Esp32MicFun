@@ -516,6 +516,11 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
     uint16_t currentBin = 0;
     uint8_t x;
 
+    auto theHue = HSVHue::HUE_PURPLE;
+    if (_TheDesiredHue >= 0) {
+        theHue = (HSVHue)_TheDesiredHue;
+    }
+
     for (uint8_t iLine = 0; iLine < numLines; iLine++) {
         for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
             auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
@@ -534,7 +539,7 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
             } else {
                 x = THE_PANEL_WIDTH - xPix - 1;
             }
-            _TheLeds[_TheMapping.XY(x, currentLine)] = CHSV(HSVHue::HUE_PURPLE + (value / 2), 255, (uint8_t)value);
+            _TheLeds[_TheMapping.XY(x, currentLine)] = CHSV(theHue + (value / 2), 255, (uint8_t)value);
         }
         currentLine--;
     }
