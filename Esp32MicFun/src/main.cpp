@@ -81,7 +81,7 @@ void ConfigureNTP()
     //    if (timeinfo.tm_year < (2020 - 1900)) {
     //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
     if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
-        configTime(3600, 0, "pool.ntp.org");
+        configTime(3600, 3600, "pool.ntp.org"); // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
         sntp_set_sync_interval(60000);
         sntp_restart();
     }
@@ -96,8 +96,6 @@ void ConfigureNTP()
 }
 
 // Task to read samples.
-// FftPower theFFT(FFT_SIZE, AUDIO_DATA_OUT);
-// uint16_t dataOrig[AUDIO_DATA_OUT * OVERSAMPLING];
 void vTaskReader(void* pvParameters)
 {
     const uint8_t REAL_BYTES_X_SAMPLE = BYTES_X_SAMPLE == 3 ? 4 : BYTES_X_SAMPLE;
@@ -950,6 +948,10 @@ void setup()
     _NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode);
     _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
     _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
+
+    log_d(Utils::string_format("Loaded defaults: Style=%d Intensity=%d ConsumsPerMinut=%d NightMode=%d PianoMode=%d Hue=%d",
+        (int)_TheDrawStyle, (int)_MAX_MILLIS, (int)_AgrupaConsumsPerMinuts, (int)_NightMode, (int)_pianoMode, (int)_TheDesiredHue)
+              .c_str());
 
     // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
     FastLED.setTemperature(Halogen);

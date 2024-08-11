@@ -130,9 +130,6 @@ Preferences _ThePrefs;
 #define PREF_CURRENT_BY_MINUTES "CurrentByMins"
 #define PREF_CUSTOM_HUE "CustomHue"
 
-//------------
-// IR Related
-//------------
 // Mems mic inmp441
 // gnd --> gnd
 // vdd --> 3.3v
@@ -140,6 +137,9 @@ Preferences _ThePrefs;
 // sck --> gpio25
 // ws  --> gpio5
 // l/r --> gnd (left)
+//------------
+// IR Related
+//------------
 #define IR_KEY_INCBRIGHTNESS 0x5C
 #define IR_KEY_DECBRIGHTNESS 0x5D
 #define IR_KEY_STEP 0x41

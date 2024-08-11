@@ -108,7 +108,7 @@ void DrawLedBars(MsgAudio2Draw& mad)
     const auto numItems = _TheMapping.GetWidth();
     uint8_t maxBassValue = 0;
     int16_t value = 0;
-    uint8_t maxHeight = min(18, BAR_HEIGHT);
+    uint8_t maxHeight = min(16, BAR_HEIGHT); //18
     uint8_t maxHeightScaled = (maxHeight * 10) + 9;
 
     assert(BAR_HEIGHT > 1);
@@ -426,10 +426,10 @@ void DrawWave(MsgAudio2Draw& mad)
     myValue.setHSV(HSVHue::HUE_PURPLE, 255, 70);
 
     uint8_t numFadingWaves = 1;
-    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
+//    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
         // numFadingWaves = 2;
         myValue.setHSV(HSVHue::HUE_AQUA, 128, 70);
-    }
+//    }
     int16_t numValuesHi = 0;
     int16_t numValuesVeryHi = 0;
     for (i = 0; i < width; i++) {
@@ -525,11 +525,6 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
         for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
             auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
             value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-            // if (value < 25) {
-            //     value = 0;
-            // } else {
-            //     value -= 25;
-            // }
             if (value < 3) { // black? el fem transparent :)
                 continue;
             }
