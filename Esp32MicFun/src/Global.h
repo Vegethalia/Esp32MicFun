@@ -80,6 +80,7 @@ WiFiClient _TheWifi;
 uint32_t _InitTime = 0;
 uint16_t _numFrames = 0;
 uint32_t _TheFrameNumber = 0;
+uint32_t _LastMqttReconnect = 0;
 float _fps = 0.0f;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
@@ -95,6 +96,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 // MQTT related
 #define MQTT_BROKER "192.168.1.140"
 #define MQTT_PORT 1888
+#define MQTT_RECONNECT_IGNORE_MSG_MS 60000
 
 #define TOPIC_INTENSITY "caseta/spectrometre/intensity"
 #define TOPIC_DELAYFRAME "caseta/spectrometre/delay"

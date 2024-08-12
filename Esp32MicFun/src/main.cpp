@@ -889,6 +889,7 @@ void Connect2MQTT()
         if (!_ThePubSub.connect((String("ESP32_Espectrometer") + WiFi.macAddress()[0]).c_str())) {
             log_e("ERROR!! PubSubClient was not able to connect to PiRuter!!");
         } else { // Subscribe to the feeds
+            _LastMqttReconnect = millis();
             log_i("PubSubClient connected to PiRuter MQTT broker!!");
             _ThePubSub.publish(TOPIC_DEBUG, "PubSubClient connected to PiRuter MQTT broker!!", true);
 
@@ -1118,6 +1119,11 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     }
     log_v("Received message from [%s]: [%s]", theTopic.c_str(), theMsg.c_str());
 
+    if (millis() - _LastMqttReconnect < MQTT_RECONNECT_IGNORE_MSG_MS) {
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Ignoring MqttMSG [%s][%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
+        return;
+    }
+
     if (theTopic.find(TOPIC_INTENSITY) != std::string::npos) {
         auto origIntensity = _MAX_MILLIS;
         auto newIntensity = min(std::atoi(theMsg.c_str()), 255); //(int)MAX_MILLIS);
@@ -1162,6 +1168,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
         SetNightMode(nightOn);
         UpdatePref(Prefs::PR_STYLE);
         UpdatePref(Prefs::PR_NIGHTMODE);
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str(), true);
     }
     if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
         int minuts = std::atoi(theMsg.c_str());
