@@ -148,47 +148,34 @@ enum Prefs {
 // sck --> gpio25
 // ws  --> gpio5
 // l/r --> gnd (left)
+
 //------------
 // IR Related
 //------------
-#define IR_KEY_INCBRIGHTNESS 0x5C
-#define IR_KEY_DECBRIGHTNESS 0x5D
-#define IR_KEY_STEP 0x41
-#define IR_KEY_POWER 0x40
-#define IR_KEY_RED 0x58
-#define IR_KEY_GREEN 0x59
-#define IR_KEY_BLUE 0x45
-#define IR_KEY_WHITE 0x44
-#define IR_KEY_LIGHTRED 0x54
-#define IR_KEY_LIGHTGREEN 0x55
-#define IR_KEY_LIGHTBLUE 0x49
-#define IR_KEY_PINK 0x48
-#define IR_KEY_ORANGE 0x50
-#define IR_KEY_AQUA 0x52
-#define IR_KEY_PURPLE 0x4D
-#define IR_KEY_YELLOW 0x18
-#define IR_KEY_FUCSIA 0x1A
-#define IR_KEY_LIGHTAQUA 0x1B
-#define IR_KEY_INCRED 0x14
-#define IR_KEY_DECRED 0x10
-#define IR_KEY_INCGREEN 0x15
-#define IR_KEY_DECGREEN 0x11
-#define IR_KEY_INCBLUE 0x16
-#define IR_KEY_DECBLUE 0x12
-#define IR_KEY_QUICK 0x17
-#define IR_KEY_SLOW 0x13
-#define IR_KEY_EFFECT1 0x0C
-#define IR_KEY_EFFECT2 0x0D
-#define IR_KEY_EFFECT3 0x0E
-#define IR_KEY_EFFECT4 0x08
-#define IR_KEY_EFFECT5 0x09
-#define IR_KEY_EFFECT6 0x0A
-#define IR_KEY_JUMP1 0x04
-#define IR_KEY_JUMP2 0x05
-#define IR_KEY_FADE1 0x06
-#define IR_KEY_FADE2 0x07
+enum GEN_KEY_PRESS {
+    KEY_NONE,
+    KEY_0,
+    KEY_1,
+    KEY_2,
+    KEY_3,
+    KEY_4,
+    KEY_5,
+    KEY_6,
+    KEY_7,
+    KEY_8,
+    KEY_9,
+    KEY_PROD,
+    KEY_DIV,
+    KEY_MINUS,
+    KEY_PLUS,
+    KEY_ENTER,
+    KEY_UP,
+    KEY_DOWN,
+    KEY_LEFT,
+    KEY_RIGHT
+};
 
-int32_t _lastCommandIR = -1;
+GEN_KEY_PRESS _TheLastKey = GEN_KEY_PRESS::KEY_NONE;
 
 //------------
 // Task Related

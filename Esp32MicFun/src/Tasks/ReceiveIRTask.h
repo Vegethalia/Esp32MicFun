@@ -1,7 +1,89 @@
+// Key Codes
+
+// The following are the key codes for the common IR LedColor remote control.
+#define IR_KEY_INCBRIGHTNESS 0x5C
+#define IR_KEY_DECBRIGHTNESS 0x5D
+#define IR_KEY_STEP 0x41
+#define IR_KEY_POWER 0x40
+#define IR_KEY_RED 0x58
+#define IR_KEY_GREEN 0x59
+#define IR_KEY_BLUE 0x45
+#define IR_KEY_WHITE 0x44
+#define IR_KEY_LIGHTRED 0x54
+#define IR_KEY_LIGHTGREEN 0x55
+#define IR_KEY_LIGHTBLUE 0x49
+#define IR_KEY_PINK 0x48
+#define IR_KEY_ORANGE 0x50
+#define IR_KEY_AQUA 0x52
+#define IR_KEY_PURPLE 0x4D
+#define IR_KEY_YELLOW 0x18
+#define IR_KEY_FUCSIA 0x1A
+#define IR_KEY_LIGHTAQUA 0x1B
+#define IR_KEY_INCRED 0x14
+#define IR_KEY_DECRED 0x10
+#define IR_KEY_INCGREEN 0x15
+#define IR_KEY_DECGREEN 0x11
+#define IR_KEY_INCBLUE 0x16
+#define IR_KEY_DECBLUE 0x12
+#define IR_KEY_QUICK 0x17
+#define IR_KEY_SLOW 0x13
+#define IR_KEY_EFFECT1 0x0C
+#define IR_KEY_EFFECT2 0x0D
+#define IR_KEY_EFFECT3 0x0E
+#define IR_KEY_EFFECT4 0x08
+#define IR_KEY_EFFECT5 0x09
+#define IR_KEY_EFFECT6 0x0A
+#define IR_KEY_JUMP1 0x04
+#define IR_KEY_JUMP2 0x05
+#define IR_KEY_FADE1 0x06
+#define IR_KEY_FADE2 0x07
+
+// The following are the key codes for the DYON SCORPION IR remote control.
+#define IR_KEY_DYON_POWER 0x18
+#define IR_KEY_DYON_0 0x14
+#define IR_KEY_DYON_1 0x1A
+#define IR_KEY_DYON_2 0x11
+#define IR_KEY_DYON_3 0x09
+#define IR_KEY_DYON_4 0x1B
+#define IR_KEY_DYON_5 0x12
+#define IR_KEY_DYON_6 0x0A
+#define IR_KEY_DYON_7 0x1C
+#define IR_KEY_DYON_8 0x13
+#define IR_KEY_DYON_9 0x0B
+#define IR_KEY_DYON_RED 0x19
+#define IR_KEY_DYON_GREEN 0x08
+#define IR_KEY_DYON_YELLOW 0x03
+#define IR_KEY_DYON_BLUE 0x1D
+#define IR_KEY_DYON_OK 0x07
+#define IR_KEY_DYON_UP 0x0D
+#define IR_KEY_DYON_RIGHT 0x16
+#define IR_KEY_DYON_DOWN 0x1E
+#define IR_KEY_DYON_LEFT 0x17
+#define IR_KEY_DYON_PLAY 0x45
+#define IR_KEY_DYON_RECORD 0x41
+#define IR_KEY_DYON_PAUSE 0x4C
+#define IR_KEY_DYON_STOP 0x49
+#define IR_KEY_DYON_INC 0x54
+#define IR_KEY_DYON_DEC 0x58
+#define IR_KEY_DYON_REFRESH 0x55
+#define IR_KEY_DYON_ZOOM 0x59
+
+// Global Vars
+int32_t _lastCommandIR = -1;
+
+// Advanced declarations
+
+/// @brief Processes the IR commands for the CalcMode. Only used when in CalcMode visualization style.
+/// @param command
+void ProcessIRCommand4CalcMode(uint32_t command);
+/// @brief Processes the intention of changing the drawing style.
+/// @param style
+/// @return Returns true if the style has changed.
+bool ChangeDrawStyle(DRAW_STYLE style);
 
 /// @brief This task is responsible for receiving IR commands and processing them.
 /// Updates some of the Global vars.
-/// @param pvParameters 
+/// @param pvParameters
 void vTaskReceiveIR(void* pvParameters)
 {
     // As this program is a special purpose capture/decoder, let us use a larger
@@ -44,7 +126,11 @@ void vTaskReceiveIR(void* pvParameters)
             log_d("IR Decode:0x%2X IsRepeat=%d", results.command, results.repeat ? 1 : 0);
             _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR: Value=%d Command=0x%2X IsRepeat=%d", (uint32_t)results.value, results.command, results.repeat ? 1 : 0).c_str(), false);
 
+            if (_TheDrawStyle == DRAW_STYLE::CALC_MODE) {
+                ProcessIRCommand4CalcMode(command);
+            }
             bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE;
+
             switch (command) {
             case IR_KEY_POWER:
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR RESTART").c_str(), false);
@@ -64,11 +150,13 @@ void vTaskReceiveIR(void* pvParameters)
                 }
                 break;
             case IR_KEY_FADE2:
-                SetNightMode(!_NightMode);
-                UpdatePref(Prefs::PR_STYLE);
-                UpdatePref(Prefs::PR_NIGHTMODE);
+                if (allowStyleChange) {
+                    SetNightMode(!_NightMode);
+                    UpdatePref(Prefs::PR_STYLE);
+                    UpdatePref(Prefs::PR_NIGHTMODE);
 
-                _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str(), true);
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str(), true);
+                }
                 break;
             case IR_KEY_INCBRIGHTNESS:
                 _lastCommandIR = IR_KEY_INCBRIGHTNESS;
@@ -111,47 +199,24 @@ void vTaskReceiveIR(void* pvParameters)
                 _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), false);
                 break;
             case IR_KEY_EFFECT1:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-                }
+                ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP);
                 break;
             case IR_KEY_EFFECT2:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-                }
+                ChangeDrawStyle(DRAW_STYLE::VERT_FIRE);
                 break;
             case IR_KEY_EFFECT3:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::HORIZ_FIRE;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-                }
+                ChangeDrawStyle(DRAW_STYLE::HORIZ_FIRE);
                 break;
             case IR_KEY_EFFECT4:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::VISUAL_CURRENT;
+                if (ChangeDrawStyle(DRAW_STYLE::VISUAL_CURRENT)) {
                     _UpdateCurrentNow = true;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
                 }
                 break;
             case IR_KEY_EFFECT5:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::MATRIX_FFT;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-                }
+                ChangeDrawStyle(DRAW_STYLE::MATRIX_FFT);
                 break;
             case IR_KEY_EFFECT6:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::DISCO_LIGTHS;
-                    UpdatePref(Prefs::PR_STYLE);
-                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-                }
+                ChangeDrawStyle(DRAW_STYLE::DISCO_LIGTHS);
                 break;
             case IR_KEY_JUMP1:
                 _pianoMode = true;
@@ -164,12 +229,16 @@ void vTaskReceiveIR(void* pvParameters)
                 _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE OFF", false);
                 break;
             case IR_KEY_INCRED:
-                _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts + 1, (int)60), 1);
-                UpdatePref(Prefs::PR_GROUPMINS);
+                if (allowStyleChange) {
+                    _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts + 1, (int)60), 1);
+                    UpdatePref(Prefs::PR_GROUPMINS);
+                }
                 break;
             case IR_KEY_DECRED:
-                _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts - 1, (int)60), 1);
-                UpdatePref(Prefs::PR_GROUPMINS);
+                if (allowStyleChange) {
+                    _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts - 1, (int)60), 1);
+                    UpdatePref(Prefs::PR_GROUPMINS);
+                }
                 break;
             case IR_KEY_RED:
                 _TheDesiredHue = HSVHue::HUE_RED;
@@ -220,8 +289,7 @@ void vTaskReceiveIR(void* pvParameters)
                 UpdatePref(Prefs::PR_CUSTOM_HUE);
                 break;
             case IR_KEY_QUICK:
-                if (allowStyleChange) {
-                    _TheDrawStyle = DRAW_STYLE::CALC_MODE;
+                if (ChangeDrawStyle(DRAW_STYLE::CALC_MODE)) {
                     // UpdatePref(Prefs::PR_STYLE); //aquest mode no cal guardar-lo.
                     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=CALC_MODE").c_str(), false);
                 }
@@ -230,4 +298,80 @@ void vTaskReceiveIR(void* pvParameters)
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
+}
+
+void ProcessIRCommand4CalcMode(uint32_t command)
+{
+    switch (command) {
+    case IR_KEY_DYON_0:
+        _TheLastKey = GEN_KEY_PRESS::KEY_0;
+        break;
+    case IR_KEY_DYON_1:
+        _TheLastKey = GEN_KEY_PRESS::KEY_1;
+        break;
+    case IR_KEY_DYON_2:
+        _TheLastKey = GEN_KEY_PRESS::KEY_2;
+        break;
+    case IR_KEY_DYON_3:
+        _TheLastKey = GEN_KEY_PRESS::KEY_3;
+        break;
+    case IR_KEY_DYON_4:
+        _TheLastKey = GEN_KEY_PRESS::KEY_4;
+        break;
+    case IR_KEY_DYON_5:
+        _TheLastKey = GEN_KEY_PRESS::KEY_5;
+        break;
+    case IR_KEY_DYON_6:
+        _TheLastKey = GEN_KEY_PRESS::KEY_6;
+        break;
+    case IR_KEY_DYON_7:
+        _TheLastKey = GEN_KEY_PRESS::KEY_7;
+        break;
+    case IR_KEY_DYON_8:
+        _TheLastKey = GEN_KEY_PRESS::KEY_8;
+        break;
+    case IR_KEY_DYON_9:
+        _TheLastKey = GEN_KEY_PRESS::KEY_9;
+        break;
+    case IR_KEY_DYON_RED:
+        _TheLastKey = GEN_KEY_PRESS::KEY_PLUS;
+        break;
+    case IR_KEY_DYON_GREEN:
+        _TheLastKey = GEN_KEY_PRESS::KEY_MINUS;
+        break;
+    case IR_KEY_DYON_YELLOW:
+        _TheLastKey = GEN_KEY_PRESS::KEY_PROD;
+        break;
+    case IR_KEY_DYON_BLUE:
+        _TheLastKey = GEN_KEY_PRESS::KEY_DIV;
+        break;
+    case IR_KEY_DYON_OK:
+        _TheLastKey = GEN_KEY_PRESS::KEY_ENTER;
+        break;
+    case IR_KEY_DYON_UP:
+        _TheLastKey = GEN_KEY_PRESS::KEY_UP;
+        break;
+    case IR_KEY_DYON_DOWN:
+        _TheLastKey = GEN_KEY_PRESS::KEY_DOWN;
+        break;
+    case IR_KEY_DYON_LEFT:
+        _TheLastKey = GEN_KEY_PRESS::KEY_LEFT;
+        break;
+    case IR_KEY_DYON_RIGHT:
+        _TheLastKey = GEN_KEY_PRESS::KEY_RIGHT;
+        break;
+    }
+}
+
+bool ChangeDrawStyle(DRAW_STYLE style)
+{
+    bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE;
+
+    if (allowStyleChange && _TheDrawStyle != style) {
+        _TheDrawStyle = style;
+        UpdatePref(Prefs::PR_STYLE);
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
+        return true;
+    }
+    return false;
 }
