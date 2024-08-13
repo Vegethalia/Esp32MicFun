@@ -125,6 +125,15 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 // Preferences related
 Preferences _ThePrefs;
 
+enum Prefs {
+    PR_INTENSITY, // uses _MAX_MILLIS
+    PR_STYLE, // uses _TheDrawStyle
+    PR_GROUPMINS, // uses  _AgrupaConsumsPerMinuts
+    PR_NIGHTMODE, // uses _NightMode
+    PR_PIANOMODE, // uses _pianoMode
+    PR_CUSTOM_HUE // uses _TheDesiredHue
+};
+
 #define PREF_STYLE "Style"
 #define PREF_INTENSITY "Intensity"
 #define PREF_PIANOMODE "PianoMode"
@@ -226,12 +235,18 @@ enum DRAW_STYLE {
     VISUAL_CURRENT = 4,
     MATRIX_FFT = 5,
     DISCO_LIGTHS = 6,
+    CALC_MODE = 7,
 
-    MAX_STYLE = DISCO_LIGTHS,
+    MAX_STYLE = CALC_MODE,
     DEFAULT_STYLE = MATRIX_FFT
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
 int16_t _TheDesiredHue = -1; // el custom color a aplicar. -1 -> color per defecte.
+uint8_t _1stBarValue = 128;
+
+// Calculator Mode
+#define CALC_MODE_SHOWTITLE_MS 2000
+int32_t _StartedCalcMode = -1;
 
 // consum electricitat
 #define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts

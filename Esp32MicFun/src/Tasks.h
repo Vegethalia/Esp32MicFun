@@ -1,0 +1,6 @@
+#include "Tasks/DrawerTask.h"
+#include "Tasks/ReaderTask.h"
+#include "Tasks/ReceiveIRTask.h"
+#include "Tasks/ResetWhenHungTask.h"
+#include "Tasks/ShowLedsTask.h"
+#include "Tasks/WifiReconnectTask.h"
