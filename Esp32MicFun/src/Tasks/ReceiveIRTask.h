@@ -76,10 +76,6 @@ int32_t _lastCommandIR = -1;
 /// @brief Processes the IR commands for the CalcMode. Only used when in CalcMode visualization style.
 /// @param command
 void ProcessIRCommand4CalcMode(uint32_t command);
-/// @brief Processes the intention of changing the drawing style.
-/// @param style
-/// @return Returns true if the style has changed.
-bool ChangeDrawStyle(DRAW_STYLE style);
 
 /// @brief This task is responsible for receiving IR commands and processing them.
 /// Updates some of the Global vars.
@@ -360,18 +356,11 @@ void ProcessIRCommand4CalcMode(uint32_t command)
     case IR_KEY_DYON_RIGHT:
         _TheLastKey = GEN_KEY_PRESS::KEY_RIGHT;
         break;
+    case IR_KEY_DYON_REFRESH:
+        _TheLastKey = GEN_KEY_PRESS::KEY_REFRESH;
+        break;
+    case IR_KEY_DYON_POWER:
+        ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true);
+        break;
     }
-}
-
-bool ChangeDrawStyle(DRAW_STYLE style)
-{
-    bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE;
-
-    if (allowStyleChange && _TheDrawStyle != style) {
-        _TheDrawStyle = style;
-        UpdatePref(Prefs::PR_STYLE);
-        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
-        return true;
-    }
-    return false;
 }

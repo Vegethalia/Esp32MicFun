@@ -96,7 +96,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 // MQTT related
 #define MQTT_BROKER "192.168.1.140"
 #define MQTT_PORT 1888
-#define MQTT_RECONNECT_IGNORE_MSG_MS 60000
+#define MQTT_RECONNECT_IGNORE_MSG_MS 30000
 
 #define TOPIC_INTENSITY "caseta/spectrometre/intensity"
 #define TOPIC_DELAYFRAME "caseta/spectrometre/delay"
@@ -172,7 +172,8 @@ enum GEN_KEY_PRESS {
     KEY_UP,
     KEY_DOWN,
     KEY_LEFT,
-    KEY_RIGHT
+    KEY_RIGHT,
+    KEY_REFRESH
 };
 
 GEN_KEY_PRESS _TheLastKey = GEN_KEY_PRESS::KEY_NONE;
@@ -232,7 +233,7 @@ int16_t _TheDesiredHue = -1; // el custom color a aplicar. -1 -> color per defec
 uint8_t _1stBarValue = 128;
 
 // Calculator Mode
-#define CALC_MODE_SHOWTITLE_MS 2000
+#define CALC_MODE_SHOWTITLE_MS 8000
 int32_t _StartedCalcMode = -1;
 
 // consum electricitat

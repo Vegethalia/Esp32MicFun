@@ -234,7 +234,7 @@ void DrawParametric(MsgAudio2Draw& mad)
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     //_ThePanel.SetBaseHue(HSVHue::HUE_YELLOW);
-    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, __dpd->textPos, 0, __dpd->hue, intensity);
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, __dpd->textPos, 16, __dpd->hue, intensity);
 
     __dpd->textPos += __dpd->inc;
     if (__dpd->textPos < (-THE_PANEL_WIDTH * 2)) {

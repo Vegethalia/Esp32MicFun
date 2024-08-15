@@ -1,7 +1,8 @@
 #include "Effects/effect_utils.h"
 
-#include "Effects/CalcMode.h"
 #include "Effects/Clock.h"
+
+#include "Effects/CalcMode.h"
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
 #include "Effects/Frame.h"

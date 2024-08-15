@@ -542,7 +542,7 @@ public:
     // It is posible to define negative drawXPos values. This way the 1st pixel painted will be the one at the 0 position.
     // The color and value are specified in Hue/Intensity
     void DrawScreenBufferXY(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint8_t firstVertTile, uint8_t lasttVertTile,
-        int16_t drawXPos, int16_t drawYPos, uint8_t hue, uint8_t intensity)
+        int16_t drawXPos, int16_t drawYPos, uint8_t hue, uint8_t intensity, bool autoIncHue = true, uint8_t sat = 180)
     {
         uint8_t pixColor = hue;
 
@@ -557,7 +557,9 @@ public:
             }
 
             for (; x < totalPixels; x++) {
-                pixColor += 2;
+                if (autoIncHue) {
+                    pixColor += 2;
+                }
                 if ((drawXPos + x) < 0) {
                     continue;
                 }
@@ -573,7 +575,7 @@ public:
                 }
                 for (uint8_t xbit = 0; xbit < 8; xbit++) {
                     if (pixelCol & mask) { // pintar aquest bit!
-                        (*_pTheLeds)[_pTheMapping->XY(x + drawXPos, (tileRow * 8) + xbit + drawYPos)] += CHSV(pixColor, 180, intensity);
+                        (*_pTheLeds)[_pTheMapping->XY(x + drawXPos, ((tileRow - firstVertTile) * 8) + xbit + drawYPos)] += CHSV(pixColor, sat, intensity);
                     }
                     mask = mask << 1;
                     // pixColor++;

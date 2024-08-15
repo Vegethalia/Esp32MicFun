@@ -130,8 +130,9 @@ void vTaskDrawer(void* pvParameters)
                     break;
                 case DRAW_STYLE::CALC_MODE:
                     FastLED.clear();
-                    DrawFrame(HUE_PURPLE, std::max((uint8_t)(100), _1stBarValue));
+                    // DrawFrame(HUE_PURPLE, std::max((uint8_t)(100), _1stBarValue));
                     DrawCalculator(mad);
+                    DrawMatrixFFT(mad);
                     break;
                 }
             }

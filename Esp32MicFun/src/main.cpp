@@ -40,6 +40,10 @@
 void SetNightMode(bool nightOn);
 /// @brief Persists a given preference value.
 void UpdatePref(Prefs thePref);
+/// @brief Processes a change in the drawing style, restoring the required parameters.
+void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle);
+/// @brief Changes the drawing style. Calls ProcessStyleChange.
+bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange = false);
 
 #include "Tasks.h" //tasks might call some of the functions declared above
 
@@ -74,6 +78,8 @@ void setup()
     _NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode);
     _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
     _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
+
+    _TheDrawStyle = DRAW_STYLE::CALC_MODE;
 
     log_d(Utils::string_format("Loaded defaults: Style=%d Intensity=%d ConsumsPerMinut=%d NightMode=%d PianoMode=%d Hue=%d",
         (int)_TheDrawStyle, (int)_MAX_MILLIS, (int)_AgrupaConsumsPerMinuts, (int)_NightMode, (int)_pianoMode, (int)_TheDesiredHue)
@@ -270,4 +276,33 @@ void SetNightMode(bool nightOn)
         _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
     }
     FastLED.setBrightness(_MAX_MILLIS);
+}
+
+void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle)
+{
+    if (oldStyle == DRAW_STYLE::CALC_MODE) { // restore clock font
+        _u8g2.setFont(u8g2_font_princess_tr); // u8g2_font_oskool_tr);
+        _StartedCalcMode = -1; // reset calcMode
+    }
+}
+
+bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange)
+{
+    bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE || forceChange;
+
+    if (allowStyleChange && _TheDrawStyle != style) {
+        ProcessStyleChange(_TheDrawStyle, style);
+        _TheDrawStyle = style;
+        if (style != DRAW_STYLE::CALC_MODE) {
+            UpdatePref(Prefs::PR_STYLE);
+        }
+
+        if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
+            _UpdateCurrentNow = true;
+        }
+
+        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
+        return true;
+    }
+    return false;
 }

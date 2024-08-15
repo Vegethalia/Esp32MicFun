@@ -1,7 +1,7 @@
 #define CLOCK_HORIZ_PIXELS 41
 #define CLOCK_VERT_PIXELS 9 // 7
 
-void DrawClock()
+void DrawClock(uint8_t fontHeight = CLOCK_VERT_PIXELS, uint8_t xPos = THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS)
 {
     static int baseHue = 0;
 
@@ -32,7 +32,7 @@ void DrawClock()
     // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
     _u8g2.clearBuffer();
     //    _u8g2.setFont(u8g2_font_squeezed_r6_tn); // u8g2_font_tom_thumb_4x6_mn);
-    _u8g2.drawStr(THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS, theTime.c_str());
+    _u8g2.drawStr(xPos, fontHeight, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     uint8_t intensity;

@@ -195,6 +195,9 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
             auto aux = (float)(pow(_pRealFftPlan->output[currentBin], 2) + pow(_pRealFftPlan->output[currentBin + 1], 2));
             // pFreqPower[ind] = (int32_t)(10.0 * log((float)sqrt(aux) / (float)maxFftMagnitude));
             float mag = 1.0f / q_rsqrt(aux);
+            if (mag > maxFftMagnitude) { // error?
+                mag = maxFftMagnitude;
+            }
             pFreqPower[ind] = (float)(10.0f * log(mag / (float)maxFftMagnitude));
 
             if (mag > maxMag) {

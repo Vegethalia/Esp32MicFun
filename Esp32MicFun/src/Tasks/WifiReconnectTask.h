@@ -212,13 +212,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated delay=%dms", _delayFrame).c_str(), true);
     }
     if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
-        _TheDrawStyle = (DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1);
-        UpdatePref(Prefs::PR_STYLE);
-
-        if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
-            _UpdateCurrentNow = true;
-        }
-        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), true);
+        ChangeDrawStyle((DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1));
     }
     if (theTopic.find(TOPIC_RESET) != std::string::npos) {
         bool resetNow = std::atoi(theMsg.c_str()) != 0;
@@ -229,9 +223,11 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
     if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
         byte nightOn = std::atoi(theMsg.c_str()) != 0;
         _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
+        auto oldStyle = _TheDrawStyle;
         SetNightMode(nightOn);
         UpdatePref(Prefs::PR_STYLE);
         UpdatePref(Prefs::PR_NIGHTMODE);
+        ProcessStyleChange(oldStyle, _TheDrawStyle);
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str(), true);
     }
     if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
