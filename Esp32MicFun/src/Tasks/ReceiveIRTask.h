@@ -330,10 +330,10 @@ void ProcessIRCommand4CalcMode(uint32_t command)
         _TheLastKey = GEN_KEY_PRESS::KEY_9;
         break;
     case IR_KEY_DYON_RED:
-        _TheLastKey = GEN_KEY_PRESS::KEY_PLUS;
+        _TheLastKey = GEN_KEY_PRESS::KEY_MINUS;
         break;
     case IR_KEY_DYON_GREEN:
-        _TheLastKey = GEN_KEY_PRESS::KEY_MINUS;
+        _TheLastKey = GEN_KEY_PRESS::KEY_PLUS;
         break;
     case IR_KEY_DYON_YELLOW:
         _TheLastKey = GEN_KEY_PRESS::KEY_PROD;
