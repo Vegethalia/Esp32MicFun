@@ -233,8 +233,9 @@ int16_t _TheDesiredHue = -1; // el custom color a aplicar. -1 -> color per defec
 uint8_t _1stBarValue = 128;
 
 // Calculator Mode
-#define CALC_MODE_SHOWTITLE_MS 8000
+#define CALC_MODE_SHOWTITLE_MS 6000
 int32_t _StartedCalcMode = -1;
+bool _AllLinesUsed=false; // true if all lines from top to bottom of panel are used
 
 // consum electricitat
 #define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts

@@ -20,7 +20,8 @@ std::string _CalcNum2;
 std::string _CalcNum3;
 std::string _CalcNum4;
 bool _Calculat = false; // si es true, el resultat ha estat calculat i es pot pintar "maco"
-int32_t _Result = 0; // el resultat de la operació si _Calculat és true
+int64_t _Result = 0; // el resultat de la operació si _Calculat és true
+float _ResultFloat = 0.0f; // el resultat de la operació si _Calculat és true i la operació és una divisió
 uint8_t _NumDigitsResShown = 0; // quants dígits del resultat s'han de mostrar
 bool _LeftClock = false;
 
@@ -180,9 +181,9 @@ char GetSymbolFromOp(CALC_OPERATION calcOp)
     return '?';
 }
 
-int32_t SolveOperation(int32_t num1, int32_t num2, CALC_OPERATION op)
+double SolveOperation(double num1, int32_t num2, CALC_OPERATION op)
 {
-    int32_t res = 0;
+    double res = 0;
     switch (op) {
     case CALC_OPERATION::SUMA:
         res = num1 + num2;
@@ -206,7 +207,7 @@ void Calculate()
     int32_t num2 = atoi(_CalcNum2.c_str());
     int32_t num3 = atoi(_CalcNum3.c_str());
     int32_t num4 = atoi(_CalcNum4.c_str());
-    int32_t res = num1;
+    double res = num1;
 
     if (_CalcOp1 != CALC_OPERATION::NONE) {
         res = SolveOperation(num1, num2, _CalcOp1);
@@ -217,14 +218,9 @@ void Calculate()
     if (_CalcOp3 != CALC_OPERATION::NONE) {
         res = SolveOperation(res, num4, _CalcOp3);
     }
-    _Result = res;
+    _Result = (int64_t)res;
+    _ResultFloat = res;
     _Calculat = true;
-    // _CalcNum1 = std::to_string(num1);
-    // _CalcNum2 = std::to_string(num2);
-    // _CalcNum3 = std::to_string(num3);
-    // _CalcNum4 = std::to_string(num4);
-    // _CalcOp1 = _CalcOp2 = _CalcOp3 = CALC_OPERATION::NONE;
-    // _currentNum = NUM1;
 }
 void drawSumaResta(uint8_t varIntens)
 {
@@ -309,6 +305,97 @@ void drawSumaResta(uint8_t varIntens)
     _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
         THE_PANEL_WIDTH - lenRes - 2, 0, HSVHue::HUE_YELLOW, 128, false, 64);
 }
+
+void drawMult(uint8_t varIntens)
+{
+    if (std::atoi(_CalcNum1.c_str()) < std::atoi(_CalcNum2.c_str())) {
+        std::string aux = _CalcNum1;
+        _CalcNum1 = _CalcNum2;
+        _CalcNum2 = aux;
+    }
+
+    std::string sRes = std::to_string(_Result);
+
+    int8_t topMarge = 0;
+    uint8_t lenNum1 = _u8g2.getStrWidth(_CalcNum1.c_str());
+    uint8_t lenNum2 = _u8g2.getStrWidth(_CalcNum2.c_str());
+    uint8_t lenRes = _u8g2.getStrWidth(sRes.c_str());
+    uint8_t maxLine = 0;
+    uint8_t lenLastNum = 0;
+    uint8_t maxWidth = 0;
+
+    std::string op;
+    op += GetSymbolFromOp(_CalcOp1);
+    uint8_t lenOp1 = _u8g2.getStrWidth(op.c_str()) + 2;
+
+    // pintem els 2 números a multiplicar
+    _AllLinesUsed = false;
+    if (_CalcNum2.length() == 1) {
+        topMarge = 2;
+    } else if (_CalcNum2.length() == 2) {
+        topMarge = -NUMBERS_FONT_HEIGHT + 1;
+        _LeftClock = true;
+    } else {
+        topMarge = -NUMBERS_FONT_HEIGHT;
+        _LeftClock = true;
+        _AllLinesUsed = true;
+    }
+
+    _u8g2.clearBuffer();
+    maxLine = NUMBERS_FONT_HEIGHT * 2 + topMarge;
+    _u8g2.drawStr(0, maxLine, _CalcNum1.c_str());
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+        THE_PANEL_WIDTH - lenNum1 - 2, 0, HSVHue::HUE_PURPLE, 128, false, 164);
+
+    _u8g2.clearBuffer();
+    maxLine += NUMBERS_FONT_HEIGHT;
+    lenLastNum = lenNum2;
+    maxWidth = std::max((uint8_t)lenNum1, (uint8_t)(lenNum2 + lenOp1));
+    _u8g2.drawStr(0, maxLine, _CalcNum2.c_str());
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+        THE_PANEL_WIDTH - lenNum2 - 2, 0, HSVHue::HUE_AQUA, 128, false, 164);
+
+    // pintem el símbol i la línia de la operació
+    _u8g2.clearBuffer();
+    _u8g2.drawStr(0, maxLine, op.c_str());
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+        THE_PANEL_WIDTH - lenLastNum - lenOp1, 0, HSVHue::HUE_RED, varIntens, false, 164);
+
+    maxWidth = (uint8_t)std::max((uint8_t)maxWidth, lenRes) + 2;
+    for (uint8_t i = 0; i < maxWidth; i++) {
+        _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
+    }
+
+    // per cada dígit del multiplicador, pintem la línia de la multiplicació
+    int32_t num1 = std::atoi(_CalcNum1.c_str());
+    maxLine++;
+    for (uint8_t i = 1; i <= _CalcNum2.length(); i++) {
+        std::string digitChar = _CalcNum2.substr(_CalcNum2.length() - i, 1);
+        uint8_t digit = std::atoi(digitChar.c_str());
+        int32_t partialRes = num1 * digit;
+        std::string partialResStr = std::to_string(partialRes);
+
+        maxLine += NUMBERS_FONT_HEIGHT;
+        _u8g2.clearBuffer();
+        _u8g2.drawStr(0, maxLine, partialResStr.c_str());
+        uint8_t lenPartialRes = _u8g2.getStrWidth(partialResStr.c_str());
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+            THE_PANEL_WIDTH - lenPartialRes - ((i - 1) * NUMBERS_FONT_WIDTH) - 2, 0, HSVHue::HUE_RED + i * 16, 128, false, 190);
+
+        maxWidth = (uint8_t)std::max((uint8_t)maxWidth, (uint8_t)(lenPartialRes + i * NUMBERS_FONT_WIDTH));
+    }
+    if (_CalcNum2.length() > 1) {
+        for (uint8_t i = 0; i < maxWidth; i++) {
+            _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
+        }
+
+        _u8g2.clearBuffer();
+        _u8g2.drawStr(0, maxLine + NUMBERS_FONT_HEIGHT + 1, sRes.c_str());
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+            THE_PANEL_WIDTH - lenRes - 2, 0, HSVHue::HUE_YELLOW, 128, false, 64);
+    }
+}
+
 void DrawCalculator(MsgAudio2Draw& mad)
 {
     static uint8_t __hue = 0;
@@ -399,8 +486,16 @@ void DrawCalculator(MsgAudio2Draw& mad)
             drawSumaResta(varIntens);
         } else if (same2OpsSuma || same3OpsSuma) {
             drawSumaResta(varIntens);
+        } else if (_CalcOp1 == CALC_OPERATION::MULT && _CalcOp2 == CALC_OPERATION::NONE) {
+            drawMult(varIntens);
         } else {
-            std::string sRes = std::to_string(_Result);
+            std::string sRes;
+            if (_CalcOp1 == CALC_OPERATION::DIV) {
+                sRes = Utils::string_format("%2.2f", _ResultFloat);
+            }
+            else {
+                sRes = std::to_string(_Result);
+            }
             if (opStr.length() + sRes.length() > DIGITS_PER_LINE) { // pintar el resultat en la següent línia
                 _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, sRes.c_str());
                 uint8_t marge = 2 + (DIGITS_PER_LINE - sRes.length()) * NUMBERS_FONT_WIDTH;
