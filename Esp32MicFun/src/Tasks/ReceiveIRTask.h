@@ -67,6 +67,7 @@
 #define IR_KEY_DYON_DEC 0x58
 #define IR_KEY_DYON_REFRESH 0x55
 #define IR_KEY_DYON_ZOOM 0x59
+#define IR_KEY_DYON_DISP 0x60
 
 // Global Vars
 int32_t _lastCommandIR = -1;
@@ -284,6 +285,7 @@ void vTaskReceiveIR(void* pvParameters)
                 _TheDesiredHue = -1;
                 UpdatePref(Prefs::PR_CUSTOM_HUE);
                 break;
+            case IR_KEY_DYON_DISP:
             case IR_KEY_QUICK:
                 if (ChangeDrawStyle(DRAW_STYLE::CALC_MODE)) {
                     // UpdatePref(Prefs::PR_STYLE); //aquest mode no cal guardar-lo.

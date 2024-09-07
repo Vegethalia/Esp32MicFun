@@ -30,8 +30,6 @@
 
 #include "Global.h"
 
-#include "Effects.h" //uses some of the vars declared in Global
-
 //----------------------
 // Advanced declarations
 //----------------------
@@ -44,6 +42,8 @@ void UpdatePref(Prefs thePref);
 void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle);
 /// @brief Changes the drawing style. Calls ProcessStyleChange.
 bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange = false);
+
+#include "Effects.h" //uses some of the vars declared in Global
 
 #include "Tasks.h" //tasks might call some of the functions declared above
 
@@ -79,7 +79,7 @@ void setup()
     _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
     _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
 
-    _TheDrawStyle = DRAW_STYLE::CALC_MODE;
+    //_TheDrawStyle = DRAW_STYLE::VERT_FIRE;
 
     log_d(Utils::string_format("Loaded defaults: Style=%d Intensity=%d ConsumsPerMinut=%d NightMode=%d PianoMode=%d Hue=%d",
         (int)_TheDrawStyle, (int)_MAX_MILLIS, (int)_AgrupaConsumsPerMinuts, (int)_NightMode, (int)_pianoMode, (int)_TheDesiredHue)
@@ -295,6 +295,8 @@ bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange)
         _TheDrawStyle = style;
         if (style != DRAW_STYLE::CALC_MODE) {
             UpdatePref(Prefs::PR_STYLE);
+        } else {
+            _LastCalcKeyPressed = millis();
         }
 
         if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {

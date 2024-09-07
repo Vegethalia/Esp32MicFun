@@ -22,8 +22,9 @@ std::string _CalcNum4;
 bool _Calculat = false; // si es true, el resultat ha estat calculat i es pot pintar "maco"
 int64_t _Result = 0; // el resultat de la operació si _Calculat és true
 float _ResultFloat = 0.0f; // el resultat de la operació si _Calculat és true i la operació és una divisió
-uint8_t _NumDigitsResShown = 0; // quants dígits del resultat s'han de mostrar
 bool _LeftClock = false;
+uint32_t _LastCalcKeyPressed = 0;
+uint8_t _NumDigitsResShown = 0; // quants dígits del resultat s'han de mostrar
 
 enum CALC_OPERATION {
     NONE,
@@ -44,6 +45,7 @@ void ResetCalcul()
     _currentNum = NUM1;
     _Calculat = false;
     _LeftClock = false;
+    _NumDigitsResShown = 0;
 }
 
 /// @brief processa la key passada
@@ -52,6 +54,7 @@ void ResetCalcul()
 bool ProcessNewKey(GEN_KEY_PRESS theKey)
 {
     bool retValue = false;
+    _LastCalcKeyPressed = millis();
 
     if (_Calculat && theKey != GEN_KEY_PRESS::KEY_RIGHT && theKey != GEN_KEY_PRESS::KEY_LEFT && theKey != GEN_KEY_PRESS::KEY_ENTER) {
         ResetCalcul();
@@ -155,7 +158,8 @@ bool ProcessNewKey(GEN_KEY_PRESS theKey)
         _NumDigitsResShown = _Calculat && _NumDigitsResShown > 0 ? _NumDigitsResShown - 1 : _NumDigitsResShown;
         break;
     }
-    std::string msg = Utils::string_format("pNum=%s pOp=%d currentNum=%d", pNum->c_str(), (int)*pOp, (int)_currentNum);
+    std::string msg = Utils::string_format("pNum=%s pOp=%d currentNum=%d digitsShown=%d",
+        pNum->c_str(), (int)*pOp, (int)_currentNum, (int)_NumDigitsResShown);
     _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
 
     return retValue;
@@ -369,11 +373,33 @@ void drawMult(uint8_t varIntens)
     // per cada dígit del multiplicador, pintem la línia de la multiplicació
     int32_t num1 = std::atoi(_CalcNum1.c_str());
     maxLine++;
+    uint8_t partialMult1Len = 0, partialMult2Len = 0, partialMult3Len = 0;
     for (uint8_t i = 1; i <= _CalcNum2.length(); i++) {
         std::string digitChar = _CalcNum2.substr(_CalcNum2.length() - i, 1);
         uint8_t digit = std::atoi(digitChar.c_str());
         int32_t partialRes = num1 * digit;
         std::string partialResStr = std::to_string(partialRes);
+
+        if (i == 1) {
+            partialMult1Len = partialResStr.length();
+            if (partialResStr.length() > _NumDigitsResShown) {
+                partialResStr = partialResStr.substr(partialResStr.length() - _NumDigitsResShown);
+            }
+        } else if (i == 2) {
+            partialMult2Len = partialResStr.length();
+            if (_NumDigitsResShown < partialMult1Len) {
+                partialResStr = "";
+            } else if (partialResStr.length() > (_NumDigitsResShown - partialMult1Len)) {
+                partialResStr = partialResStr.substr(partialResStr.length() - (_NumDigitsResShown - partialMult1Len));
+            }
+        } else if (i == 3) {
+            partialMult3Len = partialResStr.length();
+            if (_NumDigitsResShown < (partialMult1Len + partialMult2Len)) {
+                partialResStr = "";
+            } else if (partialResStr.length() > (_NumDigitsResShown - partialMult1Len - partialMult2Len)) {
+                partialResStr = partialResStr.substr(partialResStr.length() - (_NumDigitsResShown - partialMult1Len - partialMult2Len));
+            }
+        }
 
         maxLine += NUMBERS_FONT_HEIGHT;
         _u8g2.clearBuffer();
@@ -385,6 +411,15 @@ void drawMult(uint8_t varIntens)
         maxWidth = (uint8_t)std::max((uint8_t)maxWidth, (uint8_t)(lenPartialRes + i * NUMBERS_FONT_WIDTH));
     }
     if (_CalcNum2.length() > 1) {
+        // amagem digits del resultat
+        if (_NumDigitsResShown < (partialMult1Len + partialMult2Len + partialMult3Len)) {
+            sRes = "";
+            maxWidth = 0;
+        } else if (sRes.length() > (_NumDigitsResShown - partialMult1Len - partialMult2Len - partialMult3Len)) {
+            sRes = sRes.substr(sRes.length() - (_NumDigitsResShown - partialMult1Len - partialMult2Len - partialMult3Len));
+            lenRes = _u8g2.getStrWidth(sRes.c_str());
+        }
+
         for (uint8_t i = 0; i < maxWidth; i++) {
             _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
         }
@@ -401,6 +436,12 @@ void DrawCalculator(MsgAudio2Draw& mad)
     static uint8_t __hue = 0;
     static int16_t __xTitlePos = THE_PANEL_WIDTH;
     uint8_t varIntens = std::max((uint8_t)(100), _1stBarValue);
+
+    if (millis() - _LastCalcKeyPressed > 10 * 60000) { // 10 minuts
+        ResetCalcul();
+        ChangeDrawStyle(DRAW_STYLE::VERT_FIRE, true);
+        return;
+    }
 
     if (_StartedCalcMode <= 0) {
         ResetCalcul();
@@ -429,7 +470,7 @@ void DrawCalculator(MsgAudio2Draw& mad)
         bool solve = ProcessNewKey(_TheLastKey);
         if (solve) {
             std::string sRes = std::to_string(_Result);
-            _NumDigitsResShown = _Calculat ? sRes.length() : 0; // el 1er cop no mostrem res, el segon mostrem tot
+            _NumDigitsResShown = _Calculat ? 0xff : 0; // el 1er cop no mostrem res, el segon mostrem tot
             Calculate();
             std::string msg = Utils::string_format("NumDigitsShown=%d", _NumDigitsResShown);
             _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
@@ -492,8 +533,7 @@ void DrawCalculator(MsgAudio2Draw& mad)
             std::string sRes;
             if (_CalcOp1 == CALC_OPERATION::DIV) {
                 sRes = Utils::string_format("%2.2f", _ResultFloat);
-            }
-            else {
+            } else {
                 sRes = std::to_string(_Result);
             }
             if (opStr.length() + sRes.length() > DIGITS_PER_LINE) { // pintar el resultat en la següent línia
