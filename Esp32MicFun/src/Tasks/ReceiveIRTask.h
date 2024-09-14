@@ -227,14 +227,32 @@ void vTaskReceiveIR(void* pvParameters)
                 break;
             case IR_KEY_INCRED:
                 if (allowStyleChange) {
-                    _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts + 1, (int)60), 1);
-                    UpdatePref(Prefs::PR_GROUPMINS);
+                    if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
+                        _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts + 1, (int)60), 1);
+                        UpdatePref(Prefs::PR_GROUPMINS);
+                    } else if (_TheDrawStyle == DRAW_STYLE::BARS_WITH_TOP) {
+                        _TheLastKey = GEN_KEY_PRESS::KEY_INC1;
+                    }
                 }
                 break;
             case IR_KEY_DECRED:
                 if (allowStyleChange) {
-                    _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts - 1, (int)60), 1);
-                    UpdatePref(Prefs::PR_GROUPMINS);
+                    if (_TheDrawStyle == DRAW_STYLE::VISUAL_CURRENT) {
+                        _AgrupaConsumsPerMinuts = (uint16_t)max(min(_AgrupaConsumsPerMinuts - 1, (int)60), 1);
+                        UpdatePref(Prefs::PR_GROUPMINS);
+                    } else if (_TheDrawStyle == DRAW_STYLE::BARS_WITH_TOP) {
+                        _TheLastKey = GEN_KEY_PRESS::KEY_DEC1;
+                    }
+                }
+                break;
+            case IR_KEY_INCBLUE:
+                if (allowStyleChange) {
+                    _TheLastKey = GEN_KEY_PRESS::KEY_INC2;
+                }
+                break;
+            case IR_KEY_DECBLUE:
+                if (allowStyleChange) {
+                    _TheLastKey = GEN_KEY_PRESS::KEY_DEC2;
                 }
                 break;
             case IR_KEY_RED:
@@ -355,6 +373,7 @@ void ProcessIRCommand4CalcMode(uint32_t command)
     case IR_KEY_DYON_LEFT:
         _TheLastKey = GEN_KEY_PRESS::KEY_LEFT;
         break;
+    // case IR_KEY_INCBLUE:
     case IR_KEY_DYON_RIGHT:
         _TheLastKey = GEN_KEY_PRESS::KEY_RIGHT;
         break;

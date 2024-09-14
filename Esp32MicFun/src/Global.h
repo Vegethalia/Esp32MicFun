@@ -173,7 +173,11 @@ enum GEN_KEY_PRESS {
     KEY_DOWN,
     KEY_LEFT,
     KEY_RIGHT,
-    KEY_REFRESH
+    KEY_REFRESH,
+    KEY_INC1,
+    KEY_DEC1,
+    KEY_INC2,
+    KEY_DEC2,
 };
 
 GEN_KEY_PRESS _TheLastKey = GEN_KEY_PRESS::KEY_NONE;
@@ -235,7 +239,7 @@ uint8_t _1stBarValue = 128;
 // Calculator Mode
 #define CALC_MODE_SHOWTITLE_MS 6000
 int32_t _StartedCalcMode = -1;
-bool _AllLinesUsed=false; // true if all lines from top to bottom of panel are used
+bool _AllLinesUsed = false; // true if all lines from top to bottom of panel are used
 
 // consum electricitat
 #define DEFAULT_CONSUM_PER_MINUTS 2 // per defecte cada bar seran 2 minuts

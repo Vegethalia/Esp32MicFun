@@ -272,6 +272,11 @@ public:
     }
 };
 
+enum ALTERDRAW : uint8_t {
+    NO_ALTER = 0,
+    ODD = 1,
+    ALTERNATE = 2
+};
 // This class encapsulates the whole drawing process in the "serpentine led panel", made of PANEL_WIDTH x PANEL_HEIGHT leds (or pixels)
 template <uint16_t TOTAL_LEDS, uint16_t PANEL_WIDTH, uint16_t PANEL_HEIGHT>
 class PowerBarsPanel {
@@ -328,7 +333,10 @@ public:
     }
 
     // Draws the n-th bar (0 based) with the value passed. Value must be scaled from 0 to PANEL_HEIGHT*10
-    void DrawBar(uint8_t numBar, uint8_t value, uint8_t brightness, uint16_t maxheight = PANEL_HEIGHT - 1)
+    // if dimm is true, that column will be drawn "dimmed" (less bright)
+    // alterLines is the style of the bar. 0=all pixels drawn, 1=only odd lines, 2=only even lines
+    void DrawBar(uint8_t numBar, uint8_t value, bool dimm = false, ALTERDRAW alterLines = ALTERDRAW::NO_ALTER,
+        uint16_t maxheight = PANEL_HEIGHT - 1)
     {
         // constexpr uint16_t maxheight = PANEL_HEIGHT - 1;
         if (!_pTheLeds || !_pTheMapping || numBar >= PANEL_WIDTH) {
@@ -336,16 +344,6 @@ public:
         }
 
         auto now = millis();
-
-        // uint8_t minBoostBin = (uint8_t)(PANEL_WIDTH*0.13); //the first 4 bars in 33 width panel
-        // constexpr float maxTrebleBoost=1.8;
-        // constexpr float minBassBoost = 1.0;
-        // constexpr float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)PANEL_WIDTH);
-
-        // if(numBar>minBoostBin) {
-        // 	auto boost = 1.0f + (numBar * freqBoost);
-        // 	value = min((int)(value * boost), (PANEL_HEIGHT * 10)-1);
-        // }
 
         if (_TheColumns[numBar].CurrentHeight < value) {
             _TheColumns[numBar].CurrentHeight = value;
@@ -386,6 +384,13 @@ public:
         uint8_t maxY = value / 10;
         if (value >= 5) {
             while (y <= maxY) {
+                if (alterLines == ALTERDRAW::ODD && (y % 2) != 0) {
+                    y++;
+                    continue;
+                } else if (alterLines == ALTERDRAW::ALTERNATE && (y % 3) == 0) {
+                    y++;
+                    continue;
+                }
                 CRGB colPixel;
                 switch (_ColorScheme) {
                 case COLOR_SCHEME::CS2:
@@ -393,7 +398,7 @@ public:
                     break;
                 case COLOR_SCHEME::CS1: {
                     // auto bright2 = (y)*10;
-                    colPixel = CHSV(_CurrentBaseHue, 255, maxY * 12); //(y + 2) * 15); // CRGB(bright, bright, bright);
+                    colPixel = CHSV(_CurrentBaseHue, dimm ? 200 : 255, dimm ? maxY * 8 : maxY * 12); //(y + 2) * 15); // CRGB(bright, bright, bright);
                     break;
                 }
                 default: {
