@@ -10,6 +10,7 @@
 #include "Effects/InitDemoParametric.h"
 #include "Effects/LedBars.h"
 #include "Effects/MatrixFFT.h"
+#include "Effects/PulseBars.h"
 #include "Effects/VertSpectrogram.h"
 #include "Effects/Wave.h"
 

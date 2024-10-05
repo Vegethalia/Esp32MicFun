@@ -255,6 +255,18 @@ void vTaskReceiveIR(void* pvParameters)
                     _TheLastKey = GEN_KEY_PRESS::KEY_DEC2;
                 }
                 break;
+            case IR_KEY_INCGREEN:
+                if (allowStyleChange && _WaveDrawEvery < 5) {
+                    _WaveDrawEvery++;
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str(), false);
+                }
+                break;
+            case IR_KEY_DECGREEN:
+                if (allowStyleChange && _WaveDrawEvery > 1) {
+                    _WaveDrawEvery--;
+                    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str(), false);
+                }
+                break;
             case IR_KEY_RED:
                 _TheDesiredHue = HSVHue::HUE_RED;
                 UpdatePref(Prefs::PR_CUSTOM_HUE);

@@ -75,7 +75,7 @@ void setup()
     _TheDrawStyle = (DRAW_STYLE)(_ThePrefs.getUChar(PREF_STYLE, DRAW_STYLE::DEFAULT_STYLE));
     _MAX_MILLIS = _ThePrefs.getUShort(PREF_INTENSITY, _MAX_MILLIS);
     _AgrupaConsumsPerMinuts = _ThePrefs.getUShort(PREF_CURRENT_BY_MINUTES, DEFAULT_CONSUM_PER_MINUTS);
-    _NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode);
+    //_NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode); //night mode is always off at start
     _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
     _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
 

@@ -1,13 +1,13 @@
 #define CLOCK_HORIZ_PIXELS 41
 #define CLOCK_VERT_PIXELS 9 // 7
 
-void DrawClock(uint8_t fontHeight = CLOCK_VERT_PIXELS, uint8_t xPos = THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS)
+#define CENTER_CLOCK true
+
+void DrawClock(
+    uint8_t fontHeight = CLOCK_VERT_PIXELS + 1,
+    uint8_t xPos = CENTER_CLOCK ? (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS + 1) / 2 : (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS - 2))
 {
     static int baseHue = 0;
-
-    // if (_NightMode && (_TheFrameNumber % 2) == 0) {
-    //     return;
-    // }
 
     struct tm timeinfo;
     if (_Connected2Wifi) {

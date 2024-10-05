@@ -78,7 +78,10 @@ void vTaskDrawer(void* pvParameters)
                 case DRAW_STYLE::VERT_FIRE:
                     FastLED.clear();
                     DrawWave(mad);
-                    DrawVertSpectrogram(mad);
+                    DrawVertSpectrogram(mad); //, VertSpectrogramStyle::RUNING);
+                    if (_pianoMode) {
+                        DrawPulses(mad);
+                    }
                     DrawClock();
                     break;
                 case DRAW_STYLE::HORIZ_FIRE:

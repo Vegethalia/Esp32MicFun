@@ -88,6 +88,7 @@ bool _pianoMode = false; // true;
 bool _DemoMode = true; // when the device starts, execute a sequence of "demo" figures
 bool _NightMode = false; // true if night mode is ON --> dimm colors
 uint32_t _DemoModeFrame = 0; // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
+byte _WaveDrawEvery = 1; // to jump some pixels when drawing the wave
 
 uint32_t _LastCheck4Wifi = 0;
 
