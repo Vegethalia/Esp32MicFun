@@ -120,7 +120,7 @@ void ConfigureNTP()
     //    if (timeinfo.tm_year < (2020 - 1900)) {
     //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
     if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
-        configTime(3600, 3600, "pool.ntp.org"); // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+        configTime(3600, 0, "pool.ntp.org"); // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
         sntp_set_sync_interval(60000);
         sntp_restart();
     }
