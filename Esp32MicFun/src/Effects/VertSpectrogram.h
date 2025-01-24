@@ -1,18 +1,16 @@
+enum VertSpectrogramStyle : uint8_t {
+    FIRE = 0,
+    RUNING
+};
 
-void DrawVertSpectrogram(MsgAudio2Draw& mad)
+void DrawVertSpectrogram(MsgAudio2Draw& mad, VertSpectrogramStyle style = VertSpectrogramStyle::FIRE)
 {
     int16_t value = 0;
-    // static int lastFrame = 0;
 
-    // if((millis()-lastFrame)<10) {
-    //     return;
-    // }
-
-    //_TheLeds.fill_solid(CRGB(1,1,1));
-    //   FastLED.clear();
     static int8_t incValue = +1;
     static int8_t actualInc = 0;
     static const int8_t MAX_INC = 32;
+    static std::vector<uint8_t> _TheRunningValues;
 
     if (_numFrames % 4 == 0) {
         actualInc += incValue;
@@ -23,58 +21,57 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad)
         }
     }
 
-    // actualInc = random8(32);
-
     if (_TheDesiredHue < 0) {
         _ThePanel.SetBaseHue((HSVHue::HUE_ORANGE - (MAX_INC / 3)) + actualInc);
     } else {
         _ThePanel.SetBaseHue((_TheDesiredHue - (MAX_INC / 3)) + actualInc);
     }
+    uint8_t currentHue = _ThePanel.GetBaseHue();
     //_ThePanel.IncBaseHue();
 
     assert(THE_PANEL_WIDTH > 1);
     const auto numItems = _TheMapping.GetWidth();
-    uint8_t values[numItems];
-    memset8(values, 0, sizeof(values));
+    //uint8_t values[numItems];
+    //memset8(values, 0, sizeof(values));
 
-    // uint8_t minBoostBin = (uint8_t)(numItems * 0.33); // the first 13 bars in 33 width panel
-    // constexpr float maxTrebleBoost = 5.0;
-    // constexpr float minBassBoost = 1.0;
-    // float freqBoost = ((maxTrebleBoost - minBassBoost) / (float)numItems);
     _1stBarValue = 0;
     for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
-        // int8_t decPower = 0;
-        // if (i < 22) {
-        //     decPower = 16;
-        // } else if (i < 40) {
-        //     decPower = 10;
-        // } else if (i > (THE_PANEL_WIDTH - 10)) {
-        //     decPower = (-10);
+        // value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
+        // value = map(value, (int)MIN_FFT_DB, MAX_FFT_DB, 0, 255);
+        // values[i] = (uint8_t)value;
+        // if (i <= 5 && _1stBarValue < value) {
+        //     _1stBarValue = value;
         // }
-
-        // if (i > (THE_PANEL_WIDTH - 20)) {
-        //     value = (int16_t)((float)value * (1.25 + (i / 10.0)));
-        // }
-        value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
-        // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
-        //     auto boost = 1.0f + (i * freqBoost);
-        //     value = (int)(value * boost);
-        // }
-
-        // value = constrain(mad.pFftMag[i], MIN_FFT_DB-5, MAX_FFT_DB);
-        value = map(value, (int)MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-        values[i] = (uint8_t)value;
-        if (i <= 5 && _1stBarValue < value) {
-            _1stBarValue = value;
+        if (_pianoMode && mad.pDBs[i] < 100) { //40% of the max value
+            mad.pDBs[i] = 0;
         }
     }
-    if (_WithClock) {
-        _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS - 1);
-        //_ThePanel.PushLine(values, 6, 12);
+    if (style == VertSpectrogramStyle::FIRE) {
+        // if (_WithClock) { //jcs 2024-09-27 do not hide anything. bars can go UNDER the clock
+        //     _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS - 1);
+        // } else {
+        _ThePanel.PushLine(mad.pDBs);
+        // }
     } else {
-        _ThePanel.PushLine(values);
+        if (_TheRunningValues.size() == 0) {
+            _TheRunningValues.resize(THE_PANEL_WIDTH * THE_PANEL_HEIGHT);
+            memset8(_TheRunningValues.data(), 0, _TheRunningValues.size());
+        }
+        // desplacem totes les linies cap amunt
+        for (uint16_t j = 0; j < THE_PANEL_HEIGHT - 1; j++) {
+            memcpy(&_TheRunningValues[j * THE_PANEL_WIDTH], &_TheRunningValues[(j + 1) * THE_PANEL_WIDTH], THE_PANEL_WIDTH);
+        }
+        // copiem la nova linia
+        memcpy(&_TheRunningValues[(THE_PANEL_HEIGHT - 1) * THE_PANEL_WIDTH], mad.pDBs, THE_PANEL_WIDTH);
+        // mostrem les linies al panel
+        //  i ara restaurem el buffer auxiliar en l'array de leds
+        for (int i = 0; i < THE_PANEL_WIDTH; i++) {
+            for (int j = 0; j < THE_PANEL_HEIGHT; j++) {
+                uint8_t resta = _TheRunningValues[j * THE_PANEL_WIDTH + i] > (THE_PANEL_HEIGHT - j) * 2 ? (THE_PANEL_HEIGHT - j) * 2 : _TheRunningValues[j * THE_PANEL_WIDTH + i];
+                _TheLeds[_TheMapping.XY(i, j)] += CHSV(currentHue, 255 - (THE_PANEL_HEIGHT - j) * 2,
+                    (_TheRunningValues[j * THE_PANEL_WIDTH + i]) - resta);
+                //                _TheLeds[_TheMapping.XY(i, j)].fadeToBlackBy((THE_PANEL_HEIGHT-j)*4);
+            }
+        }
     }
-
-    // FastLED.show();
-    // lastFrame = millis();
 }

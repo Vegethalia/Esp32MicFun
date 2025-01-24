@@ -16,12 +16,13 @@ void DrawWave(MsgAudio2Draw& mad)
     uint16_t width = _TheMapping.GetWidth();
     uint16_t i;
     int16_t value;
+    uint8_t MAX_SCALE = 8;
 
     if (WITH_MEMS_MIC) { // Escalem la ona a "mic analògic 9814"
         int16_t valueOrig;
-        int16_t scale = 10 + _OffsetMv; // max value of _OffsetMv=(-9)
+        int16_t scale = MAX_SCALE + _OffsetMv; // max value of _OffsetMv=(-9)
         for (i = 0; i < mad.audioLenInSamples; i++) {
-            valueOrig = mad.pAudio[i];
+            valueOrig = mad.pAudio[i]/2; // dividim per 2 per que amb audio alt l'ona és massa gran
             // if (valueOrig < INT16_MIN / scale) {
             //     valueOrig = INT16_MIN / scale;
             // } else if (valueOrig > INT16_MAX / scale) {
@@ -39,13 +40,13 @@ void DrawWave(MsgAudio2Draw& mad)
     uint16_t pas0 = 0;
     uint16_t maxAmp = INPUT_0_VALUE;
     uint16_t iMaxAmp = 0;
-    for (i = 0; i < (width / 2); i++) {
+    for (i = 0; i < (width); i++) {
         if (mad.pAudio[i] > maxAmp) {
             maxAmp = mad.pAudio[i];
             iMaxAmp = i;
         }
     } // ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
-    for (i = iMaxAmp; i < width; i++) {
+    for (i = iMaxAmp; i < width * 2; i++) {
         if (mad.pAudio[i] <= INPUT_0_VALUE) {
             pas0 = i;
             break;
@@ -53,16 +54,19 @@ void DrawWave(MsgAudio2Draw& mad)
     }
 
     CHSV myValue;
+    //, movingPoint;
+    // movingPoint.setHSV(HSVHue::HUE_PURPLE, 128, 70);
     myValue.setHSV(HSVHue::HUE_PURPLE, 255, 70);
 
-    uint8_t numFadingWaves = 1;
+    uint8_t numFadingWaves
+        = 1;
     //    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
     // numFadingWaves = 2;
     myValue.setHSV(HSVHue::HUE_AQUA, 128, 70);
     //    }
     int16_t numValuesHi = 0;
     int16_t numValuesVeryHi = 0;
-    for (i = 0; i < width; i++) {
+    for (i = 0; i < width; i += _WaveDrawEvery) {
         value = mad.pAudio[pas0 + (i * 2)];
         value += mad.pAudio[pas0 + (i * 2) + 1];
         // value += mad.pAudio[pas0 + (i * 3) + 2];
@@ -83,6 +87,13 @@ void DrawWave(MsgAudio2Draw& mad)
         // value = min((int16_t)max(value, (int16_t)0), (int16_t)height);
         _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
         _WaveBuffer[_LasttWaveIndex][i].thePixel = myValue;
+        // if (_TheFrameNumber % width == i) {
+        //     _WaveBuffer[_LasttWaveIndex][i].thePixel = movingPoint;
+        // }
+        for (byte j = 1; j < _WaveDrawEvery; j++) {
+            _WaveBuffer[_LasttWaveIndex][i + j].ledIndex = _TheMapping.XY(i + j, value);
+            _WaveBuffer[_LasttWaveIndex][i + j].thePixel.v = 0;
+        }
     }
     if (numValuesHi > _maxValueHi) {
         _maxValueHi = numValuesHi;
@@ -96,12 +107,12 @@ void DrawWave(MsgAudio2Draw& mad)
     // }
 
     if ((millis() - _lastIncrease) > (15 * 1000)) {
-        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 6) && _OffsetMv > (-9)) {
+        if (_maxValueVeryHi > (THE_PANEL_WIDTH / 6) && _OffsetMv > (-(MAX_SCALE - 1))) {
             _OffsetMv = _OffsetMv - ((_OffsetMv > (-5)) ? 2 : 1);
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", 10 + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
-        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < 7) {
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("DEC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", MAX_SCALE + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+        } else if (_maxValueHi < (THE_PANEL_WIDTH / 5) && _OffsetMv < (MAX_SCALE - 5)) {
             _OffsetMv++;
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", 10 + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
+            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("INC WaveScale=%d, ValuesHi=%d ValuesVeryHi=%d", MAX_SCALE + _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());
         }
         // else {
         //     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("STAY --> Offset=%d ValuesHi=%d ValuesVeryHi=%d", _OffsetMv, _maxValueHi, _maxValueVeryHi).c_str());

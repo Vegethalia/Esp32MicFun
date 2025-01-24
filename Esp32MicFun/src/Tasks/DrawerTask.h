@@ -20,6 +20,7 @@ void vTaskDrawer(void* pvParameters)
     uint16_t missedFrames = 0;
     MsgAudio2Draw mad;
     WiFiUDP myUdp;
+    uint8_t calcDBs[THE_PANEL_WIDTH];
     // WiFiClient myTcp;
 
     while (true) {
@@ -52,22 +53,37 @@ void vTaskDrawer(void* pvParameters)
             _TheFrameNumber++;
 
             // Calculate max BASS power among first bars
-            _1stBarValue = 0;
+            /*_1stBarValue = 0;
             for (uint16_t i = 4; i < THE_PANEL_WIDTH / 5; i++) {
                 auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
                 value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
                 if (_1stBarValue < value) {
                     _1stBarValue = value;
                 }
+            }*/
+            _1stBarValue = 0;
+            mad.pDBs=calcDBs;
+            for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
+                 int8_t value= constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
+                 calcDBs[i] = (uint8_t)map(value, (int)MIN_FFT_DB, MAX_FFT_DB, 0, 255);
+                 if (i <= 5 && _1stBarValue < calcDBs[i]) {
+                     _1stBarValue = calcDBs[i];
+                 }
+                 // if (_pianoMode && calcDBs[i] < 100) { // 40% of the max value
+                 //     calcDBs[i] = 0;
+                 // }
             }
 
-            if (_DemoMode) {
+                if (_DemoMode)
+            {
                 FastLED.clear();
                 DrawParametric(mad);
                 if (_Connected2Wifi) {
                     //_DemoMode = false;
                 }
-            } else {
+            }
+            else
+            {
                 switch (_TheDrawStyle) {
                 case DRAW_STYLE::BARS_WITH_TOP:
                     FastLED.clear();

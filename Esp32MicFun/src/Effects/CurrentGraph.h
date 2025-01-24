@@ -12,14 +12,14 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
     }
 
     // Calculate max BASS power among first bars
-    _1stBarValue = 0;
-    for (uint16_t i = 2; i < THE_PANEL_WIDTH / 5; i++) {
-        auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 5, 200);
-        if (_1stBarValue < value) {
-            _1stBarValue = value;
-        }
-    }
+    // _1stBarValue = 0;
+    // for (uint16_t i = 2; i < THE_PANEL_WIDTH / 5; i++) {
+    //     auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+    //     value = map(value, MIN_FFT_DB, MAX_FFT_DB, 5, 200);
+    //     if (_1stBarValue < value) {
+    //         _1stBarValue = value;
+    //     }
+    // }
 
     // pintem els eixos
     // Eix horitzontal
@@ -70,8 +70,9 @@ void DrawCurrentGraph(MsgAudio2Draw& mad)
             mapValue = map(_pLectures[i].valorEnLeds, 0, _MapMaxWhToPixels, 0, maxV);
 
             // pintem "barres"
-            intensityBar = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-            intensityBar = map(intensityBar, MIN_FFT_DB, MAX_FFT_DB + 5, 0, 140);
+            // intensityBar = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+            // intensityBar = map(intensityBar, MIN_FFT_DB, MAX_FFT_DB + 5, 0, 140);
+            intensityBar = map(mad.pDBs[i], 0, 255, 0, 140);
             for (uint8_t j = 1; j < mapValue; j++) {
                 _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
             }

@@ -1,9 +1,7 @@
 
 void DrawLedBars(MsgAudio2Draw& mad)
 {
-
-    const auto numItems
-        = _TheMapping.GetWidth();
+    const auto numItems = _TheMapping.GetWidth();
     uint8_t maxBassValue = 0;
     int16_t value = 0;
     uint8_t maxHeight = min(16, BAR_HEIGHT); // 18
@@ -48,8 +46,9 @@ void DrawLedBars(MsgAudio2Draw& mad)
         //     value = (int)(value * boost);
         // }
 
-        value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled); // fins a 89 // 169
+        // value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
+        //value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled); // fins a 89 // 169
+        value = map(mad.pDBs[i], 0, 255, 0, maxHeightScaled); // fins a 89 // 169
 
         if (__binGrouping > 1) {
             int32_t avg = value;

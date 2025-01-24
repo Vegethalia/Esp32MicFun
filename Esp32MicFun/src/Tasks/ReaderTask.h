@@ -91,7 +91,8 @@ void vTaskReader(void* pvParameters)
                         overValue = 0;
                         for (uint8_t ov = 0; ov < OVERSAMPLING; ov++, byteIndex += REAL_BYTES_X_SAMPLE) {
                             if (WITH_MEMS_MIC) { // escalem a mateix rang que MAX9814 analog mic
-                                int32_t fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 12; //>>8 to get a 24 bit value, >>4 to scale down the value to 1/8
+                                int32_t fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 11; // 12; //>>8 to get a 24 bit value, >>4 to scale down the value to 1/8
+                                // 2024-10-04 --> >>10 en comptes de >>12 pq el so que obteniem era massa baix. Ara el volum és adecuat (però hi ha més soroll)
 
                                 // pDest[k] += (int16_t)(fastValue); // >> 2 to scale down the value to 1 / 4
                                 overValue += fastValue;
@@ -157,19 +158,28 @@ void vTaskReader(void* pvParameters)
 
                     auto now = millis();
                     if ((now - recInit) >= 30000) {
-                        if (superMaxMag > 2500000) {
-                            MAX_FFT_MAGNITUDE = 3000000;
-                        } else if (superMaxMag > 2000000) {
-                            MAX_FFT_MAGNITUDE = 2500000;
-                        } else if (superMaxMag > 1500000) {
-                            MAX_FFT_MAGNITUDE = 2000000;
-                        } else if (superMaxMag > 1000000) {
-                            MAX_FFT_MAGNITUDE = 1500000;
-                        } else if (superMaxMag > 700000) {
+                        if (superMaxMag < 1000000) {
                             MAX_FFT_MAGNITUDE = 1000000;
                         } else {
-                            MAX_FFT_MAGNITUDE = 750000;
+                            MAX_FFT_MAGNITUDE = ((superMaxMag / 500000) + 1) * 500000;
+                            if (MAX_FFT_MAGNITUDE > 12000000) {
+                                MAX_FFT_MAGNITUDE = 12000000;
+                            }
                         }
+
+                        // if (superMaxMag > 2500000) {
+                        //     MAX_FFT_MAGNITUDE = 3000000;
+                        // } else if (superMaxMag > 2000000) {
+                        //     MAX_FFT_MAGNITUDE = 2500000;
+                        // } else if (superMaxMag > 1500000) {
+                        //     MAX_FFT_MAGNITUDE = 2000000;
+                        // } else if (superMaxMag > 1000000) {
+                        //     MAX_FFT_MAGNITUDE = 1500000;
+                        // } else if (superMaxMag > 700000) {
+                        //     MAX_FFT_MAGNITUDE = 1000000;
+                        // } else {
+                        //     MAX_FFT_MAGNITUDE = 750000;
+                        // }
 
                         std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxFftMag=%dk maxBin=%d maxFreq=%dHz missedFrames=%d",
                             now - recInit, totalSamples, numCalls, superMaxMag, (uint32_t)(MAX_FFT_MAGNITUDE / 1000), superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));

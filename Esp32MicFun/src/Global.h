@@ -219,6 +219,7 @@ struct MsgAudio2Draw {
     int8_t* pFftMag;
     uint16_t sizeFftMagVector;
     uint16_t max_freq;
+    uint8_t* pDBs; // magnitude in dBs on each bin of the resulting FFT (pFftMag) 
 };
 
 enum DRAW_STYLE {

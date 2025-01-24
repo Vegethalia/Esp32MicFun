@@ -257,6 +257,9 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
             //  sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
             //  sumBin = (int32_t)(10.0 * log(1.0f / (q_rsqrt(sumBin / numBins) * (float)maxFftMagnitude))); //avg energy of all bins
             float mag = 1.0f / q_rsqrt(sumBin);
+            if (mag > maxFftMagnitude) { // error?
+                mag = maxFftMagnitude;
+            }
             sumBin = (float)(10.0f * log(mag / (float)maxFftMagnitude)); // max energy of all bins
             pFreqPower[ind] = sumBin; // mitjana del powers de tots els bins fins aquesta freq.
 
