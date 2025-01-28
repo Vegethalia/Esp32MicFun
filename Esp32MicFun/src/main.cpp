@@ -1,5 +1,9 @@
 #include <Arduino.h>
-#include <FastLED.h>
+
+//#define FASTLED_ESP32_I2S
+//#define FASTLED_OVERCLOCK 1.10 
+#include<FastLED.h>
+
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <PubSubClient.h>
@@ -89,6 +93,7 @@ void setup()
     FastLED.setTemperature(Halogen);
     FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
     FastLED.setBrightness(_MAX_MILLIS);
+    FastLED.setDither(0);
 
     if (_NightMode) {
         SetNightMode(true);
@@ -100,8 +105,8 @@ void setup()
         // range 0...4096
         adc1_config_width(ADC_WIDTH_BIT_12);
         // full voltage range
-        adc1_config_channel_atten(PIN_AUDIO_IN, ADC_ATTEN_DB_11);
-        esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, _adc_chars);
+        adc1_config_channel_atten(PIN_AUDIO_IN, ADC_ATTEN_DB_12);
+        esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, DEFAULT_VREF, _adc_chars);
         // Check type of calibration value used to characterize ADC
         if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
             log_d("calibration=eFuse Vref");
