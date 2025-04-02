@@ -120,7 +120,12 @@ void ConfigureNTP()
     //    if (timeinfo.tm_year < (2020 - 1900)) {
     //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
     if (WiFi.isConnected()) { // if its not connected, the ntp server might crash (bug, probably solved already)
-        configTime(3600, 0, "pool.ntp.org"); // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+        if(_DaylightSaving) { //estiu
+          configTime(3600, 3600, "pool.ntp.org");  // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+        }
+        else { //hivern
+          configTime(3600, 0, "pool.ntp.org");  // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+        }
         sntp_set_sync_interval(60000);
         sntp_restart();
     }
@@ -149,22 +154,25 @@ void Connect2MQTT()
             _ThePubSub.publish(TOPIC_DEBUG, "PubSubClient connected to PiRuter MQTT broker!!", true);
 
             if (!_ThePubSub.subscribe(TOPIC_INTENSITY)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_INTENSITY);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_INTENSITY);
             }
             if (!_ThePubSub.subscribe(TOPIC_DELAYFRAME)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_DELAYFRAME);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DELAYFRAME);
             }
             if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_STYLE);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_STYLE);
             }
             if (!_ThePubSub.subscribe(TOPIC_RESET)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_RESET);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_RESET);
             }
             if (!_ThePubSub.subscribe(TOPIC_NIGHTMODE)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_NIGHTMODE);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_NIGHTMODE);
             }
             if (!_ThePubSub.subscribe(TOPIC_GROUPMINUTS)) {
-                log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_GROUPMINUTS);
+                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
+            }
+            if (!_ThePubSub.subscribe(TOPIC_HORARI_ESTIU)) {
+              log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
             }
             // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
             //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
@@ -237,6 +245,12 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght)
 
         _UpdateCurrentNow = true;
         _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Electricitat agrupada per [%d] minuts", (int)_AgrupaConsumsPerMinuts).c_str(), true);
+    }
+    if(theTopic.find(TOPIC_HORARI_ESTIU) != std::string::npos) {
+      _DaylightSaving = std::atoi(theMsg.c_str()) != 0;
+      UpdatePref(Prefs::PR_DAYLIGHT_SAVING);
+      ConfigureNTP();
+      _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str(), true);
     }
     // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
 }

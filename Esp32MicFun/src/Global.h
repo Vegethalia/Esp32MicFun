@@ -87,7 +87,8 @@ bool _WithClock = true;
 bool _pianoMode = false; // true;
 bool _DemoMode = true; // when the device starts, execute a sequence of "demo" figures
 bool _NightMode = false; // true if night mode is ON --> dimm colors
-uint32_t _DemoModeFrame = 0; // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
+bool _DaylightSaving = false; //true if daylight saving time is ON
+uint32_t _DemoModeFrame = 0;  // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
 byte _WaveDrawEvery = 1; // to jump some pixels when drawing the wave
 
 uint32_t _LastCheck4Wifi = 0;
@@ -110,6 +111,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
 #define TOPIC_GROUPMINUTS "caseta/spectrometre/groupbyminuts"
 #define TOPIC_LASTIP "caseta/spectrometre/lastip"
+#define TOPIC_HORARI_ESTIU "caseta/spectrometre/horariestiu"
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
@@ -132,7 +134,8 @@ enum Prefs {
     PR_GROUPMINS, // uses  _AgrupaConsumsPerMinuts
     PR_NIGHTMODE, // uses _NightMode
     PR_PIANOMODE, // uses _pianoMode
-    PR_CUSTOM_HUE // uses _TheDesiredHue
+    PR_CUSTOM_HUE, // uses _TheDesiredHue
+    PR_DAYLIGHT_SAVING // Horari d'estiu. uses _DaylightSaving.
 };
 
 #define PREF_STYLE "Style"
@@ -141,6 +144,7 @@ enum Prefs {
 #define PREF_NIGHTMODE "NightMode"
 #define PREF_CURRENT_BY_MINUTES "CurrentByMins"
 #define PREF_CUSTOM_HUE "CustomHue"
+#define PREF_DAYLIGHT_SAVING "DaylightSaving"
 
 // Mems mic inmp441
 // gnd --> gnd

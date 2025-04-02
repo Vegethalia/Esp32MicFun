@@ -20,6 +20,12 @@
 		},
 		{
 			"path": "../InfiniteTableLeds"
+		},
+		{
+			"path": "../EspNowGamePad"
+		},
+		{
+			"path": "../TestFlipaLeds"
 		}
 	],
 	"settings": {
