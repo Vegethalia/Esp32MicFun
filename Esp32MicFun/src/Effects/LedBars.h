@@ -6,7 +6,7 @@ void DrawLedBars(MsgAudio2Draw& mad)
     int16_t value = 0;
     uint8_t maxHeight = min(16, BAR_HEIGHT); // 18
     uint8_t maxHeightScaled = (maxHeight * 10) + 9;
-    static uint8_t __binGrouping = 4; // group ins every this number
+    static uint8_t __binGrouping = 5; //4 group ins every this number
     static ALTERDRAW __alterDraw = ALTERDRAW::ODD;
 
     if (_TheLastKey != GEN_KEY_PRESS::KEY_NONE) {

@@ -154,25 +154,25 @@ void Connect2MQTT()
             _ThePubSub.publish(TOPIC_DEBUG, "PubSubClient connected to PiRuter MQTT broker!!", true);
 
             if (!_ThePubSub.subscribe(TOPIC_INTENSITY)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_INTENSITY);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_INTENSITY);
             }
             if (!_ThePubSub.subscribe(TOPIC_DELAYFRAME)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DELAYFRAME);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DELAYFRAME);
             }
             if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_STYLE);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_STYLE);
             }
             if (!_ThePubSub.subscribe(TOPIC_RESET)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_RESET);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_RESET);
             }
             if (!_ThePubSub.subscribe(TOPIC_NIGHTMODE)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_NIGHTMODE);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_NIGHTMODE);
             }
             if (!_ThePubSub.subscribe(TOPIC_GROUPMINUTS)) {
-                log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
+                // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
             }
             if (!_ThePubSub.subscribe(TOPIC_HORARI_ESTIU)) {
-              log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
+            //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_GROUPMINUTS);
             }
             // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
             //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);

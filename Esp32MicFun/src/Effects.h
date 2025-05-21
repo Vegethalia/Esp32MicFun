@@ -1,7 +1,10 @@
+
 #include "Effects/effect_utils.h"
 
+// include after utils
 #include "Effects/Clock.h"
 
+// include after utils and clock
 #include "Effects/CalcMode.h"
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
@@ -11,6 +14,7 @@
 #include "Effects/LedBars.h"
 #include "Effects/MatrixFFT.h"
 #include "Effects/PulseBars.h"
+#include "Effects/SendAudio.h"
 #include "Effects/VertSpectrogram.h"
 #include "Effects/Wave.h"
 
