@@ -623,9 +623,10 @@ class PowerBarsPanel {
   // To define the drawing window, use drawXPos, drawYPos. That position will be the corresponding to position (0, firstVertTile) in buffer.
   // It is posible to define negative drawXPos values. This way the 1st pixel painted will be the one at the 0 position.
   // The color and value are specified in Hue/Intensity
-  void DrawScreenBufferXY(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint8_t firstVertTile, uint8_t lasttVertTile,
+  bool DrawScreenBufferXY(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint8_t firstVertTile, uint8_t lasttVertTile,
                           int16_t drawXPos, int16_t drawYPos, uint8_t hue, uint8_t intensity, bool autoIncHue = true, uint8_t sat = 180) {
     uint8_t pixColor = hue;
+    bool anyPixelDrawn = false;
 
     pTheScreenBuffer += (bufferWidthInTiles * 8) * firstVertTile;
 
@@ -657,6 +658,7 @@ class PowerBarsPanel {
         for (uint8_t xbit = 0; xbit < 8; xbit++) {
           if (pixelCol & mask) {  // pintar aquest bit!
             (*_pTheLeds)[_pTheMapping->XY(x + drawXPos, ((tileRow - firstVertTile) * 8) + xbit + drawYPos)] += CHSV(pixColor, sat, intensity);
+            anyPixelDrawn = true;
           }
           mask = mask << 1;
           // pixColor++;
@@ -664,6 +666,7 @@ class PowerBarsPanel {
       }
       pTheScreenBuffer += bufferWidthInTiles * 8;  // advance to the next tileRow
     }
+    return anyPixelDrawn;
   }
 
   void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, CHSV color) {

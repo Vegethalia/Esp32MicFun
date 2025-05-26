@@ -40,6 +40,8 @@
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 64  // OLED display height, in pixels
 
+#define SHAZAM_DEACTIVATION_AFTER (60 * 60 * 1000)  // 1 hour
+
 #define DEFAULT_VREF 1100              // ajusta el valor de referència per a la lectura per ADC
 #define INPUT_0_VALUE 1240             // input is biased towards 1.5V
 #define VOLTATGE_DRAW_RANGE 400        // total range is this value*2. in millivolts. 400 imply a visible range from [INPUT_0_VALUE-400]....[INPUT_0_VALUE+400]
@@ -47,8 +49,8 @@ uint32_t MAX_FFT_MAGNITUDE = 2500000;  // 75000 // a magnitude greater than this
 #define MIN_FFT_DB -60                 // a magnitude under this value will be considered 0 (noise)
 #define MAX_FFT_DB 0                   // a magnitude greater than this value will be considered Max Power
 
-#define FFT_SIZE 2048 //4096//2048
-#define HZ_PER_BIN 6 //3 //6
+#define FFT_SIZE 2048                               // 4096//2048
+#define HZ_PER_BIN 6                                // 3 //6
 #define TARGET_SAMPLE_RATE (FFT_SIZE * HZ_PER_BIN)  // 12288 // 10240 // 20480 // 11025 // 8192 //11025 //9984//9728//10752 //10496 //10240 //9216
 #define OVERSAMPLING 1                              // we will oversample by this amount
 #define SAMPLE_RATE (TARGET_SAMPLE_RATE * OVERSAMPLING)
@@ -73,8 +75,10 @@ uint32_t MAX_FFT_MAGNITUDE = 2500000;  // 75000 // a magnitude greater than this
 #define UPDATE_CONSUM_ELECTRICITAT_CADA_MS (120 * 1000)
 
 U8G2_SH1106_128X64_NONAME_F_HW_I2C _u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
-// U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
-// U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
+U8G2_SSD1306_2040X16_2_2ND_4W_HW_SPI _u8g2LongText(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
+// U8G2_SSD1326_ER_256X32_2_HW_I2C _u8g2LongText(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
+//  U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, PIN_I2C_SCL, PIN_I2C_SDA);
+//  U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, 255, PIN_I2C_SCL, PIN_I2C_SDA);
 
 // #define BARS_RESOLUTION 8 // 8=32 4=64 2=128
 //  #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
@@ -121,18 +125,23 @@ uint16_t _numFrames = 0;
 uint32_t _TheFrameNumber = 0;
 uint32_t _LastMqttReconnect = 0;
 float _fps = 0.0f;
+uint32_t _LastCheck4Wifi = 0;
 bool _Connected2Wifi = false;
 bool _WithClock = true;
-bool _pianoMode = false;       // true;
-bool _DemoMode = true;         // when the device starts, execute a sequence of "demo" figures
-bool _NightMode = false;       // true if night mode is ON --> dimm colors
-bool _DaylightSaving = false;  // true if daylight saving time is ON
-uint32_t _DemoModeFrame = 0;   // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
-byte _WaveDrawEvery = 1;       // to jump some pixels when drawing the wave
+bool _pianoMode = false;
+bool _DemoMode = true;                // when the device starts, execute a sequence of "demo" figures
+bool _NightMode = false;              // true if night mode is ON --> dimm colors
+bool _DaylightSaving = false;         // true if daylight saving time is ON
+uint32_t _DemoModeFrame = 0;          // when  _DemoMode is true, this counts the number of frames and allows to move from one state to the next
+byte _WaveDrawEvery = 1;              // to jump some pixels when drawing the wave
+bool _ShazamSongs = true;             // true if we want to detect songs. If true, _DetectedSongName will be set to the name of the song detected via MQTT.
+std::string _DetectedSongName = "";   // name of the song detected. reported via MQTT. Only when _ShazamSongs is true
+uint32_t _LastSongDisplayTime = 0;    // last time the song name was displayed
+uint32_t _LastSongDetectionTime = 0;  // The last song was detected as this time
+uint32_t _ShazamActivationTime = 0;   // time when the song detection was activated. It will be deactivated after an hour.
+bool _DisplayingSongName = false;     // true if we are displaying the song name
 
-uint32_t _LastCheck4Wifi = 0;
-
-esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+// esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
 // MQTT related
 #define MQTT_BROKER "192.168.1.140"
@@ -164,6 +173,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
+#define TOPIC_SONG_NAME "caseta/spectrometre/songname"
 
 #elif defined(PANEL_SIZE_96x48)
 #define TOPIC_INTENSITY "caseta/spectrometreBig/intensity"
@@ -178,6 +188,7 @@ esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)call
 #define TOPIC_GROUPMINUTS "caseta/spectrometreBig/groupbyminuts"
 #define TOPIC_LASTIP "caseta/spectrometreBig/lastip"
 #define TOPIC_HORARI_ESTIU "caseta/spectrometreBig/horariestiu"
+#define TOPIC_SONG_NAME "caseta/spectrometreBig/songname"
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometreBig/largestfreeblock"

@@ -186,7 +186,7 @@ void vTaskReader(void* pvParameters) {
             //     MAX_FFT_MAGNITUDE = 750000;
             // }
 
-            std::string msg(Utils::string_format("1sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxFftMag=%dk maxBin=%d maxFreq=%dHz missedFrames=%d",
+            std::string msg(Utils::string_format("10sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxFftMag=%dk maxBin=%d maxFreq=%dHz missedFrames=%d",
                                                  now - recInit, totalSamples, numCalls, superMaxMag, (uint32_t)(MAX_FFT_MAGNITUDE / 1000), superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));
             log_d("%s", msg.c_str());
             _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);

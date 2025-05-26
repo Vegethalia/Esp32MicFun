@@ -77,7 +77,12 @@ void vTaskDrawer(void* pvParameters) {
         // }
       }
       // continue; //----------------------------------------
-      //FastLED.setBrightness(64);
+      // FastLED.setBrightness(64);
+
+      if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
+        SendAudio(mad, PORT_SHAZAM_SERVICE); //enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
+      }
+
       if (_DemoMode) {
         FastLED.clear();
         DrawParametric(mad);
@@ -103,7 +108,9 @@ void vTaskDrawer(void* pvParameters) {
             break;
           case DRAW_STYLE::HORIZ_FIRE:
             DrawHorizSpectrogram(mad);
-            SendAudio(mad);
+            if (!_ShazamSongs) {
+              SendAudio(mad, PORT_STREAM_AUDIO);
+            }
             break;
           case DRAW_STYLE::VISUAL_CURRENT:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
@@ -137,6 +144,9 @@ void vTaskDrawer(void* pvParameters) {
             break;
         }
       }
+
+      ProcessShazamMode(mad);
+
       // DrawClock();
       FastLED.show();
       _Drawing = false;

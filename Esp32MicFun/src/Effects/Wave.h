@@ -8,8 +8,9 @@ void DrawWave(MsgAudio2Draw& mad) {
   static uint8_t _LasttWaveIndex = 0;                               // index of the circular buffer, apunta a la wave que toca pintar
   static int16_t _OffsetMv = -5;                                    // adjust wave scale so it does not appears to flat or clipping
   static auto _lastIncrease = millis();
-  static uint16_t _maxValueVeryHi = 0;  // max value drawn since _lastIncrease
-  static uint16_t _maxValueHi = 0;      // max value drawn since _lastIncrease
+  static uint16_t _maxValueVeryHi = 0;                // max value drawn since _lastIncrease
+  static uint16_t _maxValueHi = 0;                    // max value drawn since _lastIncrease
+  static int16_t _previousWave[THE_PANEL_WIDTH * 2];  // ens guardem les 2 últimes ones per a fer un promig
 
   uint8_t height = _TheMapping.GetHeight() - 1;
   uint16_t width = _TheMapping.GetWidth();
@@ -44,14 +45,14 @@ void DrawWave(MsgAudio2Draw& mad) {
   uint16_t pas0 = 0;
   uint16_t maxAmp = INPUT_0_VALUE;
   uint16_t iMaxAmp = 0;
-  int maxSearch = (int)(width * 0.5f);
+  int maxSearch = 32;  //(int)(width * 0.5f);
   for (i = 0; i < maxSearch; i++) {
     if (mad.pAudio[i] > maxAmp) {
       maxAmp = mad.pAudio[i];
       iMaxAmp = i;
     }
   }  // ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
-  maxSearch = (int)(width * 1.5f);
+  //maxSearch = (int)(width * 1.5f);
   pas0 = iMaxAmp;
   for (i = iMaxAmp; i < maxSearch; i++) {
     if (mad.pAudio[i] <= INPUT_0_VALUE) {
@@ -65,7 +66,7 @@ void DrawWave(MsgAudio2Draw& mad) {
   // movingPoint.setHSV(HSVHue::HUE_PURPLE, 128, 70);
   myValue.setHSV(HSVHue::HUE_PURPLE, 255, 70);
 
-  uint8_t numFadingWaves = 1;
+  uint8_t numFadingWaves = 1;  // si es canvia això, caldrà modificar el #define MAX_FADING_WAVES 1
   //    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
   // numFadingWaves = 2;
   myValue.setHSV(HSVHue::HUE_AQUA, 128, 70);
@@ -97,6 +98,10 @@ void DrawWave(MsgAudio2Draw& mad) {
     //     numValues++;
     // };
     // #endif
+    int16_t newValue = value;
+    value = (_previousWave[i] + _previousWave[i + width] + value) / 3;
+    _previousWave[i] = _previousWave[i + width];
+    _previousWave[i + width] = newValue;
     if (value >= height - 4) {
       numValuesVeryHi++;
     } else if (value >= height - 8) {

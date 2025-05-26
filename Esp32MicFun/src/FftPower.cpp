@@ -233,7 +233,7 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
     uint8_t initialBin = 0;
 #if defined(PANEL_SIZE_64x32)
     initialBin = 8;  // we leave the first 8 bins and the last 8 empty. We just show the 48 central bins
-    for (uint8_t ind == 0; ind < initialBin; ind++) {
+    for (uint8_t ind = 0; ind < initialBin; ind++) {
       pFreqPower[ind] = -100;
       pFreqPower[64 - ind - 1] = -100;
     }

@@ -8,6 +8,7 @@
 #include "Effects/CalcMode.h"
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
+#include "Effects/DrawSongName.h"
 #include "Effects/Frame.h"
 #include "Effects/HorizSpectrogram.h"
 #include "Effects/InitDemoParametric.h"
@@ -15,6 +16,7 @@
 #include "Effects/MatrixFFT.h"
 #include "Effects/PulseBars.h"
 #include "Effects/SendAudio.h"
+#include "Effects/ShazamMode.h"
 #include "Effects/VertSpectrogram.h"
 #include "Effects/Wave.h"
 
