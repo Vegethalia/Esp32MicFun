@@ -33,6 +33,7 @@
 #define IR_KEY_EFFECT4 0x08
 #define IR_KEY_EFFECT5 0x09
 #define IR_KEY_EFFECT6 0x0A
+#define IR_KEY_FLASH 0x0B
 #define IR_KEY_JUMP1 0x04
 #define IR_KEY_JUMP2 0x05
 #define IR_KEY_FADE3 0x06
@@ -154,6 +155,12 @@ void vTaskReceiveIR(void* pvParameters) {
             _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON!!", false);
             _ShazamActivationTime = millis();
           }
+          break;
+        case IR_KEY_FLASH: //activem Shazam mode i enviem missatge al servei per a que es reconegui l'audio ASAP
+          _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON (ASAP)!!", false);
+          _ShazamSongs = true;
+          _ShazamActivationTime = millis();
+          _ThePubSub.publish(TOPIC_RECOGNIZE_ASAP, "1", false);
           break;
         case IR_KEY_FADE7:
           if (allowStyleChange) {

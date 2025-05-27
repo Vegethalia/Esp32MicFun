@@ -174,6 +174,7 @@ bool _DisplayingSongName = false;     // true if we are displaying the song name
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
 #define TOPIC_SONG_NAME "caseta/spectrometre/songname"
+#define TOPIC_RECOGNIZE_ASAP "caseta/spectrometre/reconeixasap"
 
 #elif defined(PANEL_SIZE_96x48)
 #define TOPIC_INTENSITY "caseta/spectrometreBig/intensity"
