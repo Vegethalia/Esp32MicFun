@@ -25,7 +25,7 @@ void vTaskWifiReconnect(void* pvParameters) {
 
   sleep(20);  // wait a bit...
 
-  _OTA.Setup("MicFun", "", 3434);
+  _OTA.Setup("MicFun", "", OTA_PORT);
   WiFi.mode(WIFI_STA);
 
   while (true) {
@@ -61,7 +61,7 @@ void vTaskWifiReconnect(void* pvParameters) {
       _OTA.Process();
       // _TheNTPClient.update();
       if (!_ThePubSub.connected()) {
-        _ThePubSub.setBufferSize(1024);
+        _ThePubSub.setBufferSize((THUMBNAIL_WIDTH * THE_PANEL_WIDTH) + 128);  // 1024
         Connect2MQTT();
         if (_ThePubSub.connected()) {
           _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), false);
@@ -173,6 +173,10 @@ void Connect2MQTT() {
       if (!_ThePubSub.subscribe(TOPIC_SONG_NAME)) {
         //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_SONG_NAME);
       }
+      if (!_ThePubSub.subscribe(TOPIC_THUMBNAIL)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_THUMBNAIL);
+      }
+
       // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
       //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
       // }
@@ -180,14 +184,85 @@ void Connect2MQTT() {
   }
 }
 
+#if defined(PANEL_SIZE_96x48)
+const uint8_t gamma_1_8_table[256] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2,
+    2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6,
+    6, 6, 7, 7, 8, 8, 8, 9, 9, 10, 10, 10, 11, 11, 12, 12,
+    13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 21,
+    21, 22, 22, 23, 24, 24, 25, 26, 26, 27, 28, 28, 29, 30, 30, 31,
+    32, 32, 33, 34, 35, 35, 36, 37, 38, 38, 39, 40, 41, 41, 42, 43,
+    44, 45, 46, 46, 47, 48, 49, 50, 51, 52, 53, 53, 54, 55, 56, 57,
+    58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+    74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 86, 87, 88, 89, 90,
+    91, 92, 93, 95, 96, 97, 98, 99, 100, 102, 103, 104, 105, 107, 108, 109,
+    110, 111, 113, 114, 115, 116, 118, 119, 120, 122, 123, 124, 126, 127, 128, 129,
+    131, 132, 134, 135, 136, 138, 139, 140, 142, 143, 145, 146, 147, 149, 150, 152,
+    153, 154, 156, 157, 159, 160, 162, 163, 165, 166, 168, 169, 171, 172, 174, 175,
+    177, 178, 180, 181, 183, 184, 186, 188, 189, 191, 192, 194, 195, 197, 199, 200,
+    202, 204, 205, 207, 208, 210, 212, 213, 215, 217, 218, 220, 222, 224, 225, 227,
+    229, 230, 232, 234, 236, 237, 239, 241, 243, 244, 246, 248, 250, 251, 253, 255};
+#else
+const uint8_t _gamma8[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+    2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5,
+    5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10,
+    10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16,
+    17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 24, 24, 25,
+    25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 35, 35, 36,
+    37, 38, 39, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 50,
+    51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
+    69, 70, 72, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85, 86, 87, 89,
+    90, 92, 93, 95, 96, 98, 99, 101, 102, 104, 105, 107, 109, 110, 112, 114,
+    115, 117, 119, 120, 122, 124, 126, 127, 129, 131, 133, 135, 137, 138, 140, 142,
+    144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 167, 169, 171, 173, 175,
+    177, 180, 182, 184, 186, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213,
+    215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255};
+#endif
+void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
+  _ThumbnailImg.resize(dataLenght / 2);  // 2 bytes per pixel (RGB565)
+  for (uint16_t i = 0; i < dataLenght / 2; i++) {
+    uint16_t pixel = (pData[i * 2] << 8) | pData[i * 2 + 1];
+    uint8_t r = (uint8_t)((pixel >> 11) & 0x1F) << 3;
+    uint8_t g = (uint8_t)((pixel >> 5) & 0x3F) << 2;
+    uint8_t b = (uint8_t)(pixel & 0x1F) << 3;
+#if defined(PANEL_SIZE_96x48)
+//    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
+    _ThumbnailImg[i] = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma
+
+#else
+    _ThumbnailImg[i] = CRGB(_gamma8[r], _gamma8[g], _gamma8[b]);  // adjust gamma
+#endif
+
+    // to compensate the RGB565 to RGB888 conversion
+    //    // Extreure components
+    //  uint8_t r = (packed >> 11) & 0x1F;
+    //  uint8_t g = (packed >> 5) & 0x3F;
+    //  uint8_t b = packed & 0x1F;
+
+    //   // Escalar a 8 bits
+    // r = (r << 3) | (r >> 2);
+    // g = (g << 2) | (g >> 4);
+    // b = (b << 3) | (b >> 2);
+  }
+  _ThumbnailReady = true;
+  log_i("Thumbnail image decoded. Size=%d pixels", _ThumbnailImg.size());
+}
+
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
   std::string theTopic(pTopic);
   std::string theMsg;
 
-  for (uint16_t i = 0; i < dataLenght; i++) {
-    theMsg.push_back((char)pData[i]);
+  if (theTopic.find(TOPIC_THUMBNAIL) == std::string::npos) {
+    for (uint16_t i = 0; i < dataLenght; i++) {
+      theMsg.push_back((char)pData[i]);
+    }
+    log_v("Received message from [%s]: [%s]", theTopic.c_str(), theMsg.c_str());
+  } else {
+    log_v("Received message from [%s]. Data len=%dbytes", theTopic.c_str(), dataLenght);
   }
-  log_v("Received message from [%s]: [%s]", theTopic.c_str(), theMsg.c_str());
 
   if (millis() - _LastMqttReconnect < MQTT_RECONNECT_IGNORE_MSG_MS) {
     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Ignoring MqttMSG [%s][%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
@@ -259,6 +334,15 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
     _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str(), true);
+  }
+  if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
+    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str(), true);
+    DecodeThumbnail(pData, dataLenght);
+    if (_TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
+      _ThumbnailPrevStyle = _TheDrawStyle;         // remember the style when the thumbnail was received
+      _TheDrawStyle = DRAW_STYLE::DRAW_THUMBNAIL;  // force the thumbnail to be drawn
+    }
+    _TimeThumbnailReceived = millis();
   }
   // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
 }

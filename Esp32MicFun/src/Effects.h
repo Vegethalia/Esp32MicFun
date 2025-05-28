@@ -9,6 +9,7 @@
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
 #include "Effects/DrawSongName.h"
+#include "Effects/DrawThumbnail.h"
 #include "Effects/Frame.h"
 #include "Effects/HorizSpectrogram.h"
 #include "Effects/InitDemoParametric.h"

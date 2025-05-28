@@ -148,7 +148,10 @@ bool _DisplayingSongName = false;     // true if we are displaying the song name
 #define MQTT_PORT 1888
 #define MQTT_RECONNECT_IGNORE_MSG_MS 30000
 
+
 #if defined(PANEL_SIZE_64x32)
+#define OTA_PORT 3434
+
 #define TOPIC_INTENSITY "caseta/spectrometre/intensity"
 #define TOPIC_DELAYFRAME "caseta/spectrometre/delay"
 #define TOPIC_DEBUG "caseta/spectrometre/debug"
@@ -175,8 +178,11 @@ bool _DisplayingSongName = false;     // true if we are displaying the song name
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
 #define TOPIC_SONG_NAME "caseta/spectrometre/songname"
 #define TOPIC_RECOGNIZE_ASAP "caseta/spectrometre/reconeixasap"
+#define TOPIC_THUMBNAIL "caseta/spectrometre/thumbnail"
 
 #elif defined(PANEL_SIZE_96x48)
+#define OTA_PORT 3636
+
 #define TOPIC_INTENSITY "caseta/spectrometreBig/intensity"
 #define TOPIC_DELAYFRAME "caseta/spectrometreBig/delay"
 #define TOPIC_DEBUG "caseta/spectrometreBig/debug"
@@ -190,6 +196,8 @@ bool _DisplayingSongName = false;     // true if we are displaying the song name
 #define TOPIC_LASTIP "caseta/spectrometreBig/lastip"
 #define TOPIC_HORARI_ESTIU "caseta/spectrometreBig/horariestiu"
 #define TOPIC_SONG_NAME "caseta/spectrometreBig/songname"
+#define TOPIC_RECOGNIZE_ASAP "caseta/spectrometreBig/reconeixasap"
+#define TOPIC_THUMBNAIL "caseta/spectrometreBig/thumbnail"
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometreBig/largestfreeblock"
@@ -311,7 +319,8 @@ enum DRAW_STYLE {
   VISUAL_CURRENT = 4,
   MATRIX_FFT = 5,
   DISCO_LIGTHS = 6,
-  CALC_MODE = 7,
+  DRAW_THUMBNAIL = 7,
+  CALC_MODE = 8,
 
   MAX_STYLE = CALC_MODE,
   DEFAULT_STYLE = BARS_WITH_TOP
@@ -359,3 +368,14 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
   uint16_t aux = maxPixels * 1000;
   return (uint8_t)(aux / _MapMaxWhToPixels);
 }
+
+// THUMBNAIL related
+#if defined(PANEL_SIZE_96x48)
+#define THUMBNAIL_WIDTH 48
+#else
+#define THUMBNAIL_WIDTH 32
+#endif
+std::vector<CRGB> _ThumbnailImg;      // vector of CRGB to store the thumbnail image
+bool _ThumbnailReady = false;         // true if the thumbnail image is ready to be displayed
+DRAW_STYLE _ThumbnailPrevStyle;       // style that was in place before displaying the thumbnail
+uint32_t _TimeThumbnailReceived = 0;  // time when the thumbnail was received

@@ -80,7 +80,7 @@ void vTaskDrawer(void* pvParameters) {
       // FastLED.setBrightness(64);
 
       if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
-        SendAudio(mad, PORT_SHAZAM_SERVICE); //enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
+        SendAudio(mad, PORT_SHAZAM_SERVICE);  // enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
       }
 
       if (_DemoMode) {
@@ -141,6 +141,10 @@ void vTaskDrawer(void* pvParameters) {
               DrawMatrixFFT(mad);
             }
             DrawCalculator(mad);
+            break;
+          case DRAW_STYLE::DRAW_THUMBNAIL:
+            FastLED.clear();
+            DrawThumbnail();
             break;
         }
       }
