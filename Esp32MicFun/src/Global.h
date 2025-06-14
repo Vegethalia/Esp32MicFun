@@ -140,6 +140,8 @@ uint32_t _LastSongDisplayTime = 0;    // last time the song name was displayed
 uint32_t _LastSongDetectionTime = 0;  // The last song was detected as this time
 uint32_t _ShazamActivationTime = 0;   // time when the song detection was activated. It will be deactivated after an hour.
 bool _DisplayingSongName = false;     // true if we are displaying the song name
+bool _DisplayAsapIndicator = false;   // true if we are displaying the ASAP indicator
+uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was requested.
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
@@ -147,7 +149,6 @@ bool _DisplayingSongName = false;     // true if we are displaying the song name
 #define MQTT_BROKER "192.168.1.140"
 #define MQTT_PORT 1888
 #define MQTT_RECONNECT_IGNORE_MSG_MS 30000
-
 
 #if defined(PANEL_SIZE_64x32)
 #define OTA_PORT 3434

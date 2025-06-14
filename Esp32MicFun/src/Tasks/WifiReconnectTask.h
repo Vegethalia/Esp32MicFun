@@ -228,8 +228,17 @@ void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
     uint8_t r = (uint8_t)((pixel >> 11) & 0x1F) << 3;
     uint8_t g = (uint8_t)((pixel >> 5) & 0x3F) << 2;
     uint8_t b = (uint8_t)(pixel & 0x1F) << 3;
+    if(r>2) {
+      r-=2;
+    }
+    if(g>2) {
+      g-=2;
+    }
+    if(b>2) {
+      b-=2;
+    }
 #if defined(PANEL_SIZE_96x48)
-//    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
+    //    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
     _ThumbnailImg[i] = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma
 
 #else
@@ -328,6 +337,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
   if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
     _DetectedSongName = theMsg;
     _ShazamSongs = true;  // force to show the song name
+    _DisplayAsapIndicator = false;
     if (_DetectedSongName.length() < 4) {
       _DetectedSongName = "Can\xE7\xF3 desconeguda";
     }

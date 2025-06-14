@@ -1,5 +1,17 @@
+
+#if defined(PANEL_SIZE_96x48)
+#define MOVING_PARAMETRIC_POINTS 128 //quants punts dibuixem
+#define MOVING_PARAMETRIC_STEPS 252 // quants steps els fem rotar
+constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
+constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
+#else  // #define PANEL_SIZE_64x32
 #define MOVING_PARAMETRIC_POINTS 64
 #define MOVING_PARAMETRIC_STEPS 252
+constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
+constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
+#endif
+constexpr float MOVING_STEP = (2.0 * M_PI) / MOVING_PARAMETRIC_STEPS;  // 2*PI / 252
+
 struct ParametricCurve {
   uint16_t initialPoints[MOVING_PARAMETRIC_POINTS];
   float xCoord[MOVING_PARAMETRIC_STEPS];
@@ -77,21 +89,11 @@ void DrawParametric(MsgAudio2Draw& mad) {
     }
     double menysPI = -PI;
     for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
-      __dpd->steps[i] = menysPI + (i * 0.025);  // 0.025=2Pi/252. 252 son el num d'steps
-                                                // s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
+      __dpd->steps[i] = menysPI + (i * MOVING_STEP);  // 0.025=2Pi/252. 252 son el num d'steps
+                                                      // s_TheCurrentCurve.xCoord[i] = 31.1f * sin(2 * s_steps[i] + HALF_PI) + 32.0f;
     }
     __dpd->initialized = true;
   }
-
-  // Calculate max BASS power among first bars
-  // _1stBarValue = 0;
-  // for (uint16_t i = 4; i < THE_PANEL_WIDTH / 5; i++) {
-  //     auto value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-  //     value = map(value, MIN_FFT_DB, MAX_FFT_DB, 25, 255);
-  //     if (_1stBarValue < value) {
-  //         _1stBarValue = value;
-  //     }
-  // }
 
   if ((_DemoMode && _Connected2Wifi) || (_TheFrameNumber > 200)) {
     if (_DemoModeFrame == 0) {
@@ -155,10 +157,10 @@ void DrawParametric(MsgAudio2Draw& mad) {
     /* x = 31.1*sin(3*step+pi/2)+32
        y = 15.1*sin(2*step)+16*/
     for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
-      __dpd->TheCurrentCurve.xCoord[i] = 31.5f * sin(__dpd->xMag * __dpd->steps[i] + HALF_PI) + 32.0f;
-      __dpd->TheCurrentCurve.yCoord[i] = 15.5f * sin(__dpd->yMag * __dpd->steps[i] + __dpd->delta) + 16.0f;
+      __dpd->TheCurrentCurve.xCoord[i] = (PARAM_XAMP)*sin(__dpd->xMag * __dpd->steps[i] + HALF_PI) + PARAM_XAMP;
+      __dpd->TheCurrentCurve.yCoord[i] = (PARAM_YAMP)*sin(__dpd->yMag * __dpd->steps[i] + __dpd->delta) + PARAM_YAMP;
     }
-    __dpd->delta += 0.025;
+    __dpd->delta += MOVING_STEP;
     if (__dpd->delta >= TWO_PI) {
       __dpd->delta = 0.0f;
     }

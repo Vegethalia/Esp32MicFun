@@ -32,32 +32,36 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
     }
 
     // pintem k'icona de "ShazamMode"
-    // imaginem que es fa una petició a shazam cada 90..100s.
-    // Per tant si pintem 4 pixels, apaguem 1 cada 25s i quan s'apaguen tots, en teoria tindrem refresh de cançó
-    int numPixels = 4 - min(timeSinceLastDetection / 26000, (uint32_t)4);
-    if (numPixels == 0) {
-      numPixels = 1;  // al menys un pixel....
-    }
-//    if (_numFrames % 5 == 0) {
-      _intensity += _inc;
+    // imaginem que es fa una petició a shazam cada 300s.
+    // Per tant si pintem 4 pixels, apaguem 1 cada 75s i quan s'apaguen tots, en teoria tindrem refresh de cançó
+    // int numPixels = 4 - min(timeSinceLastDetection / 75000, (uint32_t)4);
+    // if (numPixels == 0) {
+    //   numPixels = 1;  // al menys un pixel....
+    // }
+    // //    if (_numFrames % 5 == 0) {
+    _intensity += _inc;
 
-      if (_intensity > 128) {
-        _intensity = 128;
-        _inc = -1;
-      } else if (_intensity < 50) {
-        _intensity = 50;
-        _inc = 1;
-      }
-  //  }
-    _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 1, 0)] = CHSV(HSVHue::HUE_PURPLE, 255, _intensity);
-    if (numPixels > 1) {
-      _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 0)] = CHSV(HSVHue::HUE_PURPLE, 200, _intensity);
+    if (_intensity > 128) {
+      _intensity = 128;
+      _inc = -1;
+    } else if (_intensity < 50) {
+      _intensity = 50;
+      _inc = 1;
     }
-    if (numPixels > 2) {
-      _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 1, 1)] = CHSV(HSVHue::HUE_PURPLE, 150, _intensity);
-    }
-    if (numPixels > 3) {
-      _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 1)] = CHSV(HSVHue::HUE_PURPLE, 100, _intensity);
+    //  }
+    _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 0)] = CHSV(HSVHue::HUE_PURPLE, 255, _intensity);
+    // if (numPixels > 1) {
+    //   _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 0)] = CHSV(HSVHue::HUE_PURPLE, 200, _intensity);
+    // }
+    // if (numPixels > 2) {
+    //   _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 1, 1)] = CHSV(HSVHue::HUE_PURPLE, 150, _intensity);
+    // }
+    // if (numPixels > 3) {
+    //   _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 1)] = CHSV(HSVHue::HUE_PURPLE, 100, _intensity);
+    // }
+
+    if (_DisplayAsapIndicator && (millis() - _AsapDetectionTime) < 90000) {  // 90s //pintem l'indicador ASAP
+      _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 3, 0)] = CHSV(HSVHue::HUE_AQUA, 255, _intensity);
     }
   }
 }
