@@ -176,6 +176,9 @@ void Connect2MQTT() {
       if (!_ThePubSub.subscribe(TOPIC_THUMBNAIL)) {
         //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_THUMBNAIL);
       }
+      if (!_ThePubSub.subscribe(TOPIC_SHAZAM_MODE)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_SHAZAM_MODE);
+      }
 
       // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
       //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
@@ -228,14 +231,14 @@ void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
     uint8_t r = (uint8_t)((pixel >> 11) & 0x1F) << 3;
     uint8_t g = (uint8_t)((pixel >> 5) & 0x3F) << 2;
     uint8_t b = (uint8_t)(pixel & 0x1F) << 3;
-    if(r>2) {
-      r-=2;
+    if (r > 2) {
+      r -= 2;
     }
-    if(g>2) {
-      g-=2;
+    if (g > 2) {
+      g -= 2;
     }
-    if(b>2) {
-      b-=2;
+    if (b > 2) {
+      b -= 2;
     }
 #if defined(PANEL_SIZE_96x48)
     //    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
@@ -353,6 +356,11 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
       _TheDrawStyle = DRAW_STYLE::DRAW_THUMBNAIL;  // force the thumbnail to be drawn
     }
     _TimeThumbnailReceived = millis();
+  }
+  if (theTopic.find(TOPIC_SHAZAM_MODE) != std::string::npos) {
+    _ShazamSongs = true;
+    _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON!!", false);
+    _ShazamActivationTime = millis();
   }
   // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
 }

@@ -161,7 +161,7 @@ void vTaskReceiveIR(void* pvParameters) {
           _ShazamSongs = true;
           _ShazamActivationTime = millis();
           _DisplayAsapIndicator = true; // show the ASAP indicator on the display
-          _AsapDetectionTime = millis(); // set the ASAP detection time to 1 hour from now
+          _AsapDetectionTime = millis(); // set the ASAP detection so it is active
           _ThePubSub.publish(TOPIC_RECOGNIZE_ASAP, "1", false);
           break;
         case IR_KEY_FADE7:

@@ -26,6 +26,10 @@
 		},
 		{
 			"path": "../TestFlipaLeds"
+		},
+		{
+			"name": "TempUploader",
+			"path": "../TempUploader"
 		}
 	],
 	"settings": {

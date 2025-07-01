@@ -26,6 +26,7 @@
 #define PIN_DATA_LEDS6 GPIO_NUM_14
 #define PIN_DATA_LEDS7 GPIO_NUM_12
 #define PIN_DATA_LEDS8 GPIO_NUM_13
+#define PIN_DATA_LEDS9 GPIO_NUM_16
 
 #define PIN_MIC_I2S_WS GPIO_NUM_19
 #define PIN_MIC_I2S_SD GPIO_NUM_18
@@ -180,6 +181,7 @@ uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was reques
 #define TOPIC_SONG_NAME "caseta/spectrometre/songname"
 #define TOPIC_RECOGNIZE_ASAP "caseta/spectrometre/reconeixasap"
 #define TOPIC_THUMBNAIL "caseta/spectrometre/thumbnail"
+#define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
 
 #elif defined(PANEL_SIZE_96x48)
 #define OTA_PORT 3636
@@ -199,6 +201,7 @@ uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was reques
 #define TOPIC_SONG_NAME "caseta/spectrometreBig/songname"
 #define TOPIC_RECOGNIZE_ASAP "caseta/spectrometreBig/reconeixasap"
 #define TOPIC_THUMBNAIL "caseta/spectrometreBig/thumbnail"
+#define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometreBig/largestfreeblock"
