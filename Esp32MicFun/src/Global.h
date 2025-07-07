@@ -106,7 +106,7 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 PanelMapping64x32 _TheMapping;
 
 #elif defined(PANEL_SIZE_96x48)
-#define THE_PANEL_HEIGHT PANEL_HEIGHT_48
+#define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT)  //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
@@ -330,7 +330,10 @@ enum DRAW_STYLE {
   DEFAULT_STYLE = BARS_WITH_TOP
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
-int16_t _TheDesiredHue = -1;  // el custom color a aplicar. -1 -> color per defecte.
+int16_t _TheDesiredHue = - 1;  // el custom color a aplicar. -1 -> color per defecte.
+uint32_t _DesiredHueLastSet = 0;           // last time the desired hue was set. Es randomitzarà el color quan passi una hora des de l'últim canvi de color
+uint8_t _binGrouping = 4;                  // per les LedBars, cada __binGrouping bins es pintara un sol bar. Per exemple, si __binGrouping=4, i tenim 32 bins, es pintaran 8 bars.
+
 uint8_t _1stBarValue = 128;
 
 // Calculator Mode
@@ -356,6 +359,17 @@ bool _UpdateCurrentNow = false;  // true if current must be updated ASAP
 uint8_t
 GetMapMaxPixels() {
   uint8_t ret = 20;
+#if defined(PANEL_SIZE_96x48)
+  if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 5000 || _MapMaxWhToPixels == 6000) {
+    ret = 30;  // 30/20/15/12/10/6/5 leds per kWh
+  } else if (_MapMaxWhToPixels == 3500 || _MapMaxWhToPixels == 4000) {
+    ret = 28;  // 8/7
+  } else if (_MapMaxWhToPixels == 4500) {
+    ret = 27;  // 6/3 leds per kWh
+  } else if (_MapMaxWhToPixels == 5500) {
+    ret = 33;  // 6 leds per kWh
+  }
+#else
   if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 4000 || _MapMaxWhToPixels == 5000) {
     ret = 20;  // 20/10/8/5/4 leds per kWh
   } else if (_MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 3500) {
@@ -365,6 +379,7 @@ GetMapMaxPixels() {
   } else if (_MapMaxWhToPixels == 5500) {
     ret = 22;  // 4 leds per kWh
   }
+#endif
   return ret;
 }
 
@@ -375,9 +390,11 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 
 // THUMBNAIL related
 #if defined(PANEL_SIZE_96x48)
-#define THUMBNAIL_WIDTH 48
+#define THUMBNAIL_HEIGHT 54
+#define THUMBNAIL_WIDTH 72
 #else
-#define THUMBNAIL_WIDTH 32
+#define THUMBNAIL_HEIGHT 32
+#define THUMBNAIL_WIDTH 52
 #endif
 std::vector<CRGB> _ThumbnailImg;      // vector of CRGB to store the thumbnail image
 bool _ThumbnailReady = false;         // true if the thumbnail image is ready to be displayed

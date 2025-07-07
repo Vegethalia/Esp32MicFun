@@ -288,50 +288,62 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_RED:
           _TheDesiredHue = HSVHue::HUE_RED;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_GREEN:
           _TheDesiredHue = HSVHue::HUE_GREEN;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_BLUE:
           _TheDesiredHue = HSVHue::HUE_BLUE;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_LIGHTRED:
           _TheDesiredHue = (HSVHue::HUE_RED + HSVHue::HUE_ORANGE) / 2;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_LIGHTGREEN:
           _TheDesiredHue = (HSVHue::HUE_GREEN + HSVHue::HUE_AQUA) / 2;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_LIGHTBLUE:
           _TheDesiredHue = HSVHue::HUE_AQUA;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_ORANGE:
           _TheDesiredHue = HSVHue::HUE_ORANGE;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_PURPLE:
           _TheDesiredHue = HSVHue::HUE_PURPLE;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_PINK:
           _TheDesiredHue = HSVHue::HUE_PINK;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_FUCSIA:
           _TheDesiredHue = (HSVHue::HUE_PURPLE + HSVHue::HUE_PINK) / 2;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_YELLOW:
           _TheDesiredHue = HSVHue::HUE_YELLOW;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_WHITE:
           _TheDesiredHue = -1;
           UpdatePref(Prefs::PR_CUSTOM_HUE);
+          _DesiredHueLastSet = millis();
           break;
         case IR_KEY_DYON_DISP:
         case IR_KEY_QUICK:

@@ -1,7 +1,7 @@
 
 #if defined(PANEL_SIZE_96x48)
-#define MOVING_PARAMETRIC_POINTS 128 //quants punts dibuixem
-#define MOVING_PARAMETRIC_STEPS 252 // quants steps els fem rotar
+#define MOVING_PARAMETRIC_POINTS 360 //quants punts dibuixem
+#define MOVING_PARAMETRIC_STEPS 360 // quants steps els fem rotar
 constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
 constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
 #else  // #define PANEL_SIZE_64x32
@@ -236,7 +236,7 @@ void DrawParametric(MsgAudio2Draw& mad) {
   //   _u8g2.drawStr(6, 12, theTime.c_str());
   //_ThePanel.SetBaseHue(HSVHue::HUE_YELLOW);
 #if defined(PANEL_SIZE_96x48)
-  _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 4, 5, __dpd->textPos, THE_PANEL_HEIGHT - 16, __dpd->hue, intensity);
+  _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 5, 6, __dpd->textPos, THE_PANEL_HEIGHT - 16, __dpd->hue, intensity);
 #else
   _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, __dpd->textPos, 16, __dpd->hue, intensity);
 #endif

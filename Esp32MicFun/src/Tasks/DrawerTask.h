@@ -129,7 +129,7 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::DISCO_LIGTHS:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
             FastLED.clear();
-            // DrawWave(mad);
+            DrawWave(mad);
             DrawMatrixFFT(mad);
             DrawDiscoLights(mad);
             DrawClock();

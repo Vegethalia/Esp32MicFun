@@ -8,8 +8,9 @@ void DrawClock(
     uint8_t xPos = CENTER_CLOCK ? (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS + 1) / 2 : (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS - 2)) {
 #if defined(PANEL_SIZE_96x48)
   xPos -= 1;  // ens saltem el pixel "txungo" que just cau a la bora d'un número de la hora
+  fontHeight += 1;
 #endif
-  static int baseHue = 0;
+      static int baseHue = 0;
 
   struct tm timeinfo;
   if (_Connected2Wifi) {

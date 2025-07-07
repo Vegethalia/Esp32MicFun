@@ -34,24 +34,15 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad, VertSpectrogramStyle style = VertSp
     //uint8_t values[numItems];
     //memset8(values, 0, sizeof(values));
 
-    _1stBarValue = 0;
-    for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
-        // value = constrain(mad.pFftMag[i], (int)MIN_FFT_DB, MAX_FFT_DB);
-        // value = map(value, (int)MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-        // values[i] = (uint8_t)value;
-        // if (i <= 5 && _1stBarValue < value) {
-        //     _1stBarValue = value;
-        // }
-        if (_pianoMode && mad.pDBs[i] < 100) { //40% of the max value
-            mad.pDBs[i] = 0;
+    if(_pianoMode) { // Ens carreguem els valors petits.
+      for (uint16_t i = 0; i < _TheMapping.GetWidth(); i++) {
+        if (mad.pDBs[i] < 100) {  // 40% of the max value . 
+          mad.pDBs[i] = 0;
         }
+      }
     }
     if (style == VertSpectrogramStyle::FIRE) {
-        // if (_WithClock) { //jcs 2024-09-27 do not hide anything. bars can go UNDER the clock
-        //     _ThePanel.PushLine(values, THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS, CLOCK_VERT_PIXELS - 1);
-        // } else {
         _ThePanel.PushLine(mad.pDBs);
-        // }
     } else {
         if (_TheRunningValues.size() == 0) {
             _TheRunningValues.resize(THE_PANEL_WIDTH * THE_PANEL_HEIGHT);

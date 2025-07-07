@@ -61,7 +61,7 @@ void vTaskWifiReconnect(void* pvParameters) {
       _OTA.Process();
       // _TheNTPClient.update();
       if (!_ThePubSub.connected()) {
-        _ThePubSub.setBufferSize((THUMBNAIL_WIDTH * THE_PANEL_WIDTH) + 128);  // 1024
+        _ThePubSub.setBufferSize((THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT * 2) + 128);  // 1024
         Connect2MQTT();
         if (_ThePubSub.connected()) {
           _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), false);
@@ -85,7 +85,7 @@ void vTaskWifiReconnect(void* pvParameters) {
 
       __theHttpClient->setConnectTimeout(2000);
       //__theHttpClient->setReuse(false);
-      if (__theHttpClient->begin(*__httpWifiClient, theUrl.c_str())) {
+      if (__theHttpClient->begin(theUrl.c_str())) {  // begin(*__httpWifiClient, theUrl.c_str())) {
         __theHttpClient->setConnectTimeout(2000);
         __theHttpClient->addHeader("Accept", "*/*");
         int httpResponse = __theHttpClient->GET();
@@ -228,18 +228,26 @@ void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
   _ThumbnailImg.resize(dataLenght / 2);  // 2 bytes per pixel (RGB565)
   for (uint16_t i = 0; i < dataLenght / 2; i++) {
     uint16_t pixel = (pData[i * 2] << 8) | pData[i * 2 + 1];
-    uint8_t r = (uint8_t)((pixel >> 11) & 0x1F) << 3;
-    uint8_t g = (uint8_t)((pixel >> 5) & 0x3F) << 2;
-    uint8_t b = (uint8_t)(pixel & 0x1F) << 3;
-    if (r > 2) {
-      r -= 2;
-    }
-    if (g > 2) {
-      g -= 2;
-    }
-    if (b > 2) {
-      b -= 2;
-    }
+    uint8_t r = (uint8_t)((pixel >> 11) & 0x1F);  // << 3;
+    uint8_t g = (uint8_t)((pixel >> 5) & 0x3F);   //<< 2;
+    uint8_t b = (uint8_t)(pixel & 0x1F);          // << 3;
+    // if (r > 3) {
+    //   r -= 3;
+    // }
+    // if (g > 3) {
+    //   g -= 3;
+    // }
+    // if (b > 3) {
+    //   b -= 3;
+    // }
+    r = (r << 3);  // Scale to 8 bits 3
+    g = (g << 2);  // Scale to 8 bits 2
+    b = (b << 3);  // Scale to 8 bits 3
+    //ara els fem 2/3 dels valors per que no brilli tant
+    r = (uint8_t)(((uint16_t)r * 2) / (uint16_t)3);
+    g = (uint8_t)(((uint16_t)g * 2) / (uint16_t)3);
+    b = (uint8_t)(((uint16_t)b * 2) / (uint16_t)3);
+
 #if defined(PANEL_SIZE_96x48)
     //    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
     _ThumbnailImg[i] = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma

@@ -82,15 +82,17 @@ void setup() {
   pinMode(PIN_DATA_LEDS6, OUTPUT);
   pinMode(PIN_DATA_LEDS7, OUTPUT);
   pinMode(PIN_DATA_LEDS8, OUTPUT);
+  pinMode(PIN_DATA_LEDS9, OUTPUT);
 
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS8, GRB>(_TheLeds, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS7, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 1, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS6, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 2, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS5, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 3, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS4, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 4, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS3, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 5, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 6, NUM_LEDS_PER_STRIP);
-  FastLED.addLeds<WS2812B, PIN_DATA_LEDS1, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 7, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS9, GRB>(_TheLeds, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS8, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 1, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS7, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 2, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS6, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 3, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS5, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 4, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS4, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 5, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS3, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 6, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 7, NUM_LEDS_PER_STRIP);
+  FastLED.addLeds<WS2812B, PIN_DATA_LEDS1, GRB>(_TheLeds, NUM_LEDS_PER_STRIP * 8, NUM_LEDS_PER_STRIP);
 
   pinMode(PIN_ENABLE_LEVELCONV, OUTPUT);
   digitalWrite(PIN_ENABLE_LEVELCONV, HIGH);  // enable level converter
@@ -105,6 +107,8 @@ void setup() {
   //_NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode); //night mode is always off at start
   _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
   _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
+  _TheDesiredHue = random8();  // DEBUUUUUUG
+
   _DaylightSaving = _ThePrefs.getBool(PREF_DAYLIGHT_SAVING, true);  // Horari d'estiu. uses _DaylightSaving.
 
   //_TheDrawStyle = DRAW_STYLE::VERT_FIRE;
@@ -187,6 +191,7 @@ void setup() {
 //  CLEDController* _MyTempController = nullptr;
 // END PLAY WITH MATRIX
 
+constexpr uint32_t ONE_HOUR_IN_MILLIS = 60 * 60 * 1000;
 void loop() {
   // PLAY WITH MATRIX
   // if(!added) {
@@ -220,6 +225,16 @@ void loop() {
 
   //  DrawParametric();
   // DrawSparks();
+  if (millis() - _DesiredHueLastSet > ONE_HOUR_IN_MILLIS) {
+    _DesiredHueLastSet = millis();
+    _TheDesiredHue = random8(0, 255);
+    UpdatePref(Prefs::PR_CUSTOM_HUE);
+    log_d("Randomized Hue=%d", _TheDesiredHue);
+    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Randomized Hue=%d", _TheDesiredHue).c_str(), false);
+    _binGrouping = random8(1, 8);  // randomize bin grouping
+    log_d("Randomized binGrouping=%d", _binGrouping);
+    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Randomized binGrouping=%d", _binGrouping).c_str(), false);
+  }
   delay(10000);
   log_d("Main: Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
   if (_Connected2Wifi) {
