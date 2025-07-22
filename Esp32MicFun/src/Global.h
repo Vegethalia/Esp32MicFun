@@ -17,7 +17,7 @@
 #define PIN_MIC_I2S_SD 33
 #define PIN_MIC_I2S_SCK 25
 
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
 #define PIN_DATA_LEDS1 GPIO_NUM_32
 #define PIN_DATA_LEDS2 GPIO_NUM_33
 #define PIN_DATA_LEDS3 GPIO_NUM_25
@@ -62,7 +62,7 @@ uint32_t MAX_FFT_MAGNITUDE = 2500000;  // 75000 // a magnitude greater than this
 #define MIC_BUFFER_SIZE (AUDIO_DATA_OUT * OVERSAMPLING)
 #define NUM_BUFFERS 2
 #define I2S_NUM_AUDIO I2S_NUM_0
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
 #define MIC_BUFFER_SIZE 256
 #define NUM_BUFFERS 3
 #define I2S_NUM_AUDIO I2S_NUM_1
@@ -105,7 +105,7 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT)  //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 PanelMapping64x32 _TheMapping;
 
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
 #define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
@@ -142,7 +142,9 @@ uint32_t _LastSongDetectionTime = 0;  // The last song was detected as this time
 uint32_t _ShazamActivationTime = 0;   // time when the song detection was activated. It will be deactivated after an hour.
 bool _DisplayingSongName = false;     // true if we are displaying the song name
 bool _DisplayAsapIndicator = false;   // true if we are displaying the ASAP indicator
+bool _SongDesconeguda = false;        // true if we are displaying the "Desconeguda" song name1
 uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was requested.
+bool _DebugMode = false;              // true if we want to send debug information via MQTT
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
@@ -155,17 +157,23 @@ uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was reques
 #define OTA_PORT 3434
 
 #define TOPIC_INTENSITY "caseta/spectrometre/intensity"
-#define TOPIC_DELAYFRAME "caseta/spectrometre/delay"
 #define TOPIC_DEBUG "caseta/spectrometre/debug"
 #define TOPIC_FPS "caseta/spectrometre/fps"
 #define TOPIC_STYLE "caseta/spectrometre/style"
-#define TOPIC_WITHWAVE "caseta/spectrometre/wave"
 #define TOPIC_BASEHUE "caseta/spectrometre/basehue"
 #define TOPIC_RESET "caseta/spectrometre/reset"
 #define TOPIC_NIGHTMODE "caseta/spectrometre/nightmode"
 #define TOPIC_GROUPMINUTS "caseta/spectrometre/groupbyminuts"
 #define TOPIC_LASTIP "caseta/spectrometre/lastip"
 #define TOPIC_HORARI_ESTIU "caseta/spectrometre/horariestiu"
+
+#define TOPIC_SONG_NAME "caseta/spectrometre/songname"
+#define TOPIC_RECOGNIZE_ASAP "caseta/spectrometre/reconeixasap"
+#define TOPIC_THUMBNAIL "caseta/spectrometre/thumbnail"
+#define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
+#define TOPIC_PIANO_MODE "caseta/spectrometre/pianomode"
+#define TOPIC_DEBUG_MODE "caseta/spectrometre/debugmode"
+#define TOPIC_REPEAT_THUMBNAIL "caseta/spectrometre/repeat"
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
@@ -178,30 +186,28 @@ uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was reques
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
-#define TOPIC_SONG_NAME "caseta/spectrometre/songname"
-#define TOPIC_RECOGNIZE_ASAP "caseta/spectrometre/reconeixasap"
-#define TOPIC_THUMBNAIL "caseta/spectrometre/thumbnail"
-#define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
 
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
 #define OTA_PORT 3636
 
 #define TOPIC_INTENSITY "caseta/spectrometreBig/intensity"
-#define TOPIC_DELAYFRAME "caseta/spectrometreBig/delay"
 #define TOPIC_DEBUG "caseta/spectrometreBig/debug"
 #define TOPIC_FPS "caseta/spectrometreBig/fps"
 #define TOPIC_STYLE "caseta/spectrometreBig/style"
-#define TOPIC_WITHWAVE "caseta/spectrometreBig/wave"
 #define TOPIC_BASEHUE "caseta/spectrometreBig/basehue"
 #define TOPIC_RESET "caseta/spectrometreBig/reset"
 #define TOPIC_NIGHTMODE "caseta/spectrometreBig/nightmode"
 #define TOPIC_GROUPMINUTS "caseta/spectrometreBig/groupbyminuts"
 #define TOPIC_LASTIP "caseta/spectrometreBig/lastip"
 #define TOPIC_HORARI_ESTIU "caseta/spectrometreBig/horariestiu"
+
 #define TOPIC_SONG_NAME "caseta/spectrometreBig/songname"
 #define TOPIC_RECOGNIZE_ASAP "caseta/spectrometreBig/reconeixasap"
 #define TOPIC_THUMBNAIL "caseta/spectrometreBig/thumbnail"
-#define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
+#define TOPIC_SHAZAM_MODE "caseta/spectrometreBig/shazammode"
+#define TOPIC_PIANO_MODE "caseta/spectrometreBig/pianomode"
+#define TOPIC_DEBUG_MODE "caseta/spectrometreBig/debugmode"
+#define TOPIC_REPEAT_THUMBNAIL "caseta/spectrometreBig/repeat"
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometreBig/largestfreeblock"
@@ -330,9 +336,10 @@ enum DRAW_STYLE {
   DEFAULT_STYLE = BARS_WITH_TOP
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
-int16_t _TheDesiredHue = - 1;  // el custom color a aplicar. -1 -> color per defecte.
-uint32_t _DesiredHueLastSet = 0;           // last time the desired hue was set. Es randomitzarà el color quan passi una hora des de l'últim canvi de color
-uint8_t _binGrouping = 4;                  // per les LedBars, cada __binGrouping bins es pintara un sol bar. Per exemple, si __binGrouping=4, i tenim 32 bins, es pintaran 8 bars.
+int16_t _TheDesiredHue = -1;      // el custom color a aplicar. -1 -> color per defecte.
+uint32_t _DesiredHueLastSet = 0;  // last time the desired hue was set. Es randomitzarà el color quan passi una hora des de l'últim canvi de color
+uint8_t _binGrouping = 4;         // per les LedBars, cada __binGrouping bins es pintara un sol bar. Per exemple, si __binGrouping=4, i tenim 32 bins, es pintaran 8 bars.
+uint8_t _barSpacing = 1;          // espai entre els bars. Per defecte 1 pixel. Si es posa a 0, no hi ha espai entre els bars
 
 uint8_t _1stBarValue = 128;
 
@@ -359,7 +366,7 @@ bool _UpdateCurrentNow = false;  // true if current must be updated ASAP
 uint8_t
 GetMapMaxPixels() {
   uint8_t ret = 20;
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
   if (_MapMaxWhToPixels == 1000 || _MapMaxWhToPixels == 1500 || _MapMaxWhToPixels == 2000 || _MapMaxWhToPixels == 2500 || _MapMaxWhToPixels == 3000 || _MapMaxWhToPixels == 5000 || _MapMaxWhToPixels == 6000) {
     ret = 30;  // 30/20/15/12/10/6/5 leds per kWh
   } else if (_MapMaxWhToPixels == 3500 || _MapMaxWhToPixels == 4000) {
@@ -389,7 +396,7 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 }
 
 // THUMBNAIL related
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
 #define THUMBNAIL_HEIGHT 54
 #define THUMBNAIL_WIDTH 72
 #else
@@ -400,3 +407,9 @@ std::vector<CRGB> _ThumbnailImg;      // vector of CRGB to store the thumbnail i
 bool _ThumbnailReady = false;         // true if the thumbnail image is ready to be displayed
 DRAW_STYLE _ThumbnailPrevStyle;       // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;  // time when the thumbnail was received
+
+void SendDebugMessage(const char* msg) {
+  if (_DebugMode && _ThePubSub.connected()) {
+    _ThePubSub.publish(TOPIC_DEBUG, msg, false);
+  }
+}

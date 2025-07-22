@@ -17,7 +17,7 @@ void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = fal
     if (smallFont) {
       _u8g2LongText.setFont(u8g2_font_smolfont_tf);  // u8g2_font_courR08_tf
     } else {
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
       vert = 2;  // 1 pixel down
       _u8g2LongText.setFont(u8g2_font_t0_12_tf);
 #elif defined(PANEL_SIZE_64x32)

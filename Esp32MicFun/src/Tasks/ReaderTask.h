@@ -126,12 +126,11 @@ void vTaskReader(void* pvParameters) {
             //                        if (!_Drawing) {
             // theFFT.GetFreqPower(mad.pFftMag, MAX_FFT_MAGNITUDE, FftPower::BinResolution::AUTO64_3Hz, maxMagI, superMaxMag);
             auto mode = _pianoMode ? FftPower::BinResolution::PIANO64_6Hz : FftPower::BinResolution::AUTO64_6Hz;  // FftPower::BinResolution::AUTO64_3Hz;
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
             if (FFT_SIZE == 4096) {
               mode = _pianoMode ? FftPower::BinResolution::PIANO96_3Hz : FftPower::BinResolution::AUTO96_3Hz;
-            }
-            else {
-              //mode = _pianoMode ? FftPower::BinResolution::PIANO96_6Hz : FftPower::BinResolution::AUTO96_6Hz;
+            } else {
+              // mode = _pianoMode ? FftPower::BinResolution::PIANO96_6Hz : FftPower::BinResolution::AUTO96_6Hz;
               mode = _pianoMode ? FftPower::BinResolution::PIANO48_6Hz : FftPower::BinResolution::AUTO96_6Hz;
             }
 #endif
@@ -171,20 +170,6 @@ void vTaskReader(void* pvParameters) {
                 MAX_FFT_MAGNITUDE = 12000000;
               }
             }
-
-            // if (superMaxMag > 2500000) {
-            //     MAX_FFT_MAGNITUDE = 3000000;
-            // } else if (superMaxMag > 2000000) {
-            //     MAX_FFT_MAGNITUDE = 2500000;
-            // } else if (superMaxMag > 1500000) {
-            //     MAX_FFT_MAGNITUDE = 2000000;
-            // } else if (superMaxMag > 1000000) {
-            //     MAX_FFT_MAGNITUDE = 1500000;
-            // } else if (superMaxMag > 700000) {
-            //     MAX_FFT_MAGNITUDE = 1000000;
-            // } else {
-            //     MAX_FFT_MAGNITUDE = 750000;
-            // }
 
             std::string msg(Utils::string_format("10sec receiving: time=%d totalSamples=%d numCalls=%d maxMag=%d maxFftMag=%dk maxBin=%d maxFreq=%dHz missedFrames=%d",
                                                  now - recInit, totalSamples, numCalls, superMaxMag, (uint32_t)(MAX_FFT_MAGNITUDE / 1000), superMaxBin, (int32_t)(superMaxBin * freqs_x_bin), missedFrames));

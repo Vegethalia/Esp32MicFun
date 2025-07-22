@@ -2,7 +2,7 @@
 
 #include "GlobalDefines.h"
 
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
 // #define I2S_DEVICE 1
 #define FASTLED_ESP32_I2S true
 // #define FASTLED_ALLOW_INTERRUPTS 0
@@ -283,7 +283,7 @@ class PanelMapping64x32 : public IPanelMapping<PANEL_WIDTH_64, PANEL_HEIGHT_32> 
   }
 };
 
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
 
 #define MINI_PANEL_WIDTH 24
 #define MINI_PANEL_HEIGHT 6
@@ -540,7 +540,7 @@ class PowerBarsPanel {
     uint8_t maxY = value / 10;
     uint8_t multValue = 14;
     uint8_t multValueDim = 8;
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
     multValue = 10;
     multValueDim = 6;
 #endif
@@ -641,7 +641,7 @@ class PowerBarsPanel {
   void PushLine(const uint8_t* pTheValues, uint16_t ignoreFromX = 10000, uint8_t ignoreToY = 0) {
     int ledDest = 0;
     uint8_t baseFade = 5;  //_pianoMode ? 1 : 5; // 5
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
     baseFade = 4;  // 2
 #endif
 
@@ -770,7 +770,7 @@ class PowerBarsPanel {
       _TheCircles.push_back(new PreDrawmCircle(7));
       _TheCircles.push_back(new PreDrawmCircle(8));
       _TheCircles.push_back(new PreDrawmCircle(8));
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
       _TheCircles.push_back(new PreDrawmCircle(9));
       _TheCircles.push_back(new PreDrawmCircle(10));
       _TheCircles.push_back(new PreDrawmCircle(11));

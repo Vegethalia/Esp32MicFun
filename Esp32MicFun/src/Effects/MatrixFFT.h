@@ -6,9 +6,9 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
     uint16_t currentBin = 0;
     uint8_t x;
 
-    auto theHue = HSVHue::HUE_PURPLE;
+    int16_t theHue = HSVHue::HUE_PURPLE;
     if (_TheDesiredHue >= 0) {
-        theHue = (HSVHue)_TheDesiredHue;
+        theHue = _TheDesiredHue;
     }
 
     for (uint8_t iLine = 0; iLine < numLines; iLine++) {

@@ -2,7 +2,7 @@
 void DrawDiscoLights(MsgAudio2Draw& mad) {
   // 32-64-128-256-512  --> 192Hz 384Hz 768Hz 1536Hz 3072Hz
   const uint16_t bins[] = {110 / HZ_PER_BIN, 240 / HZ_PER_BIN, 500 / HZ_PER_BIN, 1500 / HZ_PER_BIN, mad.sizeFftMagVector};
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
   const uint8_t max_circle = 9;
   const uint8_t yPos0 = (THE_PANEL_HEIGHT - (max_circle * 2)) + 2;
 #else

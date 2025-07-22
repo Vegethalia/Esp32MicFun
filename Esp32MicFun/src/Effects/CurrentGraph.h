@@ -6,7 +6,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
   static uint8_t _incBoleta = 0;
 
   if (!published) {
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("maxV=%d, every=%d", maxV, everyKwh).c_str());
+    SendDebugMessage(Utils::string_format("maxV=%d, every=%d", maxV, everyKwh).c_str());
     published = true;
   }
 
@@ -95,13 +95,13 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
           }
         }
       }
-			previousBarValue = mapValue;
+      previousBarValue = mapValue;
     }
     // pintem el led que es va movent per sobre la linia de valors d'electricitat
     // uint8_t fiufiu = (uint8_t)(_TheFrameNumber % (THE_PANEL_WIDTH - 1));
     // mapValue = map(_pLectures[fiufiu].valorEnLeds, 0, _MapMaxWhToPixels, 0, maxV);
     // _TheLeds[_TheMapping.XY(fiufiu + 1, THE_PANEL_HEIGHT - 2 - mapValue)] += CHSV(HSVHue::HUE_YELLOW, 255, 200);
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
     if (maxValue < 20 && _MapMaxWhToPixels > 1500) {
       _MapMaxWhToPixels -= 500;
     } else if (maxValue > 30 && _MapMaxWhToPixels < 6000) {

@@ -1,7 +1,7 @@
 
-#if defined(PANEL_SIZE_96x48)
-#define MOVING_PARAMETRIC_POINTS 360 //quants punts dibuixem
-#define MOVING_PARAMETRIC_STEPS 360 // quants steps els fem rotar
+#if defined(PANEL_SIZE_96x54)
+#define MOVING_PARAMETRIC_POINTS 256  // quants punts dibuixem
+#define MOVING_PARAMETRIC_STEPS 360   // quants steps els fem rotar
 constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
 constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
 #else  // #define PANEL_SIZE_64x32
@@ -172,6 +172,7 @@ void DrawParametric(MsgAudio2Draw& mad) {
   }
   uint8_t intensity = std::max((uint8_t)(100), _1stBarValue);
 
+  uint8_t theHue = HSVHue::HUE_YELLOW;
   for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
     if (__dpd->rotating && (_DemoModeFrame % 2) == 0) {
       __dpd->TheCurrentCurve.initialPoints[i] = (__dpd->TheCurrentCurve.initialPoints[i] + 1) % MOVING_PARAMETRIC_STEPS;
@@ -191,7 +192,12 @@ void DrawParametric(MsgAudio2Draw& mad) {
     //     intensity = intensity / 2;
     // }
 
-    _TheLeds[_TheMapping.XY(round(__dpd->TheCurrentCurve.xCoord[coord]), round(__dpd->TheCurrentCurve.yCoord[coord]))] = CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity);  //(uint8_t)value);
+    _TheLeds[_TheMapping.XY(round(__dpd->TheCurrentCurve.xCoord[coord]), round(__dpd->TheCurrentCurve.yCoord[coord]))] = CHSV(theHue, 255, intensity);  //(uint8_t)value);//CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity);  //(uint8_t)value);
+#if defined(PANEL_SIZE_96x54)
+    theHue++;
+#else
+    theHue += 4;
+#endif
   }
 
   // s_frameNum = 0;
@@ -235,7 +241,7 @@ void DrawParametric(MsgAudio2Draw& mad) {
   //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
   //   _u8g2.drawStr(6, 12, theTime.c_str());
   //_ThePanel.SetBaseHue(HSVHue::HUE_YELLOW);
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
   _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 5, 6, __dpd->textPos, THE_PANEL_HEIGHT - 16, __dpd->hue, intensity);
 #else
   _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 2, 3, __dpd->textPos, 16, __dpd->hue, intensity);

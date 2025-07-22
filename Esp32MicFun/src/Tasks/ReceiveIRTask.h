@@ -121,7 +121,7 @@ void vTaskReceiveIR(void* pvParameters) {
         _lastCommandIR = 0;
       }
       log_d("IR Decode:0x%2X IsRepeat=%d", results.command, results.repeat ? 1 : 0);
-      _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR: Value=%d Command=0x%2X IsRepeat=%d", (uint32_t)results.value, results.command, results.repeat ? 1 : 0).c_str(), false);
+      SendDebugMessage(Utils::string_format("IR: Value=%d Command=0x%2X IsRepeat=%d", (uint32_t)results.value, results.command, results.repeat ? 1 : 0).c_str());
 
       if (_TheDrawStyle == DRAW_STYLE::CALC_MODE) {
         ProcessIRCommand4CalcMode(command);
@@ -130,7 +130,7 @@ void vTaskReceiveIR(void* pvParameters) {
 
       switch (command) {
         case IR_KEY_POWER:
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("IR RESTART").c_str(), false);
+          SendDebugMessage(Utils::string_format("IR RESTART").c_str());
           delay(500);
           ESP.restart();
           break;
@@ -143,21 +143,21 @@ void vTaskReceiveIR(void* pvParameters) {
             UpdatePref(Prefs::PR_STYLE);
             UpdatePref(Prefs::PR_INTENSITY);
 
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str(), true);
+            SendDebugMessage(Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str());
           }
           break;
         case IR_KEY_FADE3:
           if (_ShazamSongs) {
             _ShazamSongs = false;
-            _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode OFF!!", false);
+            SendDebugMessage("Shazam Mode OFF!!");
           } else {
             _ShazamSongs = true;
-            _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON!!", false);
+            SendDebugMessage("Shazam Mode ON!!");
             _ShazamActivationTime = millis();
           }
           break;
         case IR_KEY_FLASH: //activem Shazam mode i enviem missatge al servei per a que es reconegui l'audio ASAP
-          _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON (ASAP)!!", false);
+          SendDebugMessage("Shazam Mode ON (ASAP)!!");
           _ShazamSongs = true;
           _ShazamActivationTime = millis();
           _DisplayAsapIndicator = true; // show the ASAP indicator on the display
@@ -170,7 +170,7 @@ void vTaskReceiveIR(void* pvParameters) {
             UpdatePref(Prefs::PR_STYLE);
             UpdatePref(Prefs::PR_NIGHTMODE);
 
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str(), true);
+            SendDebugMessage(Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str());
           }
           break;
         case IR_KEY_INCBRIGHTNESS:
@@ -191,7 +191,7 @@ void vTaskReceiveIR(void* pvParameters) {
           UpdatePref(Prefs::PR_INTENSITY);
 
           log_d("IR: INC BRIGHTNESS");
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%d", _MAX_MILLIS).c_str(), true);
+          SendDebugMessage(Utils::string_format("Updated intensity=%d", _MAX_MILLIS).c_str());
           break;
         case IR_KEY_DECBRIGHTNESS:
           _lastCommandIR = IR_KEY_DECBRIGHTNESS;
@@ -211,7 +211,7 @@ void vTaskReceiveIR(void* pvParameters) {
           UpdatePref(Prefs::PR_INTENSITY);
           log_d("IR: DEC BRIGHTNESS");
 
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), false);
+          SendDebugMessage(Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str());
           break;
         case IR_KEY_EFFECT1:
           ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP);
@@ -236,12 +236,12 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_JUMP1:
           _pianoMode = true;
           UpdatePref(Prefs::PR_PIANOMODE);
-          _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE ON", false);
+          SendDebugMessage("PIANO MODE ON");
           break;
         case IR_KEY_JUMP2:
           _pianoMode = false;
           UpdatePref(Prefs::PR_PIANOMODE);
-          _ThePubSub.publish(TOPIC_DEBUG, "PIANO MODE OFF", false);
+          SendDebugMessage("PIANO MODE OFF");
           break;
         case IR_KEY_INCRED:
           if (allowStyleChange) {
@@ -276,13 +276,13 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_INCGREEN:
           if (allowStyleChange && _WaveDrawEvery < 5) {
             _WaveDrawEvery++;
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str(), false);
+            SendDebugMessage(Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str());
           }
           break;
         case IR_KEY_DECGREEN:
           if (allowStyleChange && _WaveDrawEvery > 1) {
             _WaveDrawEvery--;
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str(), false);
+            SendDebugMessage(Utils::string_format("_WaveDrawEvery=%d", _WaveDrawEvery).c_str());
           }
           break;
         case IR_KEY_RED:
@@ -349,7 +349,7 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_QUICK:
           if (ChangeDrawStyle(DRAW_STYLE::CALC_MODE)) {
             // UpdatePref(Prefs::PR_STYLE); //aquest mode no cal guardar-lo.
-            _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=CALC_MODE").c_str(), false);
+            SendDebugMessage(Utils::string_format("Updated DrawStyle=CALC_MODE").c_str());
           }
           break;
       }

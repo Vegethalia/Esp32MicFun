@@ -5,11 +5,11 @@ void DrawLedBars(MsgAudio2Draw& mad) {
   int16_t value = 0;
 #if defined(PANEL_SIZE_64x32)
   uint8_t maxHeight = min(16, BAR_HEIGHT);  // 18
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
   uint8_t maxHeight = min(24, BAR_HEIGHT);  // 26
 #endif
   uint16_t maxHeightScaled = (maxHeight * 10) + 9;
-  //static uint8_t __binGrouping = 4;  // group bins every this number
+  // static uint8_t __binGrouping = 4;  // group bins every this number
   static ALTERDRAW __alterDraw = ALTERDRAW::ODD;
 
   if (_TheLastKey != GEN_KEY_PRESS::KEY_NONE) {
@@ -22,8 +22,7 @@ void DrawLedBars(MsgAudio2Draw& mad) {
     } else if (_TheLastKey == GEN_KEY_PRESS::KEY_INC2 && _binGrouping < 8) {
       _binGrouping++;
     }
-    std::string msg = Utils::string_format("BinGrouping=%d", (int)_binGrouping);
-    _ThePubSub.publish(TOPIC_DEBUG, msg.c_str(), false);
+    SendDebugMessage(Utils::string_format("BinGrouping=%d", (int)_binGrouping).c_str());
 
     _TheLastKey = GEN_KEY_PRESS::KEY_NONE;
   }
@@ -40,7 +39,7 @@ void DrawLedBars(MsgAudio2Draw& mad) {
   if (_TheDesiredHue < 0) {
     _ThePanel.SetBaseHue(HSVHue::HUE_BLUE);
   } else {
-    _ThePanel.SetBaseHue((HSVHue)_TheDesiredHue);
+    _ThePanel.SetBaseHue((uint8_t)_TheDesiredHue);
   }
 
   for (uint16_t i = 0; i < numItems; i += _binGrouping) {
@@ -50,7 +49,7 @@ void DrawLedBars(MsgAudio2Draw& mad) {
     // }
 
     // value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
-    // value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled); // 
+    // value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled); //
 
     if (_binGrouping > 1) {
       value = constrain(mad.pFftMag[i], MIN_FFT_DB, MAX_FFT_DB);
@@ -59,47 +58,22 @@ void DrawLedBars(MsgAudio2Draw& mad) {
       int32_t max = value;
       for (uint8_t j = 1; j < _binGrouping; j++) {
         value = constrain(mad.pFftMag[i + j], MIN_FFT_DB, MAX_FFT_DB);
-        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled);  // 
+        value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, maxHeightScaled);  //
         avg += value;
         if (value > max) {
           max = value;
         }
       }
-      // if (i > 3 && i < (THE_PANEL_WIDTH / 5) && _1stBarValue < max) {
-      //   _1stBarValue = max;
-      // }
       value = avg / _binGrouping;
-      for (uint8_t j = 0; j < _binGrouping - 1; j++) {
+      for (uint8_t j = 0; j < _binGrouping - _barSpacing; j++) {
         // _ThePanel.DrawBar(i + j - __binGrouping, max, false, __alterDraw);  // j%2==0?false:true);
         _ThePanel.DrawBar(i + j, max, false, __alterDraw);  // j%2==0?false:true);
       }
-      //i += __binGrouping;
+      // i += __binGrouping;
     } else {
       value = map(mad.pDBs[i], 0, 255, 0, maxHeightScaled);  //
       _ThePanel.DrawBar(i, value);
-      // if (i > 3 && i < (THE_PANEL_WIDTH / 5) && _1stBarValue < value) {
-      //   _1stBarValue = value;
-      // }
     }
   }
-  //_1stBarValue = _1stBarValue / 10;
-  /*    for (uint16_t i = 0; i < maxIndex; i++) {
-          uint8_t bin = binByPow[i].binNum;
-          if(bin==0) {
-              continue;
-          }
-          // if (i > minBoostBin) { // boost hi frequencies (to make them more visible)
-          //     auto boost = 1.0f + (bin * freqBoost);
-          //     value = (int)(value * boost);
-          // }
-
-          value = constrain(binByPow[i].fftMag, MIN_FFT_DB, MAX_FFT_DB);
-          value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, (BAR_HEIGHT * 10) + 9); // fins a 89
-
-          _ThePanel.DrawBar(bin - 1, value, binByPow[i].brightness);
-      }*/
-  // DrawParametric();
-
-  // FastLED.show();
   //_ThePanel.IncBaseHue();
 }

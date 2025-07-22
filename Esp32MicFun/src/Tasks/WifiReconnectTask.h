@@ -64,7 +64,7 @@ void vTaskWifiReconnect(void* pvParameters) {
         _ThePubSub.setBufferSize((THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT * 2) + 128);  // 1024
         Connect2MQTT();
         if (_ThePubSub.connected()) {
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str(), false);
+          SendDebugMessage(Utils::string_format("MicFun connected with IP=[%s]", WiFi.localIP().toString().c_str()).c_str());
           _ThePubSub.publish(TOPIC_LASTIP, Utils::string_format("%s", WiFi.localIP().toString().c_str()).c_str(), true);
         }
       }
@@ -79,7 +79,7 @@ void vTaskWifiReconnect(void* pvParameters) {
       // construïm la url ?dataFi=1685583107&numValors=60&maxKWh=4,5&mapejarDe0a=20&agruparPer=2&code=
       theUrl = Utils::string_format("%sdataFi=%lld&numValors=%d&maxWh=%d&mapejarDe0a=%d&agruparPer=%d&csvOutput=1&code=%s",
                                     CONSUM_ELECTRICITAT_URL, (int64_t)now, (THE_PANEL_WIDTH - 1), _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
-      _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
+      SendDebugMessage(Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str());
 
       __httpWifiClient->setInsecure();
 
@@ -91,17 +91,17 @@ void vTaskWifiReconnect(void* pvParameters) {
         int httpResponse = __theHttpClient->GET();
         if (httpResponse > 0) {
           std::string thePayload = __theHttpClient->getString().c_str();
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("HTTP response [%d] length=[%d]", httpResponse, thePayload.length()).c_str(), false);
+          SendDebugMessage(Utils::string_format("HTTP response [%d] length=[%d]", httpResponse, thePayload.length()).c_str());
           if (httpResponse == HTTP_CODE_OK) {
             // log_i("Payload=[%s]", thePayload.c_str());
             ProcessCurrentPayload(thePayload);
           }
         } else {
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str(), false);
-          _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("GET returned code [%d]", httpResponse).c_str(), false);
+          SendDebugMessage(Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str());
+          SendDebugMessage(Utils::string_format("GET returned code [%d]", httpResponse).c_str());
         }
       } else {
-        _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Begin returned false :(").c_str(), false);
+        SendDebugMessage(Utils::string_format("Begin returned false :(").c_str());
       }
       __theHttpClient->end();
     }
@@ -147,13 +147,10 @@ void Connect2MQTT() {
     } else {  // Subscribe to the feeds
       _LastMqttReconnect = millis();
       log_i("PubSubClient connected to PiRuter MQTT broker!!");
-      _ThePubSub.publish(TOPIC_DEBUG, "PubSubClient connected to PiRuter MQTT broker!!", true);
+      SendDebugMessage("PubSubClient connected to PiRuter MQTT broker!!");
 
       if (!_ThePubSub.subscribe(TOPIC_INTENSITY)) {
         // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_INTENSITY);
-      }
-      if (!_ThePubSub.subscribe(TOPIC_DELAYFRAME)) {
-        // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DELAYFRAME);
       }
       if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
         // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_STYLE);
@@ -179,15 +176,17 @@ void Connect2MQTT() {
       if (!_ThePubSub.subscribe(TOPIC_SHAZAM_MODE)) {
         //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_SHAZAM_MODE);
       }
-
-      // if (!_ThePubSub.subscribe(TOPIC_FPS)) {
-      //     log_e("ERROR!! PubSubClient was not able to suibscribe to [%s]", TOPIC_FPS);
-      // }
+      if (!_ThePubSub.subscribe(TOPIC_PIANO_MODE)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_PIANO_MODE);
+      }
+      if (!_ThePubSub.subscribe(TOPIC_DEBUG_MODE)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DEBUG_MODE);
+      }
     }
   }
 }
 
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
 const uint8_t gamma_1_8_table[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2,
     2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6,
@@ -224,6 +223,52 @@ const uint8_t _gamma8[] = {
     177, 180, 182, 184, 186, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213,
     215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255};
 #endif
+
+CRGB adjustPowerConsumption(CRGB& color) {
+  constexpr float maxFactor = 0.70;                     // 30% reduction for very bright colors
+  constexpr float superMaxFactor = (maxFactor - 0.1);   // 40% reduction for super bright colors
+  constexpr float limitFactor = (1.0 - maxFactor);      // 0.3
+  constexpr uint16_t limitSum = 350;                    // sum of RGB values above which we reduce brightness
+  constexpr uint16_t superLimitSum = (limitSum + 130);  // sum of RGB values above which we further reduce brightness
+  uint16_t sum = color.r + color.g + color.b;
+
+  if (sum <= 100) {
+    // No s'aplica cap ajust per valors foscos
+    return color;
+  } else if (sum > limitSum) {
+    if (sum > superLimitSum) {
+      // Reducció més gran per valors extremadament brillants
+      return CRGB(color.r * superMaxFactor, color.g * superMaxFactor, color.b * superMaxFactor);
+    }
+    // Reducció fixa del maxFactor% per valors molt brillants
+    return CRGB(color.r * maxFactor, color.g * maxFactor, color.b * maxFactor);
+  } else {
+    // Reducció progressiva entre 100 i 350
+    // Calculem un factor d'atenuació que va de 1.0 (a 100) a 0.70 (a 350)
+    float factor = 1.0 - (limitFactor * (sum - 100) / (limitSum - 100));
+    return CRGB(color.r * factor, color.g * factor, color.b * factor);
+  }
+}
+
+CRGB adjustDarkColors(CRGB& color) {
+  uint16_t sum = color.r + color.g + color.b;
+  uint8_t maxSum = 50;
+
+  if (sum >= maxSum) {
+    return color;  // No tocar colors amb prou lluminositat
+  } else {
+    // Factor d'augment: del 25% (sum=0) al 1% (sum=50)
+    float factor = 1.0 + (0.25 - (0.24 * sum / (float)maxSum));
+
+    // Aplica l'augment als components RGB (sense superar 255)
+    uint8_t r = (uint8_t)(color.r * factor);
+    uint8_t g = (uint8_t)(color.g * factor);
+    uint8_t b = (uint8_t)(color.b * factor);
+
+    return CRGB(r, g, b);
+  }
+}
+
 void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
   _ThumbnailImg.resize(dataLenght / 2);  // 2 bytes per pixel (RGB565)
   for (uint16_t i = 0; i < dataLenght / 2; i++) {
@@ -240,21 +285,29 @@ void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
     // if (b > 3) {
     //   b -= 3;
     // }
-    r = (r << 3);  // Scale to 8 bits 3
-    g = (g << 2);  // Scale to 8 bits 2
-    b = (b << 3);  // Scale to 8 bits 3
-    //ara els fem 2/3 dels valors per que no brilli tant
-    r = (uint8_t)(((uint16_t)r * 2) / (uint16_t)3);
-    g = (uint8_t)(((uint16_t)g * 2) / (uint16_t)3);
-    b = (uint8_t)(((uint16_t)b * 2) / (uint16_t)3);
-
-#if defined(PANEL_SIZE_96x48)
+    r = (r << 3);  // Scale to 8 bits
+    g = (g << 2);  // Scale to 8 bits
+    b = (b << 3);  // Scale to 8 bits
+    // ara els fem 4/5 dels valors per que no brilli tant
+    // r = (uint8_t)(((uint16_t)r * 4) / (uint16_t)5);
+    // g = (uint8_t)(((uint16_t)g * 4) / (uint16_t)5);
+    // b = (uint8_t)(((uint16_t)b * 4) / (uint16_t)5);
+    r = (uint8_t)(((uint16_t)r * 9) / (uint16_t)10);
+    g = (uint8_t)(((uint16_t)g * 9) / (uint16_t)10);
+    b = (uint8_t)(((uint16_t)b * 9) / (uint16_t)10);
+#if defined(PANEL_SIZE_96x54)
     //    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
-    _ThumbnailImg[i] = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma
+    CRGB originalColor = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma
 
 #else
-    _ThumbnailImg[i] = CRGB(_gamma8[r], _gamma8[g], _gamma8[b]);  // adjust gamma
+    CRGB originalColor = CRGB(_gamma8[r], _gamma8[g], _gamma8[b]);  // adjust gamma
 #endif
+
+    // Aplica els dos ajustos: 1) potenciem Foscos 2) limitem brillants (del codi anterior)
+    CRGB adjustedColor = adjustDarkColors(originalColor);
+    adjustedColor = adjustPowerConsumption(adjustedColor);  // Funció que ja tenies
+
+    _ThumbnailImg[i] = adjustedColor;
 
     // to compensate the RGB565 to RGB888 conversion
     //    // Extreure components
@@ -285,7 +338,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
   }
 
   if (millis() - _LastMqttReconnect < MQTT_RECONNECT_IGNORE_MSG_MS) {
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Ignoring MqttMSG [%s][%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
+    SendDebugMessage(Utils::string_format("Ignoring MqttMSG [%s][%s]", theTopic.c_str(), theMsg.c_str()).c_str());
     return;
   }
 
@@ -305,23 +358,16 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
       //     _IntensityMAmps = (uint32_t)(((MAX_TARGET_CURRENT - MIN_TARGET_CURRENT) * percentPower) + MIN_TARGET_CURRENT);
       //     FastLED.setMaxPowerInVoltsAndMilliamps(5, _IntensityMAmps); // FastLED power management set at 5V, 1500mA
       //     _ThePubSub.publish(TOPIC_INTENSITY, Utils::string_format("%d", _Intensity).c_str(), true);
-      _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str(), true);
+      SendDebugMessage(Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str());
     }
-  }
-  if (theTopic.find(TOPIC_DELAYFRAME) != std::string::npos) {
-    _delayFrame = max(std::atoi(theMsg.c_str()), (int)0);
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated delay=%dms", _delayFrame).c_str(), true);
-  }
-  if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
+  } else if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
     ChangeDrawStyle((DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1));
-  }
-  if (theTopic.find(TOPIC_RESET) != std::string::npos) {
+  } else if (theTopic.find(TOPIC_RESET) != std::string::npos) {
     bool resetNow = std::atoi(theMsg.c_str()) != 0;
     if (resetNow) {
       ESP.restart();
     }
-  }
-  if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
+  } else if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
     byte nightOn = std::atoi(theMsg.c_str()) != 0;
     _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
     auto oldStyle = _TheDrawStyle;
@@ -329,46 +375,68 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     UpdatePref(Prefs::PR_STYLE);
     UpdatePref(Prefs::PR_NIGHTMODE);
     ProcessStyleChange(oldStyle, _TheDrawStyle);
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str(), true);
-  }
-  if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
+    SendDebugMessage(Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str());
+  } else if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
     int minuts = std::atoi(theMsg.c_str());
     _AgrupaConsumsPerMinuts = (uint16_t)max(min(minuts, (int)60), 1);
     UpdatePref(Prefs::PR_GROUPMINS);
 
     _UpdateCurrentNow = true;
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Electricitat agrupada per [%d] minuts", (int)_AgrupaConsumsPerMinuts).c_str(), true);
-  }
-  if (theTopic.find(TOPIC_HORARI_ESTIU) != std::string::npos) {
+    SendDebugMessage(Utils::string_format("Electricitat agrupada per [%d] minuts", (int)_AgrupaConsumsPerMinuts).c_str());
+  } else if (theTopic.find(TOPIC_HORARI_ESTIU) != std::string::npos) {
     _DaylightSaving = std::atoi(theMsg.c_str()) != 0;
     UpdatePref(Prefs::PR_DAYLIGHT_SAVING);
     ConfigureNTP();
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str(), true);
-  }
-  if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
+    SendDebugMessage(Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str());
+  } else if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
     _DetectedSongName = theMsg;
     _ShazamSongs = true;  // force to show the song name
     _DisplayAsapIndicator = false;
+    _SongDesconeguda = false;
     if (_DetectedSongName.length() < 4) {
       _DetectedSongName = "Can\xE7\xF3 desconeguda";
+      _SongDesconeguda = true;  // force to show the "unknown song" indicator
     }
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str(), true);
-  }
-  if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str(), true);
+    SendDebugMessage(Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str());
+  } else if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
+    SendDebugMessage(Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str());
     DecodeThumbnail(pData, dataLenght);
     if (_TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
       _ThumbnailPrevStyle = _TheDrawStyle;         // remember the style when the thumbnail was received
       _TheDrawStyle = DRAW_STYLE::DRAW_THUMBNAIL;  // force the thumbnail to be drawn
     }
     _TimeThumbnailReceived = millis();
-  }
-  if (theTopic.find(TOPIC_SHAZAM_MODE) != std::string::npos) {
-    _ShazamSongs = true;
-    _ThePubSub.publish(TOPIC_DEBUG, "Shazam Mode ON!!", false);
-    _ShazamActivationTime = millis();
+  } else if (theTopic.find(TOPIC_SHAZAM_MODE) != std::string::npos) {
+    auto newMode = std::atoi(theMsg.c_str()) != 0;
+    if (newMode) {
+      _ShazamSongs = newMode;
+      _ShazamActivationTime = millis();
+      SendDebugMessage("Shazam Mode ON!!");
+    } else {
+      SendDebugMessage("Shazam Mode OFF!!");
+      _ShazamSongs = newMode;
+    }
+  } else if (theTopic.find(TOPIC_PIANO_MODE) != std::string::npos) {
+    byte modeOn = std::atoi(theMsg.c_str()) != 0;
+    if (modeOn != _pianoMode) {
+      _pianoMode = modeOn;
+      UpdatePref(Prefs::PR_PIANOMODE);
+
+      SendDebugMessage(Utils::string_format("Piano Mode %s!!", _pianoMode ? "ON" : "OFF").c_str());
+    }
+  } else if (theTopic.find(TOPIC_DEBUG_MODE) != std::string::npos) {
+    auto newMode = std::atoi(theMsg.c_str()) != 0;
+    if (newMode) {
+      _DebugMode = newMode;
+      SendDebugMessage("Debug Mode ON!!");
+    } else {
+      SendDebugMessage("Debug Mode OFF!!");
+      _DebugMode = newMode;
+    }
+  } else {
+    log_w("Unknown topic [%s] with message [%s]", theTopic.c_str(), theMsg.c_str());
   }
   // _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Received Topic=[%s] Msg=[%s]", theTopic.c_str(), theMsg.c_str()).c_str(), true);
 }
@@ -424,6 +492,6 @@ void ProcessCurrentPayload(std::string& theCsvPayload) {
     _ThePubSub.publish(TOPIC_CURRENT_WH, Utils::string_format("%d", _pLectures[nLastNonZero].valorEnLeds).c_str());
     _lastCurrentTime = _pLectures[nLastNonZero - 1].horaConsum;
   } else {
-    _ThePubSub.publish(TOPIC_DEBUG, "NO DATA");
+    SendDebugMessage("NO DATA");
   }
 }

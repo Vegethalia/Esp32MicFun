@@ -52,7 +52,7 @@ void DrawWave(MsgAudio2Draw& mad) {
       iMaxAmp = i;
     }
   }  // ja tenim l'index del pic de la muntanya mes gran. Ara busquem a on creuem per 0
-  //maxSearch = (int)(width * 1.5f);
+  // maxSearch = (int)(width * 1.5f);
   pas0 = iMaxAmp;
   for (i = iMaxAmp; i < maxSearch; i++) {
     if (mad.pAudio[i] <= INPUT_0_VALUE) {
@@ -74,7 +74,7 @@ void DrawWave(MsgAudio2Draw& mad) {
   int16_t numValuesHi = 0;
   int16_t numValuesVeryHi = 0;
   for (i = 0; i < width; i += _WaveDrawEvery) {
-    // #if defined(PANEL_SIZE_96x48)
+    // #if defined(PANEL_SIZE_96x54)
     //     value = mad.pAudio[pas0 + i];
     //     // value += mad.pAudio[pas0 + (i * 3) + 2];
     //     // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));

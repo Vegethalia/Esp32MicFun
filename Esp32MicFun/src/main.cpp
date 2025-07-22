@@ -73,7 +73,7 @@ void setup() {
   FastLED.addLeds<WS2812B, PIN_DATA_LEDS2, GRB>(_TheLeds, THE_PANEL_WIDTH * 8, THE_PANEL_WIDTH * 8);
   FastLED.addLeds<WS2812B, PIN_DATA_LEDS3, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 2, THE_PANEL_WIDTH * 8);
   FastLED.addLeds<WS2812B, PIN_DATA_LEDS4, GRB>(_TheLeds, THE_PANEL_WIDTH * 8 * 3, THE_PANEL_WIDTH * 8);
-#elif defined(PANEL_SIZE_96x48)
+#elif defined(PANEL_SIZE_96x54)
   pinMode(PIN_DATA_LEDS1, OUTPUT);
   pinMode(PIN_DATA_LEDS2, OUTPUT);
   pinMode(PIN_DATA_LEDS3, OUTPUT);
@@ -107,7 +107,7 @@ void setup() {
   //_NightMode = _ThePrefs.getBool(PREF_NIGHTMODE, _NightMode); //night mode is always off at start
   _pianoMode = _ThePrefs.getBool(PREF_PIANOMODE, _pianoMode);
   _TheDesiredHue = _ThePrefs.getInt(PREF_CUSTOM_HUE, -1);
-  _TheDesiredHue = random8();  // DEBUUUUUUG
+  //_TheDesiredHue = random8();  // DEBUUUUUUG
 
   _DaylightSaving = _ThePrefs.getBool(PREF_DAYLIGHT_SAVING, true);  // Horari d'estiu. uses _DaylightSaving.
 
@@ -117,8 +117,8 @@ void setup() {
         (int)_TheDrawStyle, (int)_MAX_MILLIS, (int)_AgrupaConsumsPerMinuts, (int)_NightMode, (int)_pianoMode, (int)_TheDesiredHue);
 
   // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
-  FastLED.setTemperature(Halogen);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
+  // FastLED.setTemperature(Halogen);
+  // FastLED.setMaxPowerInVoltsAndMilliamps(5, 20000);
   FastLED.setBrightness(_MAX_MILLIS);
   FastLED.setDither(DISABLE_DITHER);
 
@@ -193,51 +193,31 @@ void setup() {
 
 constexpr uint32_t ONE_HOUR_IN_MILLIS = 60 * 60 * 1000;
 void loop() {
-  // PLAY WITH MATRIX
-  // if(!added) {
-  //     _MyTempController = &FastLED.addLeds<WS2812B, PIN_DATA_LEDS, GRB>(_MyTempLeds, TEMP_LEDS);
-  //     _MyTempController->setTemperature(Halogen);
-  //     FastLED.setBrightness(20);
-  // }
-  // _MyTempLeds.fadeToBlackBy(10);
-  // _MyTempLeds[_indexPix] = CHSV(HSVHue::HUE_PURPLE, random8(), 100);
-  // _indexPix++;
-  // _indexPix %= TEMP_LEDS;
-  // _MyTempController->showLeds();
-  // END PLAY WITH MATRIX
-
-  // fill_rainbow(_TheLeds, NUM_LEDS, initial, thisSpeed);
-  // initial+=thisSpeed;
-  // FastLED.show();
-
-  // static int pos = 0;
-  // static int temp = 0;
-  // for (int i = 0; i < 33; i++) {
-  //     for (int j = 0; j < 16; j++) {
-  //         _TheLeds[_TheMapping.XY((i + pos) % 33, j)] = __imgArletErola2[i][j];
-  //         napplyGamma_video(_TheLeds[_TheMapping.XY((i + pos) % 33, j)], 1.8f);
-  //     }
-  // }
-  // pos++;
-
-  // FastLED.show();
-  //  delay(_delayFrame);
-
-  //  DrawParametric();
-  // DrawSparks();
   if (millis() - _DesiredHueLastSet > ONE_HOUR_IN_MILLIS) {
     _DesiredHueLastSet = millis();
-    _TheDesiredHue = random8(0, 255);
+    _TheDesiredHue = _TheFrameNumber % 256;  // random8(); //randomize hue every hour
     UpdatePref(Prefs::PR_CUSTOM_HUE);
     log_d("Randomized Hue=%d", _TheDesiredHue);
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Randomized Hue=%d", _TheDesiredHue).c_str(), false);
-    _binGrouping = random8(1, 8);  // randomize bin grouping
+    SendDebugMessage(Utils::string_format("Randomized Hue=%d", _TheDesiredHue).c_str());
+    _binGrouping = (_TheFrameNumber % 5) + 2;  // randomize binGrouping every hour
     log_d("Randomized binGrouping=%d", _binGrouping);
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Randomized binGrouping=%d", _binGrouping).c_str(), false);
+    SendDebugMessage(Utils::string_format("Randomized binGrouping=%d", _binGrouping).c_str());
+    _barSpacing = (_TheFrameNumber % (_binGrouping - 1)) + 1;  // randomize barSpacing every hour
+    log_d("Randomized barSpacing=%d", _barSpacing);
+    SendDebugMessage(Utils::string_format("Randomized barSpacing=%d", _barSpacing).c_str());
+    if (_TheDrawStyle != DRAW_STYLE::CALC_MODE) {
+      auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::DISCO_LIGTHS)) + 1);  // randomize style every hour
+      if (newStyle == DRAW_STYLE::HORIZ_FIRE) {
+        newStyle = DRAW_STYLE::BARS_WITH_TOP;  // avoid audiostreamer mode
+      }
+      log_d("Randomized DrawStyle=%d", (int)newStyle);
+      SendDebugMessage(Utils::string_format("Randomized DrawStyle=%d", (int)newStyle).c_str());
+      ChangeDrawStyle(newStyle, false);
+    }
   }
   delay(10000);
   log_d("Main: Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-  if (_Connected2Wifi) {
+  if (_DebugMode && _ThePubSub.connected()) {
     _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", esp_get_free_heap_size()).c_str());
     _ThePubSub.publish(TOPIC_BIGGESTFREEBLOCK, Utils::string_format("%d", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());
@@ -314,7 +294,7 @@ bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange) {
       _UpdateCurrentNow = true;
     }
 
-    _ThePubSub.publish(TOPIC_DEBUG, Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str(), false);
+    SendDebugMessage(Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str());
     return true;
   }
   return false;

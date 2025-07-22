@@ -27,7 +27,7 @@
 
 // uint8_t thisSpeed = 3;
 // uint8_t initial = 1;
-int _delayFrame = 100;
+//int _delayFrame = 100;
 
 // void DrawParametricHardcoded()
 // {

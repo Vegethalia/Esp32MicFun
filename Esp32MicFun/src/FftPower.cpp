@@ -244,7 +244,7 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
       // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
       float mag = 1.0f / q_rsqrt(auxSum);
       float powerInDbs = (float)(10.0f * log(mag / (float)maxFftMagnitude));  // max energy of all bins
-#if defined(PANEL_SIZE_96x48)
+#if defined(PANEL_SIZE_96x54)
       pFreqPower[(ind * 2)] = powerInDbs;
       pFreqPower[(ind * 2) + 1] = powerInDbs;
 #elif defined(PANEL_SIZE_64x32)

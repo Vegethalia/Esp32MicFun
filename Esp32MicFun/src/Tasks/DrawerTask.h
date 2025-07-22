@@ -1,3 +1,17 @@
+void DrawGrays() {
+  int j = THE_PANEL_HEIGHT / 2;
+  for (int i = THE_PANEL_WIDTH / 3; i < THE_PANEL_WIDTH * 2 / 3; i++) {
+    _TheLeds[_TheMapping.XY(i, j + 0)] = CRGB(128, 128, 128);  // Grays
+    _TheLeds[_TheMapping.XY(i, j + 1)] = CRGB(128, 128, 128);  // Grays
+    _TheLeds[_TheMapping.XY(i, j + 2)] = CRGB(80, 80, 80);     // Grays
+    _TheLeds[_TheMapping.XY(i, j + 3)] = CRGB(80, 80, 80);     // Grays
+    _TheLeds[_TheMapping.XY(i, j + 4)] = CRGB(64, 64, 64);     // Grays
+    _TheLeds[_TheMapping.XY(i, j + 5)] = CRGB(64, 64, 64);     // Grays
+    _TheLeds[_TheMapping.XY(i, j + 6)] = CRGB(40, 40, 40);     // Grays
+    _TheLeds[_TheMapping.XY(i, j + 7)] = CRGB(40, 40, 40);     // Grays
+  }
+}
+
 // Task to draw screen.
 void vTaskDrawer(void* pvParameters) {
   if (INIT_SCREEN) {
@@ -129,7 +143,9 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::DISCO_LIGTHS:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
             FastLED.clear();
+#if defined(PANEL_SIZE_96x54)
             DrawWave(mad);
+#endif
             DrawMatrixFFT(mad);
             DrawDiscoLights(mad);
             DrawClock();
@@ -150,6 +166,8 @@ void vTaskDrawer(void* pvParameters) {
       }
 
       ProcessShazamMode(mad);
+
+      // DrawGrays();
 
       // DrawClock();
       FastLED.show();
