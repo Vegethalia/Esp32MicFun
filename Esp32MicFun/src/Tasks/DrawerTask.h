@@ -93,9 +93,9 @@ void vTaskDrawer(void* pvParameters) {
       // continue; //----------------------------------------
       // FastLED.setBrightness(64);
 
-      if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
-        SendAudio(mad, PORT_SHAZAM_SERVICE);  // enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
-      }
+      // if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
+      //   SendAudio(mad, PORT_SHAZAM_SERVICE);  // enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
+      // }
 
       if (_DemoMode) {
         FastLED.clear();
@@ -114,7 +114,7 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::VERT_FIRE:
             FastLED.clear();
             DrawWave(mad);
-            DrawVertSpectrogram(mad);  //, VertSpectrogramStyle::RUNING);
+            DrawVertSpectrogram(mad, VertSpectrogramStyle::FIRE);  // El pintem primer ja que matxaca lo que ja existeix a _TheLeds per velocitat
             if (_pianoMode) {
               DrawPulses(mad);
             }

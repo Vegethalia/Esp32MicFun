@@ -10,19 +10,20 @@
 WiFiUDP _myUdpSendAudio;
 int16_t* _pBuffAudio2Send = nullptr;
 
-void SendAudio(MsgAudio2Draw& mad, uint16_t port) {
+bool SendAudio(MsgAudio2Draw& mad, uint16_t port) {
   const uint32_t ipAddres = 192 << 24 | 168 << 16 | 1 << 8 | 140;
   uint32_t numSamples = mad.audioLenInSamples;
+  bool sent = false;
 
   // #if defined(PANEL_SIZE_96x54)
   // 1sec of audio
-  const int16_t buffSizeAudio2Send = TARGET_SAMPLE_RATE / 4;  // 250ms of audio
+  const int16_t buffSizeAudio2Send = TARGET_SAMPLE_RATE / 32;  // 31.25ms of audio, múltiple de 12288
   static int16_t index = 0;
   if (!_pBuffAudio2Send) {
     _pBuffAudio2Send = (int16_t*)malloc(buffSizeAudio2Send * sizeof(int16_t));
     if (!_pBuffAudio2Send) {
       log_e("Error allocating memory for audio buffer");
-      return;
+      return false;
     }
   }
 
@@ -38,6 +39,7 @@ void SendAudio(MsgAudio2Draw& mad, uint16_t port) {
       // log_d("JustSent %d samples", index);
 
       _myUdpSendAudio.endPacket();
+      sent = true;
     }
     index = 0;
     memcpy(_pBuffAudio2Send, mad.pAudio, numSamples * sizeof(int16_t));
@@ -53,4 +55,5 @@ void SendAudio(MsgAudio2Draw& mad, uint16_t port) {
   //     _myUdpSendAudio.endPacket();
   //   }
   // #endif
+  return sent;
 }

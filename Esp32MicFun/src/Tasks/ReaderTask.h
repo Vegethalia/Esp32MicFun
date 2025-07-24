@@ -35,6 +35,7 @@ void vTaskReader(void* pvParameters) {
   log_d("Freqs_x_Bin=%3.2f. buffSizeTaskParams.data1=%d dataOrigBuffSize=%d", freqs_x_bin, buffSize, buffSizeOrig);
 
   memset(_TaskParams.fftMag, -100, sizeof(_TaskParams.fftMag));
+  bool bJustSent = false;
   for (;;) {
     if (xQueueReceive(_adc_i2s_event_queue, (void*)&adc_i2s_evt, (portTickType)portMAX_DELAY)) {
       if (adc_i2s_evt.type == I2S_EVENT_RX_DONE) {
@@ -56,6 +57,11 @@ void vTaskReader(void* pvParameters) {
           if (_OTA.Status() == OtaUpdater::OtaStatus::UPDATING) {
             continue;
           }
+
+          // if (bJustSent) {
+          //   bJustSent = false;
+          //   memset(dataOrig, 0, bytesRead);
+          // }
           // log_d("-----");
           // for (int iRaw = 0; iRaw < bytesRead - 12; iRaw += 12) {
           //     log_d("%2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X",
@@ -89,15 +95,20 @@ void vTaskReader(void* pvParameters) {
             // pDest[k] = 0;
             overValue = 0;
             for (uint8_t ov = 0; ov < OVERSAMPLING; ov++, byteIndex += REAL_BYTES_X_SAMPLE) {
-              int32_t fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 11;  // 11;  // 12; //>>8 to get a 24 bit value, >>4 to scale down the value to 1/8
+              //int32_t fastValue = ((int32_t*)(dataOrig + byteIndex))[0] >> 11;  // 11;  // 12; //>>8 to get a 24 bit value, >>4 to scale down the value to 1/8
               // 2024-10-04 --> >>10 en comptes de >>12 pq el so que obteniem era massa baix. Ara el volum és adecuat (però hi ha més soroll)
               // 2025-05-20 --> >>11 en comptes de >>10 pq el so que obtenim és massa alt (clipping).
+              int32_t fastValue = (*(int32_t*)(dataOrig + byteIndex)) >> 8;  // 8 bits sobren.
 
               // pDest[k] += (int16_t)(fastValue); // >> 2 to scale down the value to 1 / 4
               overValue += fastValue;
             }
             // }
-            pDest[k] = (int16_t)((overValue / OVERSAMPLING));
+            overValue = (int32_t)(overValue / OVERSAMPLING);  // >> (int32_t)5;  // treiem 2 bits(i els tornem a possar) per netejar soroll
+            int32_t resample32 = (overValue >> 4);
+            int16_t resample = (int16_t)(resample32); 
+
+            pDest[k] = resample;  // << (int16_t)6);         // ara amplifiquem una mica el senyal (ja sense soroll)
 
             // apply hann window w[n]=0.5·(1-cos(2Pi·n/N))=sin^2(Pi·n/N)
             // auto hann = 0.5f * (1 - cos((2.0f * PI * (float)k) / (float)(AUDIO_DATA_OUT)));
@@ -145,6 +156,10 @@ void vTaskReader(void* pvParameters) {
             if (superMaxMag < maxMag) {
               superMaxMag = maxMag;
               superMaxBin = maxBin;
+            }
+
+            if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
+              bJustSent = SendAudio(mad, PORT_SHAZAM_SERVICE);  // enviem aqui per que alguna cosa de sota modifica l'audio de mad.audiobuffer
             }
 
             if (!xQueueSendToBack(_xQueSendAudio2Drawer, &mad, 0)) {
