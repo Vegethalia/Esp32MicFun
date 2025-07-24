@@ -39,7 +39,9 @@ void DrawClock(
   // u8g2_font_eventhrees_tr --> guay però molt petita, 3x3
   // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
   _u8g2.clearBuffer();
+#if defined(PANEL_SIZE_96x54)
   _u8g2.setFont(u8g2_font_sisterserif_tr);  // bold and big
+#endif
   //_u8g2.setFont(u8g2_font_cu12_tr);  // u8g2_font_tom_thumb_4x6_mn);
   _u8g2.drawStr(xPos, fontHeight, theTime.c_str());
   //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
