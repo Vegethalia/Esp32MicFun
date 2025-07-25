@@ -355,7 +355,7 @@ class PanelMapping64x32 : public IPanelMapping<PANEL_WIDTH_64, PANEL_HEIGHT_32> 
 //     return j;
 //   }
 // };
-class PanelMapping96x48 : public IPanelMapping<MINI_PANELS_PER_LINE * MINI_PANEL_WIDTH, MINI_PANELS_PER_COLUMN * MINI_PANEL_HEIGHT> {
+class PanelMapping96x54 : public IPanelMapping<MINI_PANELS_PER_LINE * MINI_PANEL_WIDTH, MINI_PANELS_PER_COLUMN * MINI_PANEL_HEIGHT> {
  public:
   virtual uint16_t XY(uint16_t x, uint16_t y) override {
     // mapping created using the https://macetech.github.io/FastLED-XY-Map-Generator/
@@ -459,8 +459,12 @@ class PowerBarsPanel {
 
  public:
   PowerBarsPanel()
-      : _CurrentBaseHue(HSVHue::HUE_AQUA), _ColorScheme(COLOR_SCHEME::CS1) {};
+      : _CurrentBaseHue(HSVHue::HUE_AQUA), _ColorScheme(COLOR_SCHEME::CS1), _pTheLeds(nullptr), _pTheMapping(nullptr) {};
   virtual ~PowerBarsPanel() {};
+
+  CRGBArray<TOTAL_LEDS>* GetAuxLeds() {
+    return &_AuxLeds;
+  }
 
   // Sets the base hue for the color scheme
   void SetBaseHue(uint8_t theHue) { _CurrentBaseHue = theHue; }
@@ -483,6 +487,10 @@ class PowerBarsPanel {
     _pTheMapping = pTheMapping;
 
     return true;
+  }
+
+  void SetEventForBackgroundTasks(EventGroupHandle_t theEventGroup) {
+    _xTheEventForBackTasks = theEventGroup;
   }
 
   // Draws the n-th bar (0 based) with the value passed. Value must be scaled from 0 to PANEL_HEIGHT*10
@@ -641,31 +649,46 @@ class PowerBarsPanel {
   void PushLine(const uint8_t* pTheValues, uint16_t ignoreFromX = 10000, uint8_t ignoreToY = 0) {
     int ledDest = 0;
     uint8_t baseFade = 5;  //_pianoMode ? 1 : 5; // 5
+    int fromY = 0;
 #if defined(PANEL_SIZE_96x54)
     baseFade = 4;  // 2
+    fromY = PANEL_HEIGHT / 4;
 #endif
 
     // shift all columns to the top
-    for (int iLine = 0; iLine < PANEL_HEIGHT - 1; iLine++) {
+    for (int iLine = fromY; iLine < PANEL_HEIGHT - 1; iLine++) {
       for (int x = 0; x < PANEL_WIDTH; x++) {
         ledDest = _pTheMapping->XY(x, iLine);
 
         _AuxLeds[ledDest] = _AuxLeds[_pTheMapping->XY(x, iLine + 1)];
-        //(*_pTheLeds)[ledDest] = (*_pTheLeds)[_pTheMapping->XY(x, iLine + 1)];
         if (x < ignoreFromX || iLine >= ignoreToY) {
-          // if (iLine > 5) {
           _AuxLeds[ledDest].subtractFromRGB(baseFade);
-          // } else {
-          // (*_pTheLeds)[ledDest].subtractFromRGB(baseFade * 2);
-          // }
         } else {
           _AuxLeds[ledDest].subtractFromRGB(192);
         }
+        (*_pTheLeds)[ledDest] += _AuxLeds[ledDest];
       }
     }
     // i ara pintem la nova fila
     for (int x = 0; x < PANEL_WIDTH; x++) {
-      _AuxLeds[_pTheMapping->XY(x, PANEL_HEIGHT - 1)] = CHSV(_CurrentBaseHue, 255, pTheValues[x]);
+      ledDest = _pTheMapping->XY(x, PANEL_HEIGHT - 1);
+      CHSV pixel(_CurrentBaseHue, 255, pTheValues[x]);
+      _AuxLeds[ledDest] = pixel;
+      (*_pTheLeds)[ledDest] += pixel;
+    }
+    _SubCounter++;
+    if (_SubCounter > 4) {
+      _CurrentBaseHue++;
+      _SubCounter = 0;
+    }
+  }
+
+  /// @brief Com la funció PushLine, però amb els valors ja calculats per la funció de fire en la task VerticalFireTaskPrecalc.
+  /// @param pTheValues
+  void PushLineWithPrecalcFire(const uint8_t* pTheValues) {
+    // pintem la nova fila
+    for (int x = 0; x < PANEL_WIDTH; x++) {
+      _AuxLeds[_pTheMapping->XY(x, PANEL_HEIGHT - 1)].setHSV(_CurrentBaseHue, 255, pTheValues[x]);
     }
     _SubCounter++;
     if (_SubCounter > 4) {
@@ -676,7 +699,11 @@ class PowerBarsPanel {
     // i ara restaurem el buffer auxiliar en l'array de leds
     for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
       (*_pTheLeds)[z] += _AuxLeds[z];
+      // (*_pTheLeds)[z] += _AuxLeds[z];
     }
+
+    // indiquem a la background task que pot anar actualitzant el buffer auxiliar
+    xEventGroupSetBits(_xTheEventForBackTasks, BIT_0);
   }
 
   // Draw a portion of the contents of the u8g2 screen buffer in the led panel.
@@ -796,6 +823,8 @@ class PowerBarsPanel {
   CRGBArray<TOTAL_LEDS> _AuxLeds;                          // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
   IPanelMapping<PANEL_WIDTH, PANEL_HEIGHT>* _pTheMapping;  // The class that will provide the mapping coordinates
   Column _TheColumns[PANEL_WIDTH];
+
+  EventGroupHandle_t _xTheEventForBackTasks;
 
   COLOR_SCHEME _ColorScheme;
 

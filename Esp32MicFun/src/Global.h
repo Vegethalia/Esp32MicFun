@@ -111,11 +111,13 @@ PanelMapping64x32 _TheMapping;
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
 #define NUM_LEDS (THE_PANEL_WIDTH * THE_PANEL_HEIGHT)  //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
 
-PanelMapping96x48 _TheMapping;
+PanelMapping96x54 _TheMapping;
 #endif
-PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, THE_PANEL_HEIGHT> _ThePanel;
 
-CRGBArray<NUM_LEDS> _TheLeds;
+CRGBArray<NUM_LEDS> _TheLeds; // The FastLed object que pintarem al panell de leds.
+//CRGBArray<NUM_LEDS> _AuxLeds;  // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
+
+PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, THE_PANEL_HEIGHT> _ThePanel;
 
 OtaUpdater _OTA;
 PubSubClient _ThePubSub;
@@ -295,9 +297,11 @@ TaskHandle_t _wifiReconnectTaskHandle;
 // TaskHandle_t _refrescarConsumTaskHandle;
 TaskHandle_t _receiveIRTaskHandle;
 TaskHandle_t _resetWhenHungTaskHandle;
+TaskHandle_t _vertFireTaskHandle;
 
-QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer, _xQueSendFft2Led;
+QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer;
 uint8_t _adc_i2s_event_queue_size = 1;
+EventGroupHandle_t _xEventVertFireNewLine;
 
 volatile bool _Drawing = false;
 struct TaskParams {

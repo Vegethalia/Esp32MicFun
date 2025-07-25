@@ -160,7 +160,10 @@ void setup() {
   }
   // Create queue to communicate reader & drawer
   _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
-  _xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
+  //_xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
+  _xEventVertFireNewLine = xEventGroupCreate();
+  _ThePanel.SetEventForBackgroundTasks(_xEventVertFireNewLine);  // set the event for background tasks
+
   // start task to read samples from I2S
   xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0);  // 7000
   // xTaskCreate(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
@@ -179,6 +182,8 @@ void setup() {
   // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
   //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
   xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 2500, nullptr, 2, &_receiveIRTaskHandle, 1);
+
+  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetAuxLeds(), 2, &_vertFireTaskHandle);
 
   ////  xTaskCreatePinnedToCore(vTaskResetWhenHung, "Reset When Hung", 2048, nullptr, 2, &_resetWhenHungTaskHandle, 1);
 }
