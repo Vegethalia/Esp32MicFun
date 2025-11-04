@@ -30,7 +30,7 @@ void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = fal
 
     alreadyDrawedText = true;
   }
-  uint8_t intensity = std::max((uint8_t)(100), _1stBarValue);
+  uint8_t intensity = std::min(std::max((uint8_t)(75), _1stBarValue), (uint8_t)(200));
   bool painting = _ThePanel.DrawScreenBufferXY(_u8g2LongText.getBufferPtr(), _u8g2LongText.getBufferTileWidth(), 0, 1,
                                                textPos, CLOCK_VERT_PIXELS + vert, HSVHue::HUE_YELLOW, intensity, false, 128);
 

@@ -1,18 +1,36 @@
+#define ANAL_CLOCK_RADIUS ((THE_PANEL_HEIGHT / 2) - 1)
 
 void DrawWave(MsgAudio2Draw& mad) {
   struct WavePoint {
     uint16_t ledIndex;
-    CHSV thePixel;
+    // CHSV thePixel;
   };
-  static WavePoint _WaveBuffer[MAX_FADING_WAVES][THE_PANEL_WIDTH];  // circular buffer of waves
-  static uint8_t _LasttWaveIndex = 0;                               // index of the circular buffer, apunta a la wave que toca pintar
-  static int16_t _OffsetMv = -5;                                    // adjust wave scale so it does not appears to flat or clipping
+  // static WavePoint _WaveBuffer[MAX_FADING_WAVES][THE_PANEL_WIDTH];  // circular buffer of waves
+  static uint8_t _LasttWaveIndex = 0;  // index of the circular buffer, apunta a la wave que toca pintar
+  static int16_t _OffsetMv = -5;       // adjust wave scale so it does not appears to flat or clipping
   static auto _lastIncrease = millis();
   static uint16_t _maxValueVeryHi = 0;                // max value drawn since _lastIncrease
   static uint16_t _maxValueHi = 0;                    // max value drawn since _lastIncrease
   static int16_t _previousWave[THE_PANEL_WIDTH * 2];  // ens guardem les 2 últimes ones per a fer un promig
+  static std::vector<std::vector<WavePoint>> _WaveBuffer;
 
-  uint8_t height = _TheMapping.GetHeight() - 1;
+  if (_TheDrawStyle == DRAW_STYLE::VERT_FIRE) {
+    _FadingWaveMode = false;  // no volem fer fading en aquest mode
+  }
+
+  if (_FadingWaveMode) {
+    if (_WaveBuffer.size() != MAX_FADING_WAVES) {
+      _WaveBuffer.resize(MAX_FADING_WAVES);
+      for (uint8_t i = 0; i < MAX_FADING_WAVES; i++) {
+        _WaveBuffer[i].resize(THE_PANEL_WIDTH);
+      }
+    }
+  } else {
+    _WaveBuffer.resize(1);
+    _WaveBuffer[0].resize(THE_PANEL_WIDTH);
+  }
+
+  uint8_t height = _TheMapping.GetHeight() - 2;
   uint16_t width = _TheMapping.GetWidth();
   uint16_t i;
   int16_t value;
@@ -61,62 +79,42 @@ void DrawWave(MsgAudio2Draw& mad) {
     }
   }
 
-  CHSV myValue;
+  CHSV myValue, analClockValue;
   //, movingPoint;
   // movingPoint.setHSV(HSVHue::HUE_PURPLE, 128, 70);
   myValue.setHSV(HSVHue::HUE_PURPLE, 255, 70);
+  analClockValue = myValue;
+  analClockValue.s -= 32;
+  analClockValue.v -= 5;
 
-  uint8_t numFadingWaves = 1;  // si es canvia això, caldrà modificar el #define MAX_FADING_WAVES 1
+  uint8_t numFadingWaves = _WaveBuffer.size();  // si es canvia això, caldrà modificar el #define MAX_FADING_WAVES 1
   //    if (_TheDrawStyle != DRAW_STYLE::BARS_WITH_TOP) {
   // numFadingWaves = 2;
   myValue.setHSV(HSVHue::HUE_AQUA, 128, 70);
+
   //    }
   int16_t numValuesHi = 0;
   int16_t numValuesVeryHi = 0;
   for (i = 0; i < width; i += _WaveDrawEvery) {
-    // #if defined(PANEL_SIZE_96x54)
-    //     value = mad.pAudio[pas0 + i];
-    //     // value += mad.pAudio[pas0 + (i * 3) + 2];
-    //     // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));
-    //     // value = mad.pAudio[pas0 + i];
-    //     // value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
-    //     value = map(value, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE), 0, height);
-    //     // if (value > height / 2) {
-    //     //     sumValues += value;
-    //     //     numValues++;
-    //     // };
-    // #elif
     value = mad.pAudio[pas0 + (i * 2)];
     value += mad.pAudio[pas0 + (i * 2) + 1];
-    // value += mad.pAudio[pas0 + (i * 3) + 2];
-    // value = constrain(value / 3, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv));
-    // value = mad.pAudio[pas0 + i];
-    // value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE - _OffsetMv), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE - _OffsetMv), 0, height);
     value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE), 0, height);
-    // if (value > height / 2) {
-    //     sumValues += value;
-    //     numValues++;
-    // };
-    // #endif
-    int16_t newValue = value;
-    value = (_previousWave[i] + _previousWave[i + width] + value) / 3;
-    _previousWave[i] = _previousWave[i + width];
-    _previousWave[i + width] = newValue;
+
+    if (!_FadingWaveMode) {
+      int16_t newValue = value;
+      value = (_previousWave[i] + _previousWave[i + width] + value) / 3;
+      _previousWave[i] = _previousWave[i + width];
+      _previousWave[i + width] = newValue;
+    }
     if (value >= height - 4) {
       numValuesVeryHi++;
     } else if (value >= height - 8) {
       numValuesHi++;
     }
 
-    // value = min((int16_t)max(value, (int16_t)0), (int16_t)height);
     _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
-    _WaveBuffer[_LasttWaveIndex][i].thePixel = myValue;
-    // if (_TheFrameNumber % width == i) {
-    //     _WaveBuffer[_LasttWaveIndex][i].thePixel = movingPoint;
-    // }
     for (byte j = 1; j < _WaveDrawEvery; j++) {
       _WaveBuffer[_LasttWaveIndex][i + j].ledIndex = _TheMapping.XY(i + j, value);
-      _WaveBuffer[_LasttWaveIndex][i + j].thePixel.v = 0;
     }
   }
   if (numValuesHi > _maxValueHi) {
@@ -125,10 +123,6 @@ void DrawWave(MsgAudio2Draw& mad) {
   if (numValuesVeryHi > _maxValueVeryHi) {
     _maxValueVeryHi = numValuesVeryHi;
   }
-  // sumValues = sumValues / numValues;
-  // if (sumValues > _maxValue) {
-  //     _maxValue = sumValues;
-  // }
 
   if ((millis() - _lastIncrease) > (15 * 1000)) {
     if (_maxValueVeryHi > (THE_PANEL_WIDTH / 6) && _OffsetMv > (-(MAX_SCALE - 1))) {
@@ -147,29 +141,57 @@ void DrawWave(MsgAudio2Draw& mad) {
     _lastIncrease = millis();
   }
 
-  if (numFadingWaves > 1) {  // fem desapareixer la 1era wave, que serà la última ara
-    // pintem les n waves anteriors
+  if (!_FadingWaveMode) {
+    // ara pintem l'única wave
+    if (_TheDrawStyle == DRAW_STYLE::ANALOG_CLOCK) {  // pintem el centre amb un color diferent
+      for (i = 0; i < (width / 2) - ANAL_CLOCK_RADIUS; i++) {
+        _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = myValue;  // _WaveBuffer[_LasttWaveIndex][i].thePixel;
+      }
+      for (i = (width / 2) - ANAL_CLOCK_RADIUS; i < (width / 2) + ANAL_CLOCK_RADIUS; i++) {
+        _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = analClockValue;  // _WaveBuffer[_LasttWaveIndex][i].thePixel;
+      }
+      for (i = (width / 2) + ANAL_CLOCK_RADIUS; i < width; i++) {
+        _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = myValue;  // _WaveBuffer[_LasttWaveIndex][i].thePixel;
+      }
+    } else {
+      for (i = 0; i < width; i++) {
+        _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = myValue;  // _WaveBuffer[_LasttWaveIndex][i].thePixel;
+      }
+    }
+  } else {
+    CHSV myValue2 = myValue;
+    myValue2.v = 20;
+    myValue2.s = 0;
+    // myValue2.h -= 10;
+    CRGB myValueRGB = myValue2;
+    uint8_t basicLuma = myValueRGB.getLuma() - 1;
+    // myValue2.v = 5;
     for (uint8_t numWave = 1; numWave < numFadingWaves; numWave++) {
       uint8_t currentWaveIndex = (_LasttWaveIndex + numWave) % numFadingWaves;
       for (i = 0; i < width; i++) {
-        CHSV currColor = _WaveBuffer[currentWaveIndex][i].thePixel;
-        // currColor.v = currColor.v / (numWave + 1);
-        // currColor.s = currColor.s / 2;
-        currColor.h = HSVHue::HUE_GREEN;
-        // currColor.h + (15 * numWave);
-        // currColor.v = currColor.v / (numWave + 1);
-        _TheLeds[_WaveBuffer[currentWaveIndex][i].ledIndex] = currColor;
+        uint16_t ledIndex = _WaveBuffer[currentWaveIndex][i].ledIndex;
+
+        _TheLeds[ledIndex] = myValue2;  // _WaveBuffer[currentWaveIndex][i].thePixel;
+
+        // if (_TheLeds[ledIndex].getLuma() < basicLuma) {
+        //   _TheLeds[ledIndex] = myValue2;
+        // } else {
+        //   _TheLeds[ledIndex] += myValue2;  // _WaveBuffer[currentWaveIndex][i].thePixel;
+        // }
       }
+      myValue2.v += 3;  //= 5;
+      myValue2.s += 8;
+      // myValue2.h += 20;
     }
-  }
-  // ara pintem l'última (o l'única)
-  for (i = 0; i < width; i++) {
-    _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = _WaveBuffer[_LasttWaveIndex][i].thePixel;
+    // ara pintem l'última
+    myValue.v = 80;
+    myValue.s = 160;
+    for (i = 0; i < width; i++) {
+      _TheLeds[_WaveBuffer[_LasttWaveIndex][i].ledIndex] = myValue;
+    }
   }
 
   if (numFadingWaves > 1) {  // fem desapareixer la 1era wave, que serà la última ara
     _LasttWaveIndex = (_LasttWaveIndex + 1) % numFadingWaves;
   }
-
-  //_ThePanel.IncBaseHue();
 }

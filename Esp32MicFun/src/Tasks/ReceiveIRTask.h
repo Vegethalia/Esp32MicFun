@@ -231,7 +231,7 @@ void vTaskReceiveIR(void* pvParameters) {
           ChangeDrawStyle(DRAW_STYLE::MATRIX_FFT);
           break;
         case IR_KEY_EFFECT6:
-          ChangeDrawStyle(DRAW_STYLE::DISCO_LIGTHS);
+          ChangeDrawStyle(DRAW_STYLE::DISCO_LIGHTS);
           break;
         case IR_KEY_JUMP1:
           _pianoMode = true;

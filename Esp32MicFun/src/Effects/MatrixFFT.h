@@ -15,7 +15,7 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
         for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
             auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
             value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
-            if (value < 3) { // black? el fem transparent :)
+            if (value < 5) { // black? el fem transparent :)
                 continue;
             }
 

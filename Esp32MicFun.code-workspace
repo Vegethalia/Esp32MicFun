@@ -30,6 +30,12 @@
 		{
 			"name": "TempUploader",
 			"path": "../TempUploader"
+		},
+		{
+			"path": "../Robotet"
+		},
+		{
+			"path": "../FunWith_XiaoEsp32S3"
 		}
 	],
 	"settings": {

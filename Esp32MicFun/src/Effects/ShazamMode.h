@@ -32,13 +32,6 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
     }
 
     // pintem k'icona de "ShazamMode"
-    // imaginem que es fa una petició a shazam cada 300s.
-    // Per tant si pintem 4 pixels, apaguem 1 cada 75s i quan s'apaguen tots, en teoria tindrem refresh de cançó
-    // int numPixels = 4 - min(timeSinceLastDetection / 75000, (uint32_t)4);
-    // if (numPixels == 0) {
-    //   numPixels = 1;  // al menys un pixel....
-    // }
-    // //    if (_numFrames % 5 == 0) {
     _intensity += _inc;
 
     if (_intensity > 128) {

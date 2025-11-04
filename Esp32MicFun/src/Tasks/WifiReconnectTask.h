@@ -109,22 +109,46 @@ void vTaskWifiReconnect(void* pvParameters) {
   }
 }
 
+// NTP servers
+const char* _ntpServer1 = "pool.ntp.org";
+const char* _ntpServer2 = "time.google.com";
+const char* _ntpServer3 = "time.nist.gov";
+
+// TZ per a Espanya peninsular i Balears:
+// CET-1 (UTC+1) + CEST (DST) amb transicions:
+// - M3.5.0/2  = últim diumenge de març a les 02:00
+// - M10.5.0/3 = últim diumenge d’octubre a les 03:00
+const char* _TZ_CATALUNYA = "CET-1CEST,M3.5.0/2,M10.5.0/3";
+
 void ConfigureNTP() {
   time_t now;
   struct tm timeinfo;
-  time(&now);
-  localtime_r(&now, &timeinfo);
+
+  // Estableix la zona horària POSIX (activa canvi automàtic d’estiu/hivern)
+  setenv("TZ", _TZ_CATALUNYA, 1);
+  tzset();
+
+  // time(&now);
+  // localtime_r(&now, &timeinfo);
+
   // Is time set? If not, tm_year will be (1970 - 1900).
   //    if (timeinfo.tm_year < (2020 - 1900)) {
   //        log_i("Time is not set yet. Connecting to WiFi and getting time over NTP.");
-  if (WiFi.isConnected()) {                    // if its not connected, the ntp server might crash (bug, probably solved already)
-    if (_DaylightSaving) {                     // estiu
-      configTime(3600, 3600, "pool.ntp.org");  // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
-    } else {                                   // hivern
-      configTime(3600, 0, "pool.ntp.org");     // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
-    }
+  if (WiFi.isConnected()) {  // if its not connected, the ntp server might crash (bug, probably solved already)
+                             // if (_DaylightSaving) {                     // estiu
+                             //   configTime(3600, 3600, "pool.ntp.org");  // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+                             // } else {                                   // hivern
+                             //   configTime(3600, 0, "pool.ntp.org");     // 3600, 0 --> horari hivern  3600, 3600 --> horari estiu
+                             // }
+                             // Demana hora al NTP(no apliquem offsets aquí; ja ho fa la TZ)
+    configTime(0, 0, _ntpServer1, _ntpServer2, _ntpServer3);
+
     sntp_set_sync_interval(60000);
     sntp_restart();
+    sleep(1);  // wait a bit to let sntp get the time
+
+    setenv("TZ", _TZ_CATALUNYA, 1);
+    tzset();
   }
   // update 'now' variable with current time
   time(&now);
@@ -181,6 +205,9 @@ void Connect2MQTT() {
       }
       if (!_ThePubSub.subscribe(TOPIC_DEBUG_MODE)) {
         //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_DEBUG_MODE);
+      }
+      if (!_ThePubSub.subscribe(TOPIC_FADINGWAVE_MODE)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_FADINGWAVE_MODE);
       }
     }
   }
@@ -405,6 +432,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     DecodeThumbnail(pData, dataLenght);
     if (_TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
       _ThumbnailPrevStyle = _TheDrawStyle;         // remember the style when the thumbnail was received
+      _ThumbnailPrevIntensity = _MAX_MILLIS;       // remember the intensity when the thumbnail was received
       _TheDrawStyle = DRAW_STYLE::DRAW_THUMBNAIL;  // force the thumbnail to be drawn
     }
     _TimeThumbnailReceived = millis();
@@ -434,6 +462,12 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     } else {
       SendDebugMessage("Debug Mode OFF!!");
       _DebugMode = newMode;
+    }
+  } else if (theTopic.find(TOPIC_FADINGWAVE_MODE) != std::string::npos) {
+    auto newMode = std::atoi(theMsg.c_str()) != 0;
+    if (newMode != _FadingWaveMode) {
+      _FadingWaveMode = newMode;
+      SendDebugMessage(Utils::string_format("Fading Wave Mode %s!!", _FadingWaveMode ? "ON" : "OFF").c_str());
     }
   } else {
     log_w("Unknown topic [%s] with message [%s]", theTopic.c_str(), theMsg.c_str());

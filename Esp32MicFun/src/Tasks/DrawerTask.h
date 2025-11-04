@@ -140,7 +140,7 @@ void vTaskDrawer(void* pvParameters) {
             DrawMatrixFFT(mad);
             DrawClock();
             break;
-          case DRAW_STYLE::DISCO_LIGTHS:
+          case DRAW_STYLE::DISCO_LIGHTS:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
             FastLED.clear();
 #if defined(PANEL_SIZE_96x54)
@@ -161,6 +161,12 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::DRAW_THUMBNAIL:
             FastLED.clear();
             DrawThumbnail();
+            break;
+          case DRAW_STYLE::ANALOG_CLOCK:
+            FastLED.clear();
+            DrawWave(mad);
+            // DrawMatrixFFT(mad);
+            DrawAnalogClock(mad);
             break;
         }
       }

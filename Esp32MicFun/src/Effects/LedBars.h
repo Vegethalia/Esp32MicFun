@@ -10,13 +10,13 @@ void DrawLedBars(MsgAudio2Draw& mad) {
 #endif
   uint16_t maxHeightScaled = (maxHeight * 10) + 9;
   // static uint8_t __binGrouping = 4;  // group bins every this number
-  static ALTERDRAW __alterDraw = ALTERDRAW::ODD;
+  // static ALTERDRAW __alterDraw = ALTERDRAW::ODD;
 
   if (_TheLastKey != GEN_KEY_PRESS::KEY_NONE) {
     if (_TheLastKey == GEN_KEY_PRESS::KEY_INC1) {
-      __alterDraw = (((uint8_t)__alterDraw < 2) ? (ALTERDRAW)(__alterDraw + 1) : ALTERDRAW::NO_ALTER);
+      _barAlterDraw = (((uint8_t)_barAlterDraw < 2) ? (ALTERDRAW)(_barAlterDraw + 1) : ALTERDRAW::NO_ALTER);
     } else if (_TheLastKey == GEN_KEY_PRESS::KEY_DEC1) {
-      __alterDraw = (((uint8_t)__alterDraw > 0) ? (ALTERDRAW)(__alterDraw - 1) : ALTERDRAW::ALTERNATE);
+      _barAlterDraw = (((uint8_t)_barAlterDraw > 0) ? (ALTERDRAW)(_barAlterDraw - 1) : ALTERDRAW::ALTERNATE);
     } else if (_TheLastKey == GEN_KEY_PRESS::KEY_DEC2 && _binGrouping > 1) {
       _binGrouping--;
     } else if (_TheLastKey == GEN_KEY_PRESS::KEY_INC2 && _binGrouping < 8) {
@@ -67,7 +67,7 @@ void DrawLedBars(MsgAudio2Draw& mad) {
       value = avg / _binGrouping;
       for (uint8_t j = 0; j < _binGrouping - _barSpacing; j++) {
         // _ThePanel.DrawBar(i + j - __binGrouping, max, false, __alterDraw);  // j%2==0?false:true);
-        _ThePanel.DrawBar(i + j, max, false, __alterDraw);  // j%2==0?false:true);
+        _ThePanel.DrawBar(i + j, max, false, _barAlterDraw);  // j%2==0?false:true);
       }
       // i += __binGrouping;
     } else {

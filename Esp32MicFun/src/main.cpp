@@ -197,27 +197,48 @@ void setup() {
 // END PLAY WITH MATRIX
 
 constexpr uint32_t ONE_HOUR_IN_MILLIS = 60 * 60 * 1000;
+constexpr uint32_t HALF_HOUR_IN_MILLIS = 30 * 60 * 1000;
 void loop() {
-  if (millis() - _DesiredHueLastSet > ONE_HOUR_IN_MILLIS) {
+  if (millis() - _DesiredHueLastSet > HALF_HOUR_IN_MILLIS) {
     _DesiredHueLastSet = millis();
-    _TheDesiredHue = _TheFrameNumber % 256;  // random8(); //randomize hue every hour
-    UpdatePref(Prefs::PR_CUSTOM_HUE);
-    log_d("Randomized Hue=%d", _TheDesiredHue);
-    SendDebugMessage(Utils::string_format("Randomized Hue=%d", _TheDesiredHue).c_str());
-    _binGrouping = (_TheFrameNumber % 5) + 2;  // randomize binGrouping every hour
-    log_d("Randomized binGrouping=%d", _binGrouping);
-    SendDebugMessage(Utils::string_format("Randomized binGrouping=%d", _binGrouping).c_str());
-    _barSpacing = (_TheFrameNumber % (_binGrouping - 1)) + 1;  // randomize barSpacing every hour
-    log_d("Randomized barSpacing=%d", _barSpacing);
-    SendDebugMessage(Utils::string_format("Randomized barSpacing=%d", _barSpacing).c_str());
-    if (_TheDrawStyle != DRAW_STYLE::CALC_MODE) {
-      auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::DISCO_LIGTHS)) + 1);  // randomize style every hour
-      if (newStyle == DRAW_STYLE::HORIZ_FIRE) {
-        newStyle = DRAW_STYLE::BARS_WITH_TOP;  // avoid audiostreamer mode
+
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+    if (timeinfo.tm_hour >= 21 && timeinfo.tm_min >= 30 && !_NightMode) {
+      SetNightMode(true);  // set night mode on
+      SendDebugMessage("Night mode ON");
+    } else if (timeinfo.tm_hour >= 6 && timeinfo.tm_hour < 21 && _NightMode) {
+      SetNightMode(false);  // set night mode off
+      SendDebugMessage("Night mode OFF");
+    } else if (!_NightMode) {
+      _TheDesiredHue = _TheFrameNumber % 255;  // random8(); //randomize hue every hour
+      UpdatePref(Prefs::PR_CUSTOM_HUE);
+      log_d("Randomized Hue=%d", _TheDesiredHue);
+      SendDebugMessage(Utils::string_format("Randomized Hue=%d", _TheDesiredHue).c_str());
+      _binGrouping = (_TheFrameNumber % 5) + 2;  // randomize binGrouping every hour
+      log_d("Randomized binGrouping=%d", _binGrouping);
+      SendDebugMessage(Utils::string_format("Randomized binGrouping=%d", _binGrouping).c_str());
+      _barSpacing = (_TheFrameNumber % (_binGrouping - 1)) + 1;  // randomize barSpacing every hour
+      log_d("Randomized barSpacing=%d", _barSpacing);
+      SendDebugMessage(Utils::string_format("Randomized barSpacing=%d", _barSpacing).c_str());
+      _barAlterDraw = (ALTERDRAW)((_TheFrameNumber % 2) + 1);  // randomize barAlterDraw every hour
+      log_d("Randomized barAlterDraw=%d", (int)_barAlterDraw);
+      SendDebugMessage(Utils::string_format("Randomized barAlterDraw=%d", (int)_barAlterDraw).c_str());
+
+      if (_TheDrawStyle != DRAW_STYLE::CALC_MODE) {
+        auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::ANALOG_CLOCK)) + 1);  // randomize style every hour
+        if (newStyle == DRAW_STYLE::HORIZ_FIRE) {
+          newStyle = DRAW_STYLE::BARS_WITH_TOP;  // avoid audiostreamer mode
+        }
+        log_d("Randomized DrawStyle=%d", (int)newStyle);
+        SendDebugMessage(Utils::string_format("Randomized DrawStyle=%d", (int)newStyle).c_str());
+        ChangeDrawStyle(newStyle, false);
       }
-      log_d("Randomized DrawStyle=%d", (int)newStyle);
-      SendDebugMessage(Utils::string_format("Randomized DrawStyle=%d", (int)newStyle).c_str());
-      ChangeDrawStyle(newStyle, false);
+#if defined(PANEL_SIZE_96x54)
+      _FadingWaveMode = _TheFrameNumber % 2 == 0;
+      log_d("Randomized FadingWaveMode=%d", _FadingWaveMode ? 1 : 0);
+      SendDebugMessage(Utils::string_format("Randomized FadingWaveMode=%d", _FadingWaveMode ? 1 : 0).c_str());
+#endif
     }
   }
   delay(10000);
@@ -264,9 +285,15 @@ void SetNightMode(bool nightOn) {
   if (nightOn) {
     _MAX_MILLIS = NIGHT_MILLIS;
     _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+    _barAlterDraw = ALTERDRAW::ODD;
+    _FadingWaveMode = false;  // no volem fer fading en aquest mode
+    _barSpacing = 4;
+    _binGrouping = 5;
+    _ShazamSongs = false;  // no volem detectar cançons en mode nit
   } else if (!nightOn) {
     _MAX_MILLIS = DEFAULT_MILLIS;
     _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+    _ShazamSongs = true;  // volem detectar cançons en mode dia
   }
   FastLED.setBrightness(_MAX_MILLIS);
 }

@@ -146,7 +146,7 @@ void vTaskReader(void* pvParameters) {
             }
 #endif
 
-            if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT || _TheDrawStyle == DRAW_STYLE::DISCO_LIGTHS) {
+            if (_TheDrawStyle == DRAW_STYLE::MATRIX_FFT || _TheDrawStyle == DRAW_STYLE::DISCO_LIGHTS) {
               mode = FftPower::BinResolution::MATRIX;
             }
             int32_t maxMag = -1000;

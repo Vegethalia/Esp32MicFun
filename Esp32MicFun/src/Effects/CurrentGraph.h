@@ -4,6 +4,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
   uint8_t everyKwh = GetPixelsPerKwh(maxV);
   static bool published = false;
   static uint8_t _incBoleta = 0;
+  static time_t _lastScaleChange = 0;
 
   if (!published) {
     SendDebugMessage(Utils::string_format("maxV=%d, every=%d", maxV, everyKwh).c_str());
@@ -101,17 +102,26 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
     // uint8_t fiufiu = (uint8_t)(_TheFrameNumber % (THE_PANEL_WIDTH - 1));
     // mapValue = map(_pLectures[fiufiu].valorEnLeds, 0, _MapMaxWhToPixels, 0, maxV);
     // _TheLeds[_TheMapping.XY(fiufiu + 1, THE_PANEL_HEIGHT - 2 - mapValue)] += CHSV(HSVHue::HUE_YELLOW, 255, 200);
+    auto lastScaleChange = millis() - _lastScaleChange;
 #if defined(PANEL_SIZE_96x54)
-    if (maxValue < 20 && _MapMaxWhToPixels > 1500) {
-      _MapMaxWhToPixels -= 500;
-    } else if (maxValue > 30 && _MapMaxWhToPixels < 6000) {
-      _MapMaxWhToPixels += 500;
+    if (lastScaleChange > 30000) {
+      if (maxValue < 20 && _MapMaxWhToPixels > 1500) {
+        _MapMaxWhToPixels -= 500;
+        _lastScaleChange = millis();
+      } else if (maxValue > 30 && _MapMaxWhToPixels < 6000) {
+        _MapMaxWhToPixels += 500;
+        _lastScaleChange = millis();
+      }
     }
 #else
-    if (maxValue < 14 && _MapMaxWhToPixels > 1500) {
-      _MapMaxWhToPixels -= 500;
-    } else if (maxValue >= 18 && _MapMaxWhToPixels < 6000) {
-      _MapMaxWhToPixels += 500;
+    if (lastScaleChange > 30000) {
+      if (maxValue < 14 && _MapMaxWhToPixels > 1500) {
+        _MapMaxWhToPixels -= 500;
+        _lastScaleChange = millis();
+      } else if (maxValue >= 18 && _MapMaxWhToPixels < 6000) {
+        _MapMaxWhToPixels += 500;
+        _lastScaleChange = millis();
+      }
     }
 #endif
   }

@@ -84,18 +84,18 @@ U8G2_SSD1306_2040X16_2_2ND_4W_HW_SPI _u8g2LongText(U8G2_R0, PIN_I2C_SCL, PIN_I2C
 // #define BARS_RESOLUTION 8 // 8=32 4=64 2=128
 //  #define BARS_RESOLUTION 4 // 8=32 4=64 2=128
 
-#define DEFAULT_MILLIS 40
 #define MAX_MILLIS 4000
 #define NIGHT_MILLIS 4
-uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 
-#define MAX_FADING_WAVES 1  // 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
+#define MAX_FADING_WAVES 15  // 2 // number of waves maintained "alive". Every frame will paint the previous NUM_FADING_WAVES (darker) before painting the latest in front of the rest
 
 // PanelMapping33x16 _TheMapping;
 // PanelMapping64x8 _TheMapping;
 // PanelMapping64x16 _TheMapping;
 // PanelMapping64x24 _TheMapping;
 #if defined(PANEL_SIZE_64x32)
+#define DEFAULT_MILLIS 40
+#define THUMBNAIL_MILLIS 35
 // #define BAR_HEIGHT (PANEL_HEIGHT_16 - 1) // we have this amount of "vertical leds" per bar. 0 based.
 // #define THE_PANEL_WIDTH PANEL_WIDTH_33
 // #define NUM_LEDS (THE_PANEL_WIDTH * PANEL_HEIGHT_16) //(VISUALIZATION==FftPower::AUTO34?33:(AUDIO_DATA_OUT/BARS_RESOLUTION)) //198//32
@@ -106,6 +106,8 @@ uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 PanelMapping64x32 _TheMapping;
 
 #elif defined(PANEL_SIZE_96x54)
+#define DEFAULT_MILLIS 60
+#define THUMBNAIL_MILLIS 40
 #define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
@@ -114,8 +116,9 @@ PanelMapping64x32 _TheMapping;
 PanelMapping96x54 _TheMapping;
 #endif
 
-CRGBArray<NUM_LEDS> _TheLeds; // The FastLed object que pintarem al panell de leds.
-//CRGBArray<NUM_LEDS> _AuxLeds;  // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
+uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
+CRGBArray<NUM_LEDS> _TheLeds;  // The FastLed object que pintarem al panell de leds.
+// CRGBArray<NUM_LEDS> _AuxLeds;  // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
 
 PowerBarsPanel<NUM_LEDS, THE_PANEL_WIDTH, THE_PANEL_HEIGHT> _ThePanel;
 
@@ -147,6 +150,7 @@ bool _DisplayAsapIndicator = false;   // true if we are displaying the ASAP indi
 bool _SongDesconeguda = false;        // true if we are displaying the "Desconeguda" song name1
 uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was requested.
 bool _DebugMode = false;              // true if we want to send debug information via MQTT
+bool _FadingWaveMode = false;         // true if we want to display the fading wave effect
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
@@ -175,6 +179,7 @@ bool _DebugMode = false;              // true if we want to send debug informati
 #define TOPIC_SHAZAM_MODE "caseta/spectrometre/shazammode"
 #define TOPIC_PIANO_MODE "caseta/spectrometre/pianomode"
 #define TOPIC_DEBUG_MODE "caseta/spectrometre/debugmode"
+#define TOPIC_FADINGWAVE_MODE "caseta/spectrometre/fadingwavemode"
 #define TOPIC_REPEAT_THUMBNAIL "caseta/spectrometre/repeat"
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
@@ -209,6 +214,7 @@ bool _DebugMode = false;              // true if we want to send debug informati
 #define TOPIC_SHAZAM_MODE "caseta/spectrometreBig/shazammode"
 #define TOPIC_PIANO_MODE "caseta/spectrometreBig/pianomode"
 #define TOPIC_DEBUG_MODE "caseta/spectrometreBig/debugmode"
+#define TOPIC_FADINGWAVE_MODE "caseta/spectrometreBig/fadingwavemode"
 #define TOPIC_REPEAT_THUMBNAIL "caseta/spectrometreBig/repeat"
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
@@ -332,18 +338,20 @@ enum DRAW_STYLE {
   HORIZ_FIRE = 3,
   VISUAL_CURRENT = 4,
   MATRIX_FFT = 5,
-  DISCO_LIGTHS = 6,
-  DRAW_THUMBNAIL = 7,
-  CALC_MODE = 8,
+  DISCO_LIGHTS = 6,
+  ANALOG_CLOCK = 7,
+  DRAW_THUMBNAIL = 8,
+  CALC_MODE = 9,
 
   MAX_STYLE = CALC_MODE,
   DEFAULT_STYLE = BARS_WITH_TOP
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
-int16_t _TheDesiredHue = -1;      // el custom color a aplicar. -1 -> color per defecte.
-uint32_t _DesiredHueLastSet = 0;  // last time the desired hue was set. Es randomitzarà el color quan passi una hora des de l'últim canvi de color
-uint8_t _binGrouping = 4;         // per les LedBars, cada __binGrouping bins es pintara un sol bar. Per exemple, si __binGrouping=4, i tenim 32 bins, es pintaran 8 bars.
-uint8_t _barSpacing = 1;          // espai entre els bars. Per defecte 1 pixel. Si es posa a 0, no hi ha espai entre els bars
+int16_t _TheDesiredHue = -1;               // el custom color a aplicar. -1 -> color per defecte.
+uint32_t _DesiredHueLastSet = 0;           // last time the desired hue was set. Es randomitzarà el color quan passi una hora des de l'últim canvi de color
+uint8_t _binGrouping = 4;                  // per les LedBars, cada __binGrouping bins es pintara un sol bar. Per exemple, si __binGrouping=4, i tenim 32 bins, es pintaran 8 bars.
+uint8_t _barSpacing = 1;                   // espai entre els bars. Per defecte 1 pixel. Si es posa a 0, no hi ha espai entre els bars
+ALTERDRAW _barAlterDraw = ALTERDRAW::ODD;  // per pintar nomes algunes línies de les bars. Per defecte ODD.
 
 uint8_t _1stBarValue = 128;
 
@@ -407,10 +415,11 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 #define THUMBNAIL_HEIGHT 32
 #define THUMBNAIL_WIDTH 52
 #endif
-std::vector<CRGB> _ThumbnailImg;      // vector of CRGB to store the thumbnail image
-bool _ThumbnailReady = false;         // true if the thumbnail image is ready to be displayed
-DRAW_STYLE _ThumbnailPrevStyle;       // style that was in place before displaying the thumbnail
-uint32_t _TimeThumbnailReceived = 0;  // time when the thumbnail was received
+std::vector<CRGB> _ThumbnailImg;                   // vector of CRGB to store the thumbnail image
+bool _ThumbnailReady = false;                      // true if the thumbnail image is ready to be displayed
+DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
+uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received
+uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in place before displaying the thumbnail
 
 void SendDebugMessage(const char* msg) {
   if (_DebugMode && _ThePubSub.connected()) {

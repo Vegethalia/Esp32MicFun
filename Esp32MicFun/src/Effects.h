@@ -5,6 +5,7 @@
 #include "Effects/Clock.h"
 
 // include after utils and clock
+#include "Effects/AnalogClock.h"
 #include "Effects/CalcMode.h"
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
@@ -27,7 +28,7 @@
 
 // uint8_t thisSpeed = 3;
 // uint8_t initial = 1;
-//int _delayFrame = 100;
+// int _delayFrame = 100;
 
 // void DrawParametricHardcoded()
 // {

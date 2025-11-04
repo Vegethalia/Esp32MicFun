@@ -7,12 +7,16 @@ void DrawThumbnail() {
     return;
   }
   if (millis() - _TimeThumbnailReceived > 20000) {
+    FastLED.setBrightness(_ThumbnailPrevIntensity);  // restore brightness
     _TheDrawStyle = _ThumbnailPrevStyle;  // return to previous style after 10 seconds
     log_w("Thumbnail expired. Returning to previous style [%d]", (int)_TheDrawStyle);
     return;
   }
 
+  // Draw the thumbnail
+  FastLED.setBrightness(THUMBNAIL_MILLIS);
   // Draw the thumbnail image
+
   uint8_t startX = (THE_PANEL_WIDTH - THUMBNAIL_WIDTH) / 2;  // center the thumbnail horizontally
   uint16_t k = 0;                                            // THUMBNAIL_WIDTH;// index for the thumbnail image. Ens saltem la 1era línia, no sé pq te soroll....
   for (uint8_t j = 0; j < THUMBNAIL_HEIGHT; j++) {           // ens saltem la primera fila. No se pq te soroll....
