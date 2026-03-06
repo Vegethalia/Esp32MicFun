@@ -69,6 +69,7 @@ void vTaskDrawer(void* pvParameters) {
       _Drawing = true;
       ProcessPendingStyleChanges();
       _TheFrameNumber++;
+      bool refreshClockText = (_TheFrameNumber % 3) == 0;
 
       // Calculate max BASS power among first bars
       /*_1stBarValue = 0;
@@ -110,7 +111,7 @@ void vTaskDrawer(void* pvParameters) {
             FastLED.clear();
             DrawWave(mad);
             DrawLedBars(mad);
-            DrawClock();
+            DrawClock(refreshClockText);
             break;
           case DRAW_STYLE::VERT_FIRE:
             FastLED.clear();
@@ -119,7 +120,7 @@ void vTaskDrawer(void* pvParameters) {
             if (_pianoMode) {
               DrawPulses(mad);
             }
-            DrawClock();
+            DrawClock(refreshClockText);
             break;
           case DRAW_STYLE::HORIZ_FIRE:
             DrawHorizSpectrogram(mad);
@@ -132,14 +133,14 @@ void vTaskDrawer(void* pvParameters) {
             FastLED.clear();
             DrawWave(mad);
             DrawCurrentGraph(mad);
-            DrawClock();
+            DrawClock(refreshClockText);
             break;
           case DRAW_STYLE::MATRIX_FFT:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
             FastLED.clear();
             DrawWave(mad);
             DrawMatrixFFT(mad);
-            DrawClock();
+            DrawClock(refreshClockText);
             break;
           case DRAW_STYLE::DISCO_LIGHTS:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
@@ -149,7 +150,7 @@ void vTaskDrawer(void* pvParameters) {
 #endif
             DrawMatrixFFT(mad);
             DrawDiscoLights(mad);
-            DrawClock();
+            DrawClock(refreshClockText);
             break;
           case DRAW_STYLE::CALC_MODE:
             FastLED.clear();
