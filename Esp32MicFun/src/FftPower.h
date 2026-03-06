@@ -53,6 +53,11 @@ class FftPower {
   // Returns the bin index with the higher power
   void GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t maxFftMagnitude, BinResolution binRes, uint16_t& maxBin, int32_t& maxMag);
 
+#ifdef UNIT_TEST
+  void ClearOutputForTest();
+  void SetOutputBinForTest(uint16_t bin, float real, float imag);
+#endif
+
  private:
   fft_config_t* _pRealFftPlan;
   // we use 2 sample buffer to make the copy of the new samples + hanning easier

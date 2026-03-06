@@ -22,6 +22,33 @@ float q_rsqrt(float number) {
   return y;
 }
 
+namespace {
+constexpr float MIN_MAGNITUDE_RATIO = 1e-12f;
+
+inline float MagnitudeFromSquared(float squaredMagnitude) {
+  if (squaredMagnitude <= 0.0f) {
+    return 0.0f;
+  }
+  return 1.0f / q_rsqrt(squaredMagnitude);
+}
+
+inline float MagnitudeFromComplex(float real, float imag) {
+  return MagnitudeFromSquared((real * real) + (imag * imag));
+}
+
+inline int8_t MagnitudeToDb(float magnitude, uint32_t maxFftMagnitude) {
+  float referenceMagnitude = maxFftMagnitude > 0 ? (float)maxFftMagnitude : 1.0f;
+  if (magnitude > referenceMagnitude) {
+    magnitude = referenceMagnitude;
+  }
+  float ratio = magnitude / referenceMagnitude;
+  if (ratio < MIN_MAGNITUDE_RATIO) {
+    ratio = MIN_MAGNITUDE_RATIO;
+  }
+  return (int8_t)(20.0f * log10f(ratio));
+}
+}  // namespace
+
 FftPower::FftPower(uint16_t numSamples, uint16_t calculateEverySamples) {
   _buffPos = 0;
   _samplesSinceLastExecution = 0;
@@ -140,64 +167,55 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
   maxMag = -10000;
   pFreqPower[0] = -100;  // dc is not calculated
 
-  if (binRes == BinResolution::AUTO34) {  // binRes==BinResolution::AUTO32
+  if (binRes == FftPower::AUTO34) {  // binRes==BinResolution::AUTO32
     uint16_t ind = 1;
-    int32_t mag = 0;
     const uint8_t* pBinIndexes = _Auto33Groups_v4;  //_Auto32Groups;
-    uint8_t currInd = 0, upToInd = 0;
-    maxIndex = 32;
-
-    if (binRes == BinResolution::AUTO34) {
-      maxIndex = 34;
-      pBinIndexes = _Auto33Groups_v4;
-    }
+    maxIndex = 34;
     // else {
     //     maxIndex = 32;
     //     pBinIndexes = _Auto32Groups;
     // }
-    currInd = pBinIndexes[0];
-    do {
-      pFreqPower[0] = 0;
-      // log_d("Bucle %d", ind);
-      // upToInd = pBinIndexes[currInd];
-      // do{
 
-      // }while(currInd<);
+    do {
+      float bandMaxMagnitude = 0.0f;
+      // log_d("Bucle %d", ind);
 
       for (uint16_t k = pBinIndexes[ind - 1]; k < pBinIndexes[ind]; k++) {
-        mag = (int32_t)sqrt(pow(_pRealFftPlan->output[k * 2], 2) + pow(_pRealFftPlan->output[(k * 2) + 1], 2));
-        if (mag > pFreqPower[ind]) {
-          pFreqPower[ind] = mag;
+        const uint16_t fftOutIndex = k * 2;
+        float mag = MagnitudeFromComplex(_pRealFftPlan->output[fftOutIndex], _pRealFftPlan->output[fftOutIndex + 1]);
+        if (mag > bandMaxMagnitude) {
+          bandMaxMagnitude = mag;
         }
         // log_d("       Bucle %d - %d", ind,k);
       }
-      // log_d("ind=%d avg=%d", ind, avg);
-      pFreqPower[ind] = (10.0 * log((float)pFreqPower[ind] / (float)maxFftMagnitude));
-      // log_d("%d - %d", ind, pFreqPower[ind]);
+      pFreqPower[ind] = MagnitudeToDb(bandMaxMagnitude, maxFftMagnitude);
 
-      if (pFreqPower[ind] > maxMag) {
-        maxMag = pFreqPower[ind];
+      if ((int32_t)bandMaxMagnitude > maxMag) {
+        maxMag = (int32_t)bandMaxMagnitude;
         maxBin = pBinIndexes[ind - 1];
       }
       ind++;
     } while (ind < maxIndex);
-  } else if (binRes == BinResolution::MATRIX) {
-    int16_t numBins = min((int16_t)numFreqsOut, (int16_t)(_numSamples / 2));
+  } else if (binRes == FftPower::MATRIX) {
+    int16_t maxComplexBins = (int16_t)((_numSamples / 2) - 1);
+    int16_t numBins = min((int16_t)numFreqsOut, maxComplexBins);
+    if (numBins <= 0) {
+      return;
+    }
     int16_t currentBin = 1;
-    int16_t everyBin = (_numSamples / 2) / numBins;
+    int16_t everyBin = max((int16_t)1, (int16_t)(maxComplexBins / numBins));
 
     for (uint32_t ind = 0; ind < numBins; ind++, currentBin += everyBin) {
-      //  log_d("FromBin [%04d] ToBin [%02d]", fromBin, toBin);
-      auto aux = (float)(pow(_pRealFftPlan->output[currentBin], 2) + pow(_pRealFftPlan->output[currentBin + 1], 2));
-      // pFreqPower[ind] = (int32_t)(10.0 * log((float)sqrt(aux) / (float)maxFftMagnitude));
-      float mag = 1.0f / q_rsqrt(aux);
-      if (mag > maxFftMagnitude) {  // error?
-        mag = maxFftMagnitude;
+      if (currentBin > maxComplexBins) {
+        currentBin = maxComplexBins;
       }
-      pFreqPower[ind] = (float)(10.0f * log(mag / (float)maxFftMagnitude));
+      //  log_d("FromBin [%04d] ToBin [%02d]", fromBin, toBin);
+      const uint16_t fftOutIndex = currentBin * 2;
+      float mag = MagnitudeFromComplex(_pRealFftPlan->output[fftOutIndex], _pRealFftPlan->output[fftOutIndex + 1]);
+      pFreqPower[ind] = MagnitudeToDb(mag, maxFftMagnitude);
 
       if (mag > maxMag) {
-        maxMag = mag;
+        maxMag = (int32_t)mag;
         maxBin = ind;
       }
       // if (ind < 10) {
@@ -207,25 +225,22 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
       //     log_d("Bin [%02d] - Mag=%6.2f Dbs=%02d", ind, mag, pFreqPower[ind]);
       // }
     }
-  } else if (binRes == BinResolution::PIANO64_6Hz) {
+  } else if (binRes == FftPower::PIANO64_6Hz) {
     const uint16_t* pBinsNew = _64PianoKeys_v2_6Hz;
     uint8_t numBins = 64;
     maxBin = 0;
     uint32_t theBin = 0;
     for (uint16_t ind = 0; ind < numBins; ind++) {
       theBin = (pBinsNew[ind]) * 2;  //*2 pq _pRealFftPlan->output contains real,img parts interleaved.
-      float auxSum = (float)(pow(_pRealFftPlan->output[theBin], 2) + pow(_pRealFftPlan->output[theBin + 1], 2));
-      // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
-      float mag = 1.0f / q_rsqrt(auxSum);
-      float powerInDbs = (float)(10.0f * log(mag / (float)maxFftMagnitude));  // max energy of all bins
-      pFreqPower[ind] = powerInDbs;                                           // power en db's del bin indicat.
+      float mag = MagnitudeFromComplex(_pRealFftPlan->output[theBin], _pRealFftPlan->output[theBin + 1]);
+      pFreqPower[ind] = MagnitudeToDb(mag, maxFftMagnitude);  // power en db's del bin indicat.
 
       if (mag > maxMag) {
-        maxMag = mag;
+        maxMag = (int32_t)mag;
         maxBin = ind;
       }
     }
-  } else if (binRes == BinResolution::PIANO48_6Hz) {
+  } else if (binRes == FftPower::PIANO48_6Hz) {
     const uint16_t* pBinsNew = _48PianoKeys_v1_6Hz;
     uint8_t numBins = 48;
     maxBin = 0;
@@ -240,46 +255,40 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
 #endif
     for (uint16_t ind = 0; ind < numBins; ind++) {
       theBin = (pBinsNew[ind]) * 2;  //*2 pq _pRealFftPlan->output contains real,img parts interleaved.
-      float auxSum = (float)(pow(_pRealFftPlan->output[theBin], 2) + pow(_pRealFftPlan->output[theBin + 1], 2));
-      // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
-      float mag = 1.0f / q_rsqrt(auxSum);
-      float powerInDbs = (float)(10.0f * log(mag / (float)maxFftMagnitude));  // max energy of all bins
+      float mag = MagnitudeFromComplex(_pRealFftPlan->output[theBin], _pRealFftPlan->output[theBin + 1]);
 #if defined(PANEL_SIZE_96x54)
-      pFreqPower[(ind * 2)] = powerInDbs;
-      pFreqPower[(ind * 2) + 1] = powerInDbs;
+      pFreqPower[(ind * 2)] = MagnitudeToDb(mag, maxFftMagnitude);
+      pFreqPower[(ind * 2) + 1] = pFreqPower[(ind * 2)];
 #elif defined(PANEL_SIZE_64x32)
-      pFreqPower[ind + initialBin] = powerInDbs;
+      pFreqPower[ind + initialBin] = MagnitudeToDb(mag, maxFftMagnitude);
 #endif
       if (mag > maxMag) {
-        maxMag = mag;
+        maxMag = (int32_t)mag;
         maxBin = pBinsNew[ind];
       }
     }
-  } else if (binRes == BinResolution::PIANO96_3Hz || binRes == BinResolution::AUTO96_3Hz || binRes == BinResolution::AUTO96_6Hz) {
+  } else if (binRes == FftPower::PIANO96_3Hz || binRes == FftPower::AUTO96_3Hz || binRes == FftPower::AUTO96_6Hz) {
     const uint16_t* pBinsNew = _96PianoKeys_v1_3Hz;
     uint8_t numBins = 96;
     maxBin = 0;
     uint32_t theBin = 0;
-    if (binRes == BinResolution::AUTO96_3Hz) {
+    if (binRes == FftPower::AUTO96_3Hz) {
       pBinsNew = _Auto96Bands_v1_3Hz;
-    } else if (binRes == BinResolution::AUTO96_6Hz) {
+    } else if (binRes == FftPower::AUTO96_6Hz) {
       pBinsNew = _Auto96Bands_v1_6Hz;
     }
 
     for (uint16_t ind = 0; ind < numBins; ind++) {
       theBin = (pBinsNew[ind]) * 2;  //*2 pq _pRealFftPlan->output contains real,img parts interleaved.
-      float auxSum = (float)(pow(_pRealFftPlan->output[theBin], 2) + pow(_pRealFftPlan->output[theBin + 1], 2));
-      // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
-      float mag = 1.0f / q_rsqrt(auxSum);
-      float powerInDbs = (float)(10.0f * log(mag / (float)maxFftMagnitude));  // max energy of all bins
-      pFreqPower[ind] = powerInDbs;                                           // power en db's del bin indicat.
+      float mag = MagnitudeFromComplex(_pRealFftPlan->output[theBin], _pRealFftPlan->output[theBin + 1]);
+      pFreqPower[ind] = MagnitudeToDb(mag, maxFftMagnitude);  // power en db's del bin indicat.
 
       if (mag > maxMag) {
-        maxMag = mag;
+        maxMag = (int32_t)mag;
         maxBin = pBinsNew[ind];
       }
     }
-  } else if (binRes == BinResolution::AUTO64_6Hz) {
+  } else if (binRes == FftPower::AUTO64_6Hz) {
     const uint16_t* pBinsNew = _Auto64Bands_v4_6Hz;  //_Auto64Bands_v4_6Hz;
     uint8_t numBins = 64;
     maxBin = 0;
@@ -292,9 +301,8 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
       toBin = (pBinsNew[ind]) * 2;  //*2 pq _pRealFftPlan->output contains real,img parts interleaved
 
       float sumBin = 0;
-      uint16_t numBins = (toBin - fromBin) / 2;
       for (uint16_t subInd = fromBin; subInd < toBin; subInd += 2) {
-        float auxSum = (float)(pow(_pRealFftPlan->output[subInd], 2) + pow(_pRealFftPlan->output[subInd + 1], 2));
+        float auxSum = (_pRealFftPlan->output[subInd] * _pRealFftPlan->output[subInd]) + (_pRealFftPlan->output[subInd + 1] * _pRealFftPlan->output[subInd + 1]);
         // auxSum = (int32_t)(10.0 * log((float)sqrt(auxSum) / (float)maxFftMagnitude));
 
         if (auxSum > sumBin) {
@@ -305,15 +313,11 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
       // sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin) / (float)maxFftMagnitude)); // max energy of all bins
       //  sumBin = (int32_t)(10.0 * log((float)sqrt(sumBin / numBins) / (float)maxFftMagnitude));
       //  sumBin = (int32_t)(10.0 * log(1.0f / (q_rsqrt(sumBin / numBins) * (float)maxFftMagnitude))); //avg energy of all bins
-      float mag = 1.0f / q_rsqrt(sumBin);
-      if (mag > maxFftMagnitude) {  // error?
-        mag = maxFftMagnitude;
-      }
-      sumBin = (float)(10.0f * log(mag / (float)maxFftMagnitude));  // max energy of all bins
-      pFreqPower[ind] = sumBin;                                     // mitjana del powers de tots els bins fins aquesta freq.
+      float mag = MagnitudeFromSquared(sumBin);
+      pFreqPower[ind] = MagnitudeToDb(mag, maxFftMagnitude);  // màxima energia del rang en dB.
 
       if (mag > maxMag) {
-        maxMag = mag;
+        maxMag = (int32_t)mag;
         maxBin = (fromBin + 2) / 2;
       }
       // if(ind<10) {
@@ -323,6 +327,29 @@ void FftPower::GetFreqPower(int8_t* pFreqPower, uint16_t numFreqsOut, uint32_t m
     }
   }
 }
+
+#ifdef UNIT_TEST
+void FftPower::ClearOutputForTest() {
+  if (!_pRealFftPlan) {
+    return;
+  }
+  for (uint16_t i = 0; i < _numSamples; i++) {
+    _pRealFftPlan->output[i] = 0.0f;
+  }
+}
+
+void FftPower::SetOutputBinForTest(uint16_t bin, float real, float imag) {
+  if (!_pRealFftPlan) {
+    return;
+  }
+  uint16_t outIndex = bin * 2;
+  if (outIndex + 1 >= _numSamples) {
+    return;
+  }
+  _pRealFftPlan->output[outIndex] = real;
+  _pRealFftPlan->output[outIndex + 1] = imag;
+}
+#endif
 // void NewAudio(uint16_t *pAudioIn, uint16_t samplesIn)
 // {
 
