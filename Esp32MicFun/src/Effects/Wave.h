@@ -99,6 +99,7 @@ void DrawWave(MsgAudio2Draw& mad) {
     value = mad.pAudio[pas0 + (i * 2)];
     value += mad.pAudio[pas0 + (i * 2) + 1];
     value = map(value / 2, INPUT_0_VALUE - (VOLTATGE_DRAW_RANGE), INPUT_0_VALUE + (VOLTATGE_DRAW_RANGE), 0, height);
+    value = constrain(value, 0, height);
 
     if (!_FadingWaveMode) {
       int16_t newValue = value;
@@ -113,7 +114,7 @@ void DrawWave(MsgAudio2Draw& mad) {
     }
 
     _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
-    for (byte j = 1; j < _WaveDrawEvery; j++) {
+    for (byte j = 1; j < _WaveDrawEvery && (i + j) < width; j++) {
       _WaveBuffer[_LasttWaveIndex][i + j].ledIndex = _TheMapping.XY(i + j, value);
     }
   }
@@ -195,3 +196,4 @@ void DrawWave(MsgAudio2Draw& mad) {
     _LasttWaveIndex = (_LasttWaveIndex + 1) % numFadingWaves;
   }
 }
+

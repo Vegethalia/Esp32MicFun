@@ -2,14 +2,14 @@
 
 void DrawThumbnail() {
   if (!_ThumbnailReady || _ThumbnailImg.size() < (THUMBNAIL_HEIGHT * THUMBNAIL_WIDTH)) {
-    _TheDrawStyle = _ThumbnailPrevStyle;
-    log_w("Thumbnail not ready yet. Returning to previous style [%d]", (int)_TheDrawStyle);
+    ChangeDrawStyle(_ThumbnailPrevStyle, true);
+    log_w("Thumbnail not ready yet. Returning to previous style [%d]", (int)_ThumbnailPrevStyle);
     return;
   }
   if (millis() - _TimeThumbnailReceived > 20000) {
     FastLED.setBrightness(_ThumbnailPrevIntensity);  // restore brightness
-    _TheDrawStyle = _ThumbnailPrevStyle;  // return to previous style after 10 seconds
-    log_w("Thumbnail expired. Returning to previous style [%d]", (int)_TheDrawStyle);
+    ChangeDrawStyle(_ThumbnailPrevStyle, true);  // return to previous style after 10 seconds
+    log_w("Thumbnail expired. Returning to previous style [%d]", (int)_ThumbnailPrevStyle);
     return;
   }
 

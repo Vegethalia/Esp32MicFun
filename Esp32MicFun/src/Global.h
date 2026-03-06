@@ -306,6 +306,7 @@ TaskHandle_t _resetWhenHungTaskHandle;
 TaskHandle_t _vertFireTaskHandle;
 
 QueueHandle_t _adc_i2s_event_queue, _xQueSendAudio2Drawer;
+QueueHandle_t _xQueStyleChange;
 uint8_t _adc_i2s_event_queue_size = 1;
 EventGroupHandle_t _xEventVertFireNewLine;
 
@@ -345,6 +346,10 @@ enum DRAW_STYLE {
 
   MAX_STYLE = CALC_MODE,
   DEFAULT_STYLE = BARS_WITH_TOP
+};
+struct DrawStyleChangeRequest {
+  DRAW_STYLE style;
+  bool forceChange;
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
 int16_t _TheDesiredHue = -1;               // el custom color a aplicar. -1 -> color per defecte.

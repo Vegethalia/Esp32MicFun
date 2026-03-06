@@ -48,6 +48,8 @@ void UpdatePref(Prefs thePref);
 void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle);
 /// @brief Changes the drawing style. Calls ProcessStyleChange.
 bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange = false);
+/// @brief Applies queued style changes from DrawerTask frame boundary.
+void ProcessPendingStyleChanges();
 
 #include "Effects.h"  //uses some of the vars declared in Global
 #include "Tasks.h"    //tasks might call some of the functions declared above
@@ -160,6 +162,7 @@ void setup() {
   }
   // Create queue to communicate reader & drawer
   _xQueSendAudio2Drawer = xQueueCreate(1, sizeof(MsgAudio2Draw));
+  _xQueStyleChange = xQueueCreate(1, sizeof(DrawStyleChangeRequest));
   //_xQueSendFft2Led = xQueueCreate(1, sizeof(MsgAudio2Draw));
   _xEventVertFireNewLine = xEventGroupCreate();
   _ThePanel.SetEventForBackgroundTasks(_xEventVertFireNewLine);  // set the event for background tasks
@@ -284,7 +287,7 @@ void SetNightMode(bool nightOn) {
   _NightMode = nightOn;
   if (nightOn) {
     _MAX_MILLIS = NIGHT_MILLIS;
-    _TheDrawStyle = DRAW_STYLE::BARS_WITH_TOP;
+    ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true);
     _barAlterDraw = ALTERDRAW::ODD;
     _FadingWaveMode = false;  // no volem fer fading en aquest mode
     _barSpacing = 4;
@@ -292,7 +295,7 @@ void SetNightMode(bool nightOn) {
     _ShazamSongs = false;  // no volem detectar cançons en mode nit
   } else if (!nightOn) {
     _MAX_MILLIS = DEFAULT_MILLIS;
-    _TheDrawStyle = DRAW_STYLE::VERT_FIRE;
+    ChangeDrawStyle(DRAW_STYLE::VERT_FIRE, true);
     _ShazamSongs = true;  // volem detectar cançons en mode dia
   }
   FastLED.setBrightness(_MAX_MILLIS);
@@ -310,7 +313,8 @@ void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle) {
   }
 }
 
-bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange) {
+namespace {
+bool ApplyDrawStyleChange(DRAW_STYLE style, bool forceChange) {
   bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE || forceChange;
 
   if (allowStyleChange && _TheDrawStyle != style) {
@@ -330,4 +334,25 @@ bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange) {
     return true;
   }
   return false;
+}
+}  // namespace
+
+void ProcessPendingStyleChanges() {
+  if (!_xQueStyleChange) {
+    return;
+  }
+  DrawStyleChangeRequest req;
+  while (xQueueReceive(_xQueStyleChange, &req, 0) == pdPASS) {
+    ApplyDrawStyleChange(req.style, req.forceChange);
+  }
+}
+
+bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange) {
+  if (!_xQueStyleChange) {
+    return ApplyDrawStyleChange(style, forceChange);
+  }
+  DrawStyleChangeRequest req;
+  req.style = style;
+  req.forceChange = forceChange;
+  return xQueueOverwrite(_xQueStyleChange, &req) == pdPASS;
 }

@@ -67,6 +67,7 @@ void vTaskDrawer(void* pvParameters) {
         continue;
       }
       _Drawing = true;
+      ProcessPendingStyleChanges();
       _TheFrameNumber++;
 
       // Calculate max BASS power among first bars

@@ -137,13 +137,12 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_STEP:
           if (allowStyleChange) {
             _MAX_MILLIS = DEFAULT_MILLIS;
-            _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
+            ChangeDrawStyle(DRAW_STYLE::DEFAULT_STYLE, true);
             FastLED.setBrightness(_MAX_MILLIS);
 
-            UpdatePref(Prefs::PR_STYLE);
             UpdatePref(Prefs::PR_INTENSITY);
 
-            SendDebugMessage(Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)_TheDrawStyle).c_str());
+            SendDebugMessage(Utils::string_format("Updated intensity=%d. Style=%d", _MAX_MILLIS, (int)DRAW_STYLE::DEFAULT_STYLE).c_str());
           }
           break;
         case IR_KEY_FADE3:
@@ -167,7 +166,6 @@ void vTaskReceiveIR(void* pvParameters) {
         case IR_KEY_FADE7:
           if (allowStyleChange) {
             SetNightMode(!_NightMode);
-            UpdatePref(Prefs::PR_STYLE);
             UpdatePref(Prefs::PR_NIGHTMODE);
 
             SendDebugMessage(Utils::string_format("SetNightMode=%d. Style=%d", (int)_NightMode, (int)_TheDrawStyle).c_str());

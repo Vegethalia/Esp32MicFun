@@ -397,11 +397,8 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
   } else if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
     byte nightOn = std::atoi(theMsg.c_str()) != 0;
     _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
-    auto oldStyle = _TheDrawStyle;
     SetNightMode(nightOn);
-    UpdatePref(Prefs::PR_STYLE);
     UpdatePref(Prefs::PR_NIGHTMODE);
-    ProcessStyleChange(oldStyle, _TheDrawStyle);
     SendDebugMessage(Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str());
   } else if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
     int minuts = std::atoi(theMsg.c_str());
@@ -433,7 +430,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     if (_TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
       _ThumbnailPrevStyle = _TheDrawStyle;         // remember the style when the thumbnail was received
       _ThumbnailPrevIntensity = _MAX_MILLIS;       // remember the intensity when the thumbnail was received
-      _TheDrawStyle = DRAW_STYLE::DRAW_THUMBNAIL;  // force the thumbnail to be drawn
+      ChangeDrawStyle(DRAW_STYLE::DRAW_THUMBNAIL, true);  // force the thumbnail to be drawn
     }
     _TimeThumbnailReceived = millis();
   } else if (theTopic.find(TOPIC_SHAZAM_MODE) != std::string::npos) {
