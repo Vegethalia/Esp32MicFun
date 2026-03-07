@@ -116,6 +116,30 @@ PanelMapping64x32 _TheMapping;
 PanelMapping96x54 _TheMapping;
 #endif
 
+uint16_t _LedIndexMap[NUM_LEDS];
+bool _LedIndexMapReady = false;
+
+inline void InitLedIndexMap() {
+  if (_LedIndexMapReady) {
+    return;
+  }
+  uint16_t idx = 0;
+  for (uint16_t y = 0; y < THE_PANEL_HEIGHT; y++) {
+    for (uint16_t x = 0; x < THE_PANEL_WIDTH; x++) {
+      _LedIndexMap[idx++] = _TheMapping.XY(x, y);
+    }
+  }
+  _LedIndexMapReady = true;
+}
+
+inline uint16_t LedIndexXY(uint16_t x, uint16_t y) {
+  return _LedIndexMap[(y * THE_PANEL_WIDTH) + x];
+}
+
+inline uint16_t LedIndexFlat(uint16_t flatIndex) {
+  return _LedIndexMap[flatIndex];
+}
+
 uint16_t _MAX_MILLIS = DEFAULT_MILLIS;
 CRGBArray<NUM_LEDS> _TheLeds;  // The FastLed object que pintarem al panell de leds.
 // CRGBArray<NUM_LEDS> _AuxLeds;  // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.

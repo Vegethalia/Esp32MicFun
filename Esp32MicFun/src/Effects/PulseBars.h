@@ -3,7 +3,6 @@ void DrawPulses(MsgAudio2Draw& mad)
 {
     static uint8_t* __pScreenMap = nullptr;
     static uint32_t* __pLastUpdateMillis = nullptr;
-    static uint16_t* __pLedIndexMap = nullptr;
     constexpr uint8_t PULSE_DECAY = 245;  // ~0.96 in Q8
     constexpr uint8_t TRAIL_85 = 218;     // ~0.85 in Q8
     constexpr uint8_t TRAIL_70 = 179;     // ~0.70 in Q8
@@ -17,12 +16,6 @@ void DrawPulses(MsgAudio2Draw& mad)
         memset8(__pScreenMap, 0, totalPixels);
         __pLastUpdateMillis = new uint32_t[width];
         memset(__pLastUpdateMillis, 0, width * sizeof(uint32_t));
-        __pLedIndexMap = new uint16_t[totalPixels];
-        for (uint16_t j = 0; j < height; j++) {
-            for (uint16_t i = 0; i < width; i++) {
-                __pLedIndexMap[(j * width) + i] = _TheMapping.XY(i, j);
-            }
-        }
     }
 
     assert(THE_PANEL_WIDTH > 1);
@@ -77,7 +70,7 @@ void DrawPulses(MsgAudio2Draw& mad)
     for (uint16_t idx = 0; idx < totalPixels; idx++) {
         uint8_t v = __pScreenMap[idx];
         if (v) {
-            _TheLeds[__pLedIndexMap[idx]] += CHSV(currentHue, 255, v);
+            _TheLeds[LedIndexFlat(idx)] += CHSV(currentHue, 255, v);
         }
     }
 }

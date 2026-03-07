@@ -101,6 +101,7 @@ void setup() {
 #endif
 
   _ThePanel.SetParams(&_TheLeds, &_TheMapping);
+  InitLedIndexMap();
 
   _ThePrefs.begin("FlipaLeds", false);  // false=read+write
   _TheDrawStyle = (DRAW_STYLE)(_ThePrefs.getUChar(PREF_STYLE, DRAW_STYLE::DEFAULT_STYLE));
