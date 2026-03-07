@@ -29,7 +29,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
   CHSV kw = CHSV(HSVHue::HUE_PURPLE, 255, 80);
 
   for (uint8_t i = 0; i < THE_PANEL_WIDTH; i++) {
-    _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1)] = eix;
+    _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1)] = eix;
   }
   // a cada canvi d'hora pintarem un pixel verd
   if (_pLectures) {
@@ -37,7 +37,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
     for (uint8_t i = 0; i < THE_PANEL_WIDTH; i++) {
       if (_pLectures[i].horaConsum > 0 && _pLectures[i].horaConsum / 3600 != actHour) {
         actHour = _pLectures[i].horaConsum / 3600;
-        _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1)] = eixHour;
+        _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1)] = eixHour;
       }
     }
   }
@@ -57,7 +57,7 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
     }
 
     for (uint8_t i = 0 + _incBoleta; i < THE_PANEL_WIDTH; i += 4) {
-      _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += kw;
+      _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1 - j)] += kw;
     }
   }
   // i ara pintem les barres
@@ -75,11 +75,11 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
       // intensityBar = map(intensityBar, MIN_FFT_DB, MAX_FFT_DB + 5, 0, 140);
       intensityBar = map(mad.pDBs[i], 0, 255, 0, 140);
       for (uint8_t j = 1; j < mapValue; j++) {
-        _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
+        _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_AQUA, 255, (uint8_t)intensityBar);
       }
 
       // pintem "top pixel"
-      _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - mapValue)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
+      _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1 - mapValue)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
       // _TheLeds[_TheMapping.XY(i + 1, THE_PANEL_HEIGHT - 2 - mapValue)] += CHSV(HSVHue::HUE_PINK, 255, 20 + (mapValue * 11));
       //
       if (mapValue > maxValue) {
@@ -88,11 +88,11 @@ void DrawCurrentGraph(MsgAudio2Draw& mad) {
       if (i > 0) {  // pintem la línia que uneix les barres
         if (mapValue > previousBarValue) {
           for (uint8_t j = previousBarValue + 1; j < mapValue; j++) {
-            _TheLeds[_TheMapping.XY(i - 1, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
+            _TheLeds[LedIndexXY(i - 1, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
           }
         } else if (mapValue < previousBarValue) {
           for (uint8_t j = mapValue + 1; j < previousBarValue; j++) {
-            _TheLeds[_TheMapping.XY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
+            _TheLeds[LedIndexXY(i, THE_PANEL_HEIGHT - 1 - j)] += CHSV(HSVHue::HUE_YELLOW, 255, intensity);
           }
         }
       }

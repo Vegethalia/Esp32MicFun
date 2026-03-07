@@ -49,7 +49,7 @@ class AnalogClock {
     dibuixaAgulla(secAngle, static_cast<int>(RADIUS * 0.8f));
 
     uint8_t intensity = max((int)100, (int)_1stBarValue);
-    _TheLeds[_TheMapping.XY(CENTER_X, CENTER_Y)] = CHSV(HSVHue::HUE_RED, 255, intensity);  // Center dot
+    _TheLeds[LedIndexXY(CENTER_X, CENTER_Y)] = CHSV(HSVHue::HUE_RED, 255, intensity);  // Center dot
 
     if (_TheFrameNumber % 250 == 0) {
       // SendDebugMessage(Utils::string_format("Analog Clock: %02d:%02d:%02.0f NumPoints=%d", hour, minute, second, _cerclePrecalculat.size()).c_str());
@@ -71,7 +71,7 @@ class AnalogClock {
       int y = CENTER_Y - static_cast<int>(i * std::sin(angle));
       if (x >= 0 && x < THE_PANEL_WIDTH && y >= 0 && y < THE_PANEL_HEIGHT) {
         // screen[y][x] = ch;
-        _TheLeds[_TheMapping.XY(x, y)] = CHSV(HSVHue::HUE_RED, 128, 80);  // Color de l'agulla
+        _TheLeds[LedIndexXY(x, y)] = CHSV(HSVHue::HUE_RED, 128, 80);  // Color de l'agulla
       }
     }
   }
@@ -94,7 +94,7 @@ class AnalogClock {
         int y = static_cast<int>(cy + oy);
 
         if (x >= 0 && x < THE_PANEL_WIDTH && y >= 0 && y < THE_PANEL_HEIGHT) {
-          _TheLeds[_TheMapping.XY(x, y)] = hsvColor;  // Color de l'agulla
+          _TheLeds[LedIndexXY(x, y)] = hsvColor;  // Color de l'agulla
         }
       }
     }
@@ -110,7 +110,7 @@ class AnalogClock {
       int x = CENTER_X + static_cast<int>((RADIUS - 3) * std::cos(angle));
       int y = CENTER_Y - static_cast<int>((RADIUS - 3) * std::sin(angle));
       if (x >= 0 && x < THE_PANEL_WIDTH && y >= 0 && y < THE_PANEL_HEIGHT) {
-        _TheLeds[_TheMapping.XY(x, y)] += horaColor;  // Color de la marca d'hora
+        _TheLeds[LedIndexXY(x, y)] += horaColor;  // Color de la marca d'hora
       }
     }
   }
@@ -135,7 +135,7 @@ class AnalogClock {
             // CHSV hsvPixel = CHSV(baseHue, 255, 100);  // Color del cercle
             auto key = std::make_pair(x, y);
             if (_cerclePrecalculat.find(key) == _cerclePrecalculat.end()) {  // || pixel == chCercle) {
-              _cerclePrecalculat[key] = PointCercle(_TheMapping.XY(x, y), baseHue);
+              _cerclePrecalculat[key] = PointCercle(LedIndexXY(x, y), baseHue);
             }
           }
           iter++;

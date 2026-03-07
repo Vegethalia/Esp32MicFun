@@ -42,7 +42,7 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
       _inc = 1;
     }
     //  }
-    _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 0)] = CHSV(HSVHue::HUE_PURPLE, 255, _intensity);
+    _TheLeds[LedIndexFlat(THE_PANEL_WIDTH - 2)] = CHSV(HSVHue::HUE_PURPLE, 255, _intensity);
     // if (numPixels > 1) {
     //   _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 2, 0)] = CHSV(HSVHue::HUE_PURPLE, 200, _intensity);
     // }
@@ -54,7 +54,7 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
     // }
 
     if (_DisplayAsapIndicator && (millis() - _AsapDetectionTime) < 90000) {  // 90s //pintem l'indicador ASAP
-      _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - 3, 0)] = CHSV(HSVHue::HUE_AQUA, 255, _intensity);
+      _TheLeds[LedIndexFlat(THE_PANEL_WIDTH - 3)] = CHSV(HSVHue::HUE_AQUA, 255, _intensity);
     }
   }
 }

@@ -58,11 +58,13 @@ void DrawVertSpectrogram(MsgAudio2Draw& mad, VertSpectrogramStyle style = VertSp
     memcpy(&_TheRunningValues[(THE_PANEL_HEIGHT - 1) * THE_PANEL_WIDTH], mad.pDBs, THE_PANEL_WIDTH);
     // mostrem les linies al panel
     //  i ara restaurem el buffer auxiliar en l'array de leds
-    for (int i = 0; i < THE_PANEL_WIDTH; i++) {
-      for (int j = 0; j < THE_PANEL_HEIGHT; j++) {
-        uint8_t resta = _TheRunningValues[j * THE_PANEL_WIDTH + i] > (THE_PANEL_HEIGHT - j) * 2 ? (THE_PANEL_HEIGHT - j) * 2 : _TheRunningValues[j * THE_PANEL_WIDTH + i];
-        _TheLeds[_TheMapping.XY(i, j)] += CHSV(currentHue, 255 - (THE_PANEL_HEIGHT - j) * 2,
-                                               (_TheRunningValues[j * THE_PANEL_WIDTH + i]) - resta);
+    for (uint16_t j = 0; j < THE_PANEL_HEIGHT; j++) {
+      uint16_t rowBase = j * THE_PANEL_WIDTH;
+      uint8_t rowFade = (THE_PANEL_HEIGHT - j) * 2;
+      for (uint16_t i = 0; i < THE_PANEL_WIDTH; i++) {
+        uint8_t value = _TheRunningValues[rowBase + i];
+        uint8_t resta = value > rowFade ? rowFade : value;
+        _TheLeds[LedIndexFlat(rowBase + i)] += CHSV(currentHue, 255 - rowFade, value - resta);
         //                _TheLeds[_TheMapping.XY(i, j)].fadeToBlackBy((THE_PANEL_HEIGHT-j)*4);
       }
     }

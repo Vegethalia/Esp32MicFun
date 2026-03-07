@@ -12,6 +12,7 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
     }
 
     for (uint8_t iLine = 0; iLine < numLines; iLine++) {
+        uint16_t rowBase = currentLine * THE_PANEL_WIDTH;
         for (uint16_t xPix = 0; xPix < THE_PANEL_WIDTH; xPix++, currentBin++) {
             auto value = constrain(mad.pFftMag[currentBin], MIN_FFT_DB, MAX_FFT_DB);
             value = map(value, MIN_FFT_DB, MAX_FFT_DB, 0, 255);
@@ -24,7 +25,7 @@ void DrawMatrixFFT(MsgAudio2Draw& mad)
             } else {
                 x = THE_PANEL_WIDTH - xPix - 1;
             }
-            _TheLeds[_TheMapping.XY(x, currentLine)] = CHSV(theHue + (value / 2), 255, (uint8_t)value);
+            _TheLeds[LedIndexFlat(rowBase + x)] = CHSV(theHue + (value / 2), 255, (uint8_t)value);
         }
         currentLine--;
     }

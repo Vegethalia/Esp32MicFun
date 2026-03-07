@@ -192,7 +192,7 @@ void DrawParametric(MsgAudio2Draw& mad) {
     //     intensity = intensity / 2;
     // }
 
-    _TheLeds[_TheMapping.XY(round(__dpd->TheCurrentCurve.xCoord[coord]), round(__dpd->TheCurrentCurve.yCoord[coord]))] = CHSV(theHue, 255, intensity);  //(uint8_t)value);//CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity);  //(uint8_t)value);
+    _TheLeds[LedIndexXY(round(__dpd->TheCurrentCurve.xCoord[coord]), round(__dpd->TheCurrentCurve.yCoord[coord]))] = CHSV(theHue, 255, intensity);  //(uint8_t)value);//CHSV(HSVHue::HUE_YELLOW + _1stBarValue / 3, 255, intensity);  //(uint8_t)value);
 #if defined(PANEL_SIZE_96x54)
     theHue++;
 #else

@@ -113,9 +113,10 @@ void DrawWave(MsgAudio2Draw& mad) {
       numValuesHi++;
     }
 
-    _WaveBuffer[_LasttWaveIndex][i].ledIndex = _TheMapping.XY(i, value);
+    uint16_t rowBase = value * width;
+    _WaveBuffer[_LasttWaveIndex][i].ledIndex = LedIndexFlat(rowBase + i);
     for (byte j = 1; j < _WaveDrawEvery && (i + j) < width; j++) {
-      _WaveBuffer[_LasttWaveIndex][i + j].ledIndex = _TheMapping.XY(i + j, value);
+      _WaveBuffer[_LasttWaveIndex][i + j].ledIndex = LedIndexFlat(rowBase + i + j);
     }
   }
   if (numValuesHi > _maxValueHi) {

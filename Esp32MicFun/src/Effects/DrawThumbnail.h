@@ -18,10 +18,12 @@ void DrawThumbnail() {
   // Draw the thumbnail image
 
   uint8_t startX = (THE_PANEL_WIDTH - THUMBNAIL_WIDTH) / 2;  // center the thumbnail horizontally
+  const uint16_t panelWidth = THE_PANEL_WIDTH;
   uint16_t k = 0;                                            // THUMBNAIL_WIDTH;// index for the thumbnail image. Ens saltem la 1era línia, no sé pq te soroll....
   for (uint8_t j = 0; j < THUMBNAIL_HEIGHT; j++) {           // ens saltem la primera fila. No se pq te soroll....
+    uint16_t rowBase = (j * panelWidth) + startX;
     for (uint8_t i = 0; i < THUMBNAIL_WIDTH; i++, k++) {
-      _TheLeds[_TheMapping.XY(startX + i, j)] = _ThumbnailImg[k];  // draw the thumbnail pixel
+      _TheLeds[LedIndexFlat(rowBase + i)] = _ThumbnailImg[k];  // draw the thumbnail pixel
     }
   }
 }

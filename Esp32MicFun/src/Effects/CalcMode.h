@@ -300,8 +300,9 @@ void drawSumaResta(uint8_t varIntens)
         THE_PANEL_WIDTH - lenLastNum - lenOp1, 0, HSVHue::HUE_RED, varIntens, false, 164);
 
     maxWidth = (uint8_t)std::max((uint8_t)maxWidth, lenRes) + 2;
+    uint16_t rowBase = maxLine * THE_PANEL_WIDTH;
     for (uint8_t i = 0; i < maxWidth; i++) {
-        _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
+        _TheLeds[LedIndexFlat(rowBase + (THE_PANEL_WIDTH - i - 2))] = CHSV(HSVHue::HUE_RED, 128, varIntens);
     }
 
     _u8g2.clearBuffer();
@@ -366,8 +367,9 @@ void drawMult(uint8_t varIntens)
         THE_PANEL_WIDTH - lenLastNum - lenOp1, 0, HSVHue::HUE_RED, varIntens, false, 164);
 
     maxWidth = (uint8_t)std::max((uint8_t)maxWidth, lenRes) + 2;
+    uint16_t rowBase = maxLine * THE_PANEL_WIDTH;
     for (uint8_t i = 0; i < maxWidth; i++) {
-        _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
+        _TheLeds[LedIndexFlat(rowBase + (THE_PANEL_WIDTH - i - 2))] = CHSV(HSVHue::HUE_RED, 128, varIntens);
     }
 
     // per cada dígit del multiplicador, pintem la línia de la multiplicació
@@ -421,7 +423,7 @@ void drawMult(uint8_t varIntens)
         }
 
         for (uint8_t i = 0; i < maxWidth; i++) {
-            _TheLeds[_TheMapping.XY(THE_PANEL_WIDTH - i - 2, maxLine)] = CHSV(HSVHue::HUE_RED, 128, varIntens);
+            _TheLeds[LedIndexFlat((maxLine * THE_PANEL_WIDTH) + (THE_PANEL_WIDTH - i - 2))] = CHSV(HSVHue::HUE_RED, 128, varIntens);
         }
 
         _u8g2.clearBuffer();
