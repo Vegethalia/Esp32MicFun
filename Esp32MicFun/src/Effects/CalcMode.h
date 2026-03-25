@@ -284,14 +284,10 @@ bool drawDiv(uint8_t varIntens)
         return false;
     }
 
-    uint8_t totalLines = 2 + division.steps.size() + (division.steps.size() - 1) + (division.remainder != 0 ? 1 : 0);
-    if ((totalLines * NUMBERS_FONT_HEIGHT) > THE_PANEL_HEIGHT) {
-        return false;
-    }
-
     _AllLinesUsed = division.steps.size() > 1;
     _LeftClock = division.steps.size() > 2 || _CalcNum2.length() > 2;
 
+    const int16_t stepSpacing = NUMBERS_FONT_HEIGHT + 1;
     uint8_t quotientWidth = _u8g2.getStrWidth(division.quotient.c_str());
     uint8_t divisorWidth = _u8g2.getStrWidth(_CalcNum2.c_str());
     uint8_t dividendWidth = _u8g2.getStrWidth(_CalcNum1.c_str());
@@ -305,7 +301,24 @@ bool drawDiv(uint8_t varIntens)
     }
 
     int16_t dividendBaseline = NUMBERS_FONT_HEIGHT + 1;
-    int16_t quotientBaseline = dividendBaseline + NUMBERS_FONT_HEIGHT + 1;
+    int16_t quotientBaseline = dividendBaseline + stepSpacing;
+    int16_t requiredBottom = quotientBaseline;
+    int16_t requiredBaseline = dividendBaseline;
+    for (uint8_t stepIdx = 0; stepIdx < division.steps.size(); stepIdx++) {
+        if (stepIdx > 0) {
+            requiredBaseline += stepSpacing;
+            requiredBottom = std::max(requiredBottom, requiredBaseline);
+        }
+        requiredBaseline += stepSpacing;
+        requiredBottom = std::max(requiredBottom, (int16_t)(requiredBaseline + 1));
+    }
+    if (division.remainder != 0) {
+        requiredBaseline += stepSpacing;
+        requiredBottom = std::max(requiredBottom, requiredBaseline);
+    }
+    if (requiredBottom >= THE_PANEL_HEIGHT) {
+        return false;
+    }
 
     uint8_t visibleSteps = (uint8_t)std::min<size_t>(_NumDigitsResShown, division.steps.size());
     std::string visibleQuotient = division.quotient.substr(0, visibleSteps);
@@ -318,8 +331,8 @@ bool drawDiv(uint8_t varIntens)
     DrawCalcTextAt(_CalcNum1, dividendBaseline, dividendX, HSVHue::HUE_AQUA, 128);
     DrawCalcTextAt(_CalcNum2, dividendBaseline, divisorX, HSVHue::HUE_PURPLE, 128);
 
-    DrawCalcHorizontalLine(dividendBaseline + 1, rightRegionX + rightRegionWidth, rightRegionWidth + 2, CHSV(HSVHue::HUE_RED, 180, varIntens));
-    DrawCalcVerticalLine(bracketX, dividendBaseline - NUMBERS_FONT_HEIGHT + 1, dividendBaseline + 1, CHSV(HSVHue::HUE_RED, 180, varIntens));
+    DrawCalcHorizontalLine(dividendBaseline, rightRegionX + rightRegionWidth, rightRegionWidth + 2, CHSV(HSVHue::HUE_RED, 180, varIntens));
+    DrawCalcVerticalLine(bracketX, dividendBaseline - NUMBERS_FONT_HEIGHT, dividendBaseline, CHSV(HSVHue::HUE_RED, 180, varIntens));
 
     int16_t baseline = dividendBaseline;
     for (uint8_t stepIdx = 0; stepIdx < visibleSteps; stepIdx++) {
@@ -329,19 +342,19 @@ bool drawDiv(uint8_t varIntens)
         uint8_t currentWidth = _u8g2.getStrWidth(currentText.c_str());
 
         if (stepIdx > 0) {
-            baseline += NUMBERS_FONT_HEIGHT;
+            baseline += stepSpacing;
             DrawCalcTextAt(currentText, baseline, alignRight - currentWidth + 1, (uint8_t)(HSVHue::HUE_GREEN + (stepIdx * 12)), 128);
         }
 
-        baseline += NUMBERS_FONT_HEIGHT;
+        baseline += stepSpacing;
         std::string subtractionText = std::to_string(step.subtractionValue);
         uint8_t subtractionWidth = _u8g2.getStrWidth(subtractionText.c_str());
         DrawCalcTextAt(subtractionText, baseline, alignRight - subtractionWidth + 1, (uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 128, 190);
-        DrawCalcHorizontalLine(baseline, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
+        DrawCalcHorizontalLine(baseline + 1, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
     }
 
     if (visibleSteps == division.steps.size() && division.remainder != 0) {
-        baseline += NUMBERS_FONT_HEIGHT;
+        baseline += stepSpacing;
         std::string remainderText = std::to_string(division.remainder);
         uint8_t remainderWidth = _u8g2.getStrWidth(remainderText.c_str());
         int16_t alignRight = dividendX + ((division.steps.back().dividendIndex + 1) * NUMBERS_FONT_WIDTH) - 1;
