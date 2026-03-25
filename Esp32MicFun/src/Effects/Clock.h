@@ -11,15 +11,27 @@
 void DrawClock(
     bool refreshText = true,
     uint8_t fontHeight = CLOCK_VERT_PIXELS + 1,
-    uint8_t xPos = CENTER_CLOCK ? (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS) / 2 : (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS)) {
+    uint8_t xPos = CENTER_CLOCK ? (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS) / 2 : (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS),
+    bool preserveCurrentFont = false) {
 #if defined(PANEL_SIZE_96x54)
   xPos -= 1;  // ens saltem el pixel "txungo" que just cau a la bora d'un número de la hora
-  fontHeight += 1;
+  if (!preserveCurrentFont) {
+    fontHeight += 1;
+  }
 #endif
   static int baseHue = 0;
   static bool hasClockBuffer = false;
+  static uint8_t lastFontHeight = 0xff;
+  static uint8_t lastXPos = 0xff;
+  static bool lastPreserveCurrentFont = false;
 
-  if (refreshText || !hasClockBuffer) {
+  bool mustRefresh = refreshText || !hasClockBuffer || lastFontHeight != fontHeight || lastXPos != xPos || lastPreserveCurrentFont != preserveCurrentFont;
+  if (preserveCurrentFont) {
+    // In calculator mode `_u8g2` is reused right after drawing the clock, so the cached text buffer is not stable.
+    mustRefresh = true;
+  }
+
+  if (mustRefresh) {
     struct tm timeinfo;
     if (_Connected2Wifi) {
       getLocalTime(&timeinfo);
@@ -43,13 +55,18 @@ void DrawClock(
     // u8g2_font_micro_tn --> 3x5 molt guay pero ocupa 3 pixels cada char.
     _u8g2.clearBuffer();
 #if defined(PANEL_SIZE_96x54)
-    _u8g2.setFont(u8g2_font_sisterserif_tr);  // bold and big
+    if (!preserveCurrentFont) {
+      _u8g2.setFont(u8g2_font_sisterserif_tr);  // bold and big
+    }
 #endif
     //_u8g2.setFont(u8g2_font_cu12_tr);  // u8g2_font_tom_thumb_4x6_mn);
     _u8g2.drawStr(xPos, fontHeight, theTime.c_str());
     //   _u8g2.setFont(u8g2_font_micro_tn); // u8g2_font_tom_thumb_4x6_tn   u8g2_font_blipfest_07_tn);
     //   _u8g2.drawStr(6, 12, theTime.c_str());
     hasClockBuffer = true;
+    lastFontHeight = fontHeight;
+    lastXPos = xPos;
+    lastPreserveCurrentFont = preserveCurrentFont;
   }
   uint8_t intensity;
   if (_NightMode) {

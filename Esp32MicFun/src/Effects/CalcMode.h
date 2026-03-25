@@ -465,7 +465,7 @@ void DrawCalculator(MsgAudio2Draw& mad)
         }
     } else {
         _u8g2.setFont(u8g2_font_5x8_tr);
-        DrawClock((_TheFrameNumber % 3) == 0, NUMBERS_FONT_HEIGHT + 1, _LeftClock ? 0 : (THE_PANEL_WIDTH - (8 * NUMBERS_FONT_WIDTH)) / 2);
+        DrawClock((_TheFrameNumber % 3) == 0, NUMBERS_FONT_HEIGHT + 1, _LeftClock ? 0 : (THE_PANEL_WIDTH - (8 * NUMBERS_FONT_WIDTH)) / 2, true);
     }
 
     if (_TheLastKey != GEN_KEY_PRESS::KEY_NONE) {
