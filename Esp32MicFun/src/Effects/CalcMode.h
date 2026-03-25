@@ -207,6 +207,54 @@ double SolveOperation(double num1, int32_t num2, CALC_OPERATION op)
     return res;
 }
 
+uint8_t GetCalcLastVertTile(int16_t baselineY)
+{
+    return (uint8_t)std::min<int16_t>((THE_PANEL_HEIGHT - 1) / 8, std::max<int16_t>(0, baselineY) / 8);
+}
+
+void DrawCalcTextAt(const std::string& text, int16_t baselineY, int16_t xPos, uint8_t hue, uint8_t intensity, uint8_t sat = 164)
+{
+    if (text.empty()) {
+        return;
+    }
+
+    _u8g2.clearBuffer();
+    _u8g2.drawStr(0, baselineY, text.c_str());
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, GetCalcLastVertTile(baselineY),
+        xPos, 0, hue, intensity, false, sat);
+}
+
+void DrawCalcHorizontalLine(int16_t y, int16_t rightX, uint8_t width, CHSV color)
+{
+    if (y < 0 || y >= THE_PANEL_HEIGHT) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < width; i++) {
+        int16_t x = rightX - i;
+        if (x < 0) {
+            break;
+        }
+        if (x >= THE_PANEL_WIDTH) {
+            continue;
+        }
+        _TheLeds[LedIndexXY((uint16_t)x, (uint16_t)y)] = color;
+    }
+}
+
+void DrawCalcVerticalLine(int16_t x, int16_t yStart, int16_t yEnd, CHSV color)
+{
+    if (x < 0 || x >= THE_PANEL_WIDTH) {
+        return;
+    }
+
+    int16_t clampedStart = std::max<int16_t>(0, yStart);
+    int16_t clampedEnd = std::min<int16_t>(THE_PANEL_HEIGHT - 1, yEnd);
+    for (int16_t y = clampedStart; y <= clampedEnd; y++) {
+        _TheLeds[LedIndexXY((uint16_t)x, (uint16_t)y)] = color;
+    }
+}
+
 void Calculate()
 {
     int32_t num1 = atoi(_CalcNum1.c_str());
@@ -227,6 +275,102 @@ void Calculate()
     _Result = (int64_t)res;
     _ResultFloat = res;
     _Calculat = true;
+}
+
+bool drawDiv(uint8_t varIntens)
+{
+    CalcLongDivisionData division = BuildLongDivision(_CalcNum1, _CalcNum2);
+    if (!division.valid || division.steps.empty()) {
+        return false;
+    }
+
+    uint8_t totalLines = 2 + division.steps.size() + (division.steps.size() - 1) + (division.remainder != 0 ? 1 : 0);
+    if ((totalLines * NUMBERS_FONT_HEIGHT) > THE_PANEL_HEIGHT) {
+        return false;
+    }
+
+    _AllLinesUsed = division.steps.size() > 1;
+    _LeftClock = division.steps.size() > 2 || _CalcNum2.length() > 2;
+
+    uint8_t quotientWidth = _u8g2.getStrWidth(division.quotient.c_str());
+    uint8_t divisorWidth = _u8g2.getStrWidth(_CalcNum2.c_str());
+    uint8_t dividendWidth = _u8g2.getStrWidth(_CalcNum1.c_str());
+    uint8_t rightRegionWidth = std::max(quotientWidth, divisorWidth);
+    int16_t rightRegionX = THE_PANEL_WIDTH - rightRegionWidth - 2;
+    int16_t bracketX = rightRegionX - 2;
+    int16_t dividendX = bracketX - dividendWidth - 1;
+    int16_t divisorX = rightRegionX + rightRegionWidth - divisorWidth;
+    if (dividendX < 0) {
+        return false;
+    }
+
+    int16_t dividendBaseline = NUMBERS_FONT_HEIGHT + 1;
+    int16_t quotientBaseline = dividendBaseline + NUMBERS_FONT_HEIGHT + 1;
+
+    uint8_t visibleSteps = (uint8_t)std::min<size_t>(_NumDigitsResShown, division.steps.size());
+    std::string visibleQuotient = division.quotient.substr(0, visibleSteps);
+    if (!visibleQuotient.empty()) {
+        uint8_t visibleQuotientWidth = _u8g2.getStrWidth(visibleQuotient.c_str());
+        int16_t quotientX = rightRegionX + rightRegionWidth - visibleQuotientWidth;
+        DrawCalcTextAt(visibleQuotient, quotientBaseline, quotientX, HSVHue::HUE_YELLOW, 128);
+    }
+
+    DrawCalcTextAt(_CalcNum1, dividendBaseline, dividendX, HSVHue::HUE_AQUA, 128);
+    DrawCalcTextAt(_CalcNum2, dividendBaseline, divisorX, HSVHue::HUE_PURPLE, 128);
+
+    DrawCalcHorizontalLine(dividendBaseline + 1, rightRegionX + rightRegionWidth, rightRegionWidth + 2, CHSV(HSVHue::HUE_RED, 180, varIntens));
+    DrawCalcVerticalLine(bracketX, dividendBaseline - NUMBERS_FONT_HEIGHT + 1, dividendBaseline + 1, CHSV(HSVHue::HUE_RED, 180, varIntens));
+
+    int16_t baseline = dividendBaseline;
+    for (uint8_t stepIdx = 0; stepIdx < visibleSteps; stepIdx++) {
+        const auto& step = division.steps[stepIdx];
+        int16_t alignRight = dividendX + ((step.dividendIndex + 1) * NUMBERS_FONT_WIDTH) - 1;
+        std::string currentText = std::to_string(step.currentValue);
+        uint8_t currentWidth = _u8g2.getStrWidth(currentText.c_str());
+
+        if (stepIdx > 0) {
+            baseline += NUMBERS_FONT_HEIGHT;
+            DrawCalcTextAt(currentText, baseline, alignRight - currentWidth + 1, (uint8_t)(HSVHue::HUE_GREEN + (stepIdx * 12)), 128);
+        }
+
+        baseline += NUMBERS_FONT_HEIGHT;
+        std::string subtractionText = std::to_string(step.subtractionValue);
+        uint8_t subtractionWidth = _u8g2.getStrWidth(subtractionText.c_str());
+        DrawCalcTextAt(subtractionText, baseline, alignRight - subtractionWidth + 1, (uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 128, 190);
+        DrawCalcHorizontalLine(baseline, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
+    }
+
+    if (visibleSteps == division.steps.size() && division.remainder != 0) {
+        baseline += NUMBERS_FONT_HEIGHT;
+        std::string remainderText = std::to_string(division.remainder);
+        uint8_t remainderWidth = _u8g2.getStrWidth(remainderText.c_str());
+        int16_t alignRight = dividendX + ((division.steps.back().dividendIndex + 1) * NUMBERS_FONT_WIDTH) - 1;
+        DrawCalcTextAt(remainderText, baseline, alignRight - remainderWidth + 1, HSVHue::HUE_YELLOW, 128, 190);
+    }
+
+    return true;
+}
+
+void drawCompactResult(std::string numsStr, const std::string& opStr, uint8_t varIntens)
+{
+    std::string sRes;
+    if (_CalcOp1 == CALC_OPERATION::DIV) {
+        sRes = Utils::string_format("%2.2f", _ResultFloat);
+    } else {
+        sRes = std::to_string(_Result);
+    }
+    if (opStr.length() + sRes.length() > DIGITS_PER_LINE) { // pintar el resultat en la següent línia
+        _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, sRes.c_str());
+        uint8_t marge = 2 + (DIGITS_PER_LINE - sRes.length()) * NUMBERS_FONT_WIDTH;
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 3, 3, marge, NUMBERS_FONT_HEIGHT * 3 + 2,
+            HSVHue::HUE_AQUA, 128, false, 164);
+    } else { // pintar el resultat en la mateixa línia
+        numsStr = "";
+        numsStr.append(opStr.length(), ' ');
+        numsStr += sRes;
+        _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, numsStr.c_str());
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 3, 3, 2, NUMBERS_FONT_HEIGHT * 2 + 2, HSVHue::HUE_AQUA, 128, false, 164);
+    }
 }
 void drawSumaResta(uint8_t varIntens)
 {
@@ -519,25 +663,9 @@ void DrawCalculator(MsgAudio2Draw& mad)
             drawSumaResta(varIntens);
         } else if (_CalcOp1 == CALC_OPERATION::MULT && _CalcOp2 == CALC_OPERATION::NONE) {
             drawMult(varIntens);
+        } else if (_CalcOp1 == CALC_OPERATION::DIV && _CalcOp2 == CALC_OPERATION::NONE && drawDiv(varIntens)) {
         } else {
-            std::string sRes;
-            if (_CalcOp1 == CALC_OPERATION::DIV) {
-                sRes = Utils::string_format("%2.2f", _ResultFloat);
-            } else {
-                sRes = std::to_string(_Result);
-            }
-            if (opStr.length() + sRes.length() > DIGITS_PER_LINE) { // pintar el resultat en la següent línia
-                _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, sRes.c_str());
-                uint8_t marge = 2 + (DIGITS_PER_LINE - sRes.length()) * NUMBERS_FONT_WIDTH;
-                _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 3, 3, marge, NUMBERS_FONT_HEIGHT * 3 + 2,
-                    HSVHue::HUE_AQUA, 128, false, 164);
-            } else { // pintar el resultat en la mateixa línia
-                numsStr = "";
-                numsStr.append(opStr.length(), ' ');
-                numsStr += sRes;
-                _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, numsStr.c_str());
-                _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 3, 3, 2, NUMBERS_FONT_HEIGHT * 2 + 2, HSVHue::HUE_AQUA, 128, false, 164);
-            }
+            drawCompactResult(numsStr, opStr, varIntens);
         }
     } else {
         _u8g2.drawStr(0, 31 - MARGIN_TILE_VERT, cursor.c_str());

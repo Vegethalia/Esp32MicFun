@@ -142,6 +142,40 @@ void test_calcmode_reveal_shows_result_only_after_all_partial_digits(void) {
   TEST_ASSERT_EQUAL_STRING("114", GetVisibleRightDigits("5332114", 20, 23).c_str());
 }
 
+void test_long_division_builds_expected_steps(void) {
+  CalcLongDivisionData division = BuildLongDivision("3421", "12");
+  TEST_ASSERT_TRUE(division.valid);
+  TEST_ASSERT_EQUAL_STRING("285", division.quotient.c_str());
+  TEST_ASSERT_EQUAL_UINT32(1, division.remainder);
+  TEST_ASSERT_EQUAL_UINT8(1, division.quotientStartIndex);
+  TEST_ASSERT_EQUAL_UINT32(3, division.steps.size());
+
+  TEST_ASSERT_EQUAL_UINT32(34, division.steps[0].currentValue);
+  TEST_ASSERT_EQUAL_UINT32(24, division.steps[0].subtractionValue);
+  TEST_ASSERT_EQUAL_UINT32(10, division.steps[0].remainderValue);
+  TEST_ASSERT_EQUAL_UINT8(1, division.steps[0].dividendIndex);
+
+  TEST_ASSERT_EQUAL_UINT32(102, division.steps[1].currentValue);
+  TEST_ASSERT_EQUAL_UINT32(96, division.steps[1].subtractionValue);
+  TEST_ASSERT_EQUAL_UINT32(6, division.steps[1].remainderValue);
+  TEST_ASSERT_EQUAL_UINT8(2, division.steps[1].dividendIndex);
+
+  TEST_ASSERT_EQUAL_UINT32(61, division.steps[2].currentValue);
+  TEST_ASSERT_EQUAL_UINT32(60, division.steps[2].subtractionValue);
+  TEST_ASSERT_EQUAL_UINT32(1, division.steps[2].remainderValue);
+  TEST_ASSERT_EQUAL_UINT8(3, division.steps[2].dividendIndex);
+}
+
+void test_long_division_keeps_zero_in_quotient_steps(void) {
+  CalcLongDivisionData division = BuildLongDivision("1005", "5");
+  TEST_ASSERT_TRUE(division.valid);
+  TEST_ASSERT_EQUAL_STRING("201", division.quotient.c_str());
+  TEST_ASSERT_EQUAL_UINT32(0, division.remainder);
+  TEST_ASSERT_EQUAL_UINT32(3, division.steps.size());
+  TEST_ASSERT_EQUAL_UINT32(0, division.steps[1].currentValue);
+  TEST_ASSERT_EQUAL_UINT32(0, division.steps[1].subtractionValue);
+}
+
 #if defined(ARDUINO)
 void setup(void) {
   delay(1000);
@@ -151,6 +185,8 @@ void setup(void) {
   RUN_TEST(test_auto34_db_is_clamped_to_zero_over_reference);
   RUN_TEST(test_calcmode_reveal_hides_fourth_partial_until_prior_digits_are_shown);
   RUN_TEST(test_calcmode_reveal_shows_result_only_after_all_partial_digits);
+  RUN_TEST(test_long_division_builds_expected_steps);
+  RUN_TEST(test_long_division_keeps_zero_in_quotient_steps);
   UNITY_END();
 }
 
@@ -165,6 +201,8 @@ int main(int argc, char** argv) {
   RUN_TEST(test_auto34_db_is_clamped_to_zero_over_reference);
   RUN_TEST(test_calcmode_reveal_hides_fourth_partial_until_prior_digits_are_shown);
   RUN_TEST(test_calcmode_reveal_shows_result_only_after_all_partial_digits);
+  RUN_TEST(test_long_division_builds_expected_steps);
+  RUN_TEST(test_long_division_keeps_zero_in_quotient_steps);
   return UNITY_END();
 }
 #endif
