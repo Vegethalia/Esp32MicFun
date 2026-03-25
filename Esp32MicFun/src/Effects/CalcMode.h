@@ -1,4 +1,6 @@
 
+#include "CalcModeUtils.h"
+
 // variables globals de la calculadora
 #define NUM1 1
 #define NUM2 2
@@ -313,6 +315,10 @@ void drawSumaResta(uint8_t varIntens)
 
 void drawMult(uint8_t varIntens)
 {
+    auto getLastVertTile = [](int16_t baselineY) -> uint8_t {
+        return (uint8_t)std::min<int16_t>((THE_PANEL_HEIGHT - 1) / 8, std::max<int16_t>(0, baselineY) / 8);
+    };
+
     if (std::atoi(_CalcNum1.c_str()) < std::atoi(_CalcNum2.c_str())) {
         std::string aux = _CalcNum1;
         _CalcNum1 = _CalcNum2;
@@ -349,7 +355,7 @@ void drawMult(uint8_t varIntens)
     _u8g2.clearBuffer();
     maxLine = NUMBERS_FONT_HEIGHT * 2 + topMarge;
     _u8g2.drawStr(0, maxLine, _CalcNum1.c_str());
-    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, getLastVertTile(maxLine),
         THE_PANEL_WIDTH - lenNum1 - 2, 0, HSVHue::HUE_PURPLE, 128, false, 164);
 
     _u8g2.clearBuffer();
@@ -357,13 +363,13 @@ void drawMult(uint8_t varIntens)
     lenLastNum = lenNum2;
     maxWidth = std::max((uint8_t)lenNum1, (uint8_t)(lenNum2 + lenOp1));
     _u8g2.drawStr(0, maxLine, _CalcNum2.c_str());
-    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, getLastVertTile(maxLine),
         THE_PANEL_WIDTH - lenNum2 - 2, 0, HSVHue::HUE_AQUA, 128, false, 164);
 
     // pintem el símbol i la línia de la operació
     _u8g2.clearBuffer();
     _u8g2.drawStr(0, maxLine, op.c_str());
-    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+    _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, getLastVertTile(maxLine),
         THE_PANEL_WIDTH - lenLastNum - lenOp1, 0, HSVHue::HUE_RED, varIntens, false, 164);
 
     maxWidth = (uint8_t)std::max((uint8_t)maxWidth, lenRes) + 2;
@@ -375,50 +381,32 @@ void drawMult(uint8_t varIntens)
     // per cada dígit del multiplicador, pintem la línia de la multiplicació
     int32_t num1 = std::atoi(_CalcNum1.c_str());
     maxLine++;
-    uint8_t partialMult1Len = 0, partialMult2Len = 0, partialMult3Len = 0;
+    uint16_t totalPartialDigits = 0;
     for (uint8_t i = 1; i <= _CalcNum2.length(); i++) {
         std::string digitChar = _CalcNum2.substr(_CalcNum2.length() - i, 1);
         uint8_t digit = std::atoi(digitChar.c_str());
         int32_t partialRes = num1 * digit;
         std::string partialResStr = std::to_string(partialRes);
-
-        if (i == 1) {
-            partialMult1Len = partialResStr.length();
-            if (partialResStr.length() > _NumDigitsResShown) {
-                partialResStr = partialResStr.substr(partialResStr.length() - _NumDigitsResShown);
-            }
-        } else if (i == 2) {
-            partialMult2Len = partialResStr.length();
-            if (_NumDigitsResShown < partialMult1Len) {
-                partialResStr = "";
-            } else if (partialResStr.length() > (_NumDigitsResShown - partialMult1Len)) {
-                partialResStr = partialResStr.substr(partialResStr.length() - (_NumDigitsResShown - partialMult1Len));
-            }
-        } else if (i == 3) {
-            partialMult3Len = partialResStr.length();
-            if (_NumDigitsResShown < (partialMult1Len + partialMult2Len)) {
-                partialResStr = "";
-            } else if (partialResStr.length() > (_NumDigitsResShown - partialMult1Len - partialMult2Len)) {
-                partialResStr = partialResStr.substr(partialResStr.length() - (_NumDigitsResShown - partialMult1Len - partialMult2Len));
-            }
-        }
+        uint16_t partialDigits = partialResStr.length();
+        partialResStr = GetVisibleRightDigits(partialResStr, totalPartialDigits, _NumDigitsResShown);
+        totalPartialDigits += partialDigits;
 
         maxLine += NUMBERS_FONT_HEIGHT;
         _u8g2.clearBuffer();
         _u8g2.drawStr(0, maxLine, partialResStr.c_str());
         uint8_t lenPartialRes = _u8g2.getStrWidth(partialResStr.c_str());
-        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, getLastVertTile(maxLine),
             THE_PANEL_WIDTH - lenPartialRes - ((i - 1) * NUMBERS_FONT_WIDTH) - 2, 0, HSVHue::HUE_RED + i * 16, 128, false, 190);
 
         maxWidth = (uint8_t)std::max((uint8_t)maxWidth, (uint8_t)(lenPartialRes + i * NUMBERS_FONT_WIDTH));
     }
     if (_CalcNum2.length() > 1) {
         // amagem digits del resultat
-        if (_NumDigitsResShown < (partialMult1Len + partialMult2Len + partialMult3Len)) {
+        if (_NumDigitsResShown <= totalPartialDigits) {
             sRes = "";
             maxWidth = 0;
-        } else if (sRes.length() > (_NumDigitsResShown - partialMult1Len - partialMult2Len - partialMult3Len)) {
-            sRes = sRes.substr(sRes.length() - (_NumDigitsResShown - partialMult1Len - partialMult2Len - partialMult3Len));
+        } else if (sRes.length() > (_NumDigitsResShown - totalPartialDigits)) {
+            sRes = sRes.substr(sRes.length() - (_NumDigitsResShown - totalPartialDigits));
             lenRes = _u8g2.getStrWidth(sRes.c_str());
         }
 
@@ -428,7 +416,7 @@ void drawMult(uint8_t varIntens)
 
         _u8g2.clearBuffer();
         _u8g2.drawStr(0, maxLine + NUMBERS_FONT_HEIGHT + 1, sRes.c_str());
-        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
+        _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, getLastVertTile(maxLine + NUMBERS_FONT_HEIGHT + 1),
             THE_PANEL_WIDTH - lenRes - 2, 0, HSVHue::HUE_YELLOW, 128, false, 64);
     }
 }
