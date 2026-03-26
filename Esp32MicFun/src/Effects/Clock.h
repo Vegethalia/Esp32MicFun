@@ -12,7 +12,9 @@ void DrawClock(
     bool refreshText = true,
     uint8_t fontHeight = CLOCK_VERT_PIXELS + 1,
     int16_t xPos = CENTER_CLOCK ? (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS) / 2 : (THE_PANEL_WIDTH - CLOCK_HORIZ_PIXELS),
-    bool preserveCurrentFont = false) {
+    bool preserveCurrentFont = false,
+    uint8_t sat = 255,
+    uint8_t intensityDivisor = 1) {
   int16_t drawXPos = xPos;
 #if defined(PANEL_SIZE_96x54)
   if (drawXPos > 0) {
@@ -79,6 +81,9 @@ void DrawClock(
     _ThePanel.SetBaseHue((uint8_t)(_TheFrameNumber / 4));
     intensity = max((int)164, (int)_1stBarValue);
   }
-  _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, intensity);
+  if (intensityDivisor > 1) {
+    intensity = (uint8_t)max(1, (int)intensity / intensityDivisor);
+  }
+  _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, intensity, sat);
   //        FastLED.show();
 }

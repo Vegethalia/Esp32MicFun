@@ -709,7 +709,7 @@ class PowerBarsPanel {
   // Draw a portion of the contents of the u8g2 screen buffer in the led panel.
   // The portion drawed goes from pixel 0 to pixel width-1 horizontally, and vertically the number of vertical tiles.
   // The color and value are specified in Hue/Intensity
-  void DrawScreenBuffer(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint16_t width, uint8_t vertTiles, uint8_t hue, uint8_t intensity) {
+  void DrawScreenBuffer(const uint8_t* pTheScreenBuffer, uint16_t bufferWidthInTiles, uint16_t width, uint8_t vertTiles, uint8_t hue, uint8_t intensity, uint8_t sat = 255) {
     uint8_t pixColor = _CurrentBaseHue;
     for (uint8_t tileRow = 0; tileRow < vertTiles; tileRow++) {
       for (uint16_t x = 0; x < width; x++) {
@@ -719,7 +719,7 @@ class PowerBarsPanel {
         uint8_t pixelCol = pTheScreenBuffer[x];
         for (uint8_t xbit = 0; xbit < 8; xbit++) {
           if (pixelCol & mask) {  // pintar aquest bit!
-            (*_pTheLeds)[_pTheMapping->XY(x, (tileRow * 8) + xbit)] = CHSV(pixColor, 255, intensity);
+            (*_pTheLeds)[_pTheMapping->XY(x, (tileRow * 8) + xbit)] = CHSV(pixColor, sat, intensity);
           }
           mask = mask << 1;
           if (!_NightMode) {

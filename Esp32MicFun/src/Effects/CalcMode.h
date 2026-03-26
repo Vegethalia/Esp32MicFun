@@ -303,6 +303,7 @@ bool drawDiv(uint8_t varIntens)
     int16_t dividendBaseline = NUMBERS_FONT_HEIGHT + 1;
     int16_t quotientBaseline = dividendBaseline + stepSpacing;
     int16_t requiredBottom = quotientBaseline;
+    int16_t requiredBottomWithoutFinalRemainder = quotientBaseline;
     int16_t requiredBaseline = dividendBaseline;
     for (uint8_t stepIdx = 0; stepIdx < division.steps.size(); stepIdx++) {
         if (stepIdx > 0) {
@@ -312,12 +313,15 @@ bool drawDiv(uint8_t varIntens)
         requiredBaseline += stepSpacing;
         requiredBottom = std::max(requiredBottom, (int16_t)(requiredBaseline + 1));
     }
-    if (division.remainder != 0) {
-        requiredBaseline += stepSpacing;
-        requiredBottom = std::max(requiredBottom, (int16_t)(requiredBaseline + 1));
-    }
-    if (requiredBottom >= THE_PANEL_HEIGHT) {
+    requiredBottomWithoutFinalRemainder = requiredBottom;
+    requiredBaseline += stepSpacing;
+    requiredBottom = std::max(requiredBottom, (int16_t)(requiredBaseline + 1));
+    if (requiredBottomWithoutFinalRemainder >= THE_PANEL_HEIGHT) {
         return false;
+    }
+    bool allowFinalRemainderOverflow = requiredBottom >= THE_PANEL_HEIGHT;
+    if (allowFinalRemainderOverflow) {
+        _AllLinesUsed = true;
     }
 
     uint8_t visibleSteps = (uint8_t)std::min<size_t>(_NumDigitsResShown, division.steps.size());
@@ -343,22 +347,24 @@ bool drawDiv(uint8_t varIntens)
 
         if (stepIdx > 0) {
             baseline += stepSpacing;
-            DrawCalcTextAt(currentText, baseline, alignRight - currentWidth + 1, (uint8_t)(HSVHue::HUE_GREEN + (stepIdx * 12)), 128);
+            DrawCalcTextAt(currentText, baseline, alignRight - currentWidth + 1, HSVHue::HUE_AQUA, 128, 190);
         }
 
         baseline += stepSpacing;
         std::string subtractionText = std::to_string(step.subtractionValue);
         uint8_t subtractionWidth = _u8g2.getStrWidth(subtractionText.c_str());
-        DrawCalcTextAt(subtractionText, baseline, alignRight - subtractionWidth + 1, (uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 128, 190);
+        DrawCalcTextAt(subtractionText, baseline, alignRight - subtractionWidth + 1, HSVHue::HUE_AQUA, 64, 0);
         DrawCalcHorizontalLine(baseline, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
     }
 
-    if (visibleSteps == division.steps.size() && division.remainder != 0) {
+    if (visibleSteps == division.steps.size()) {
         baseline += stepSpacing;
-        std::string remainderText = std::to_string(division.remainder);
+        std::string remainderText = division.remainder == 0 ? "*" : std::to_string(division.remainder);
         uint8_t remainderWidth = _u8g2.getStrWidth(remainderText.c_str());
         int16_t alignRight = dividendX + ((division.steps.back().dividendIndex + 1) * NUMBERS_FONT_WIDTH) - 1;
-        DrawCalcTextAt(remainderText, baseline + 1, alignRight - remainderWidth + 1, HSVHue::HUE_YELLOW, 128, 190);
+        if (!allowFinalRemainderOverflow || (baseline + 1) < THE_PANEL_HEIGHT) {
+            DrawCalcTextAt(remainderText, baseline + 1, alignRight - remainderWidth + 1, HSVHue::HUE_AQUA, 128, 190);
+        }
     }
 
     return true;
@@ -611,7 +617,7 @@ void DrawCalculator(MsgAudio2Draw& mad)
         }
     } else {
         _u8g2.setFont(u8g2_font_5x8_tr);
-        DrawClock((_TheFrameNumber % 3) == 0, NUMBERS_FONT_HEIGHT + 1, _LeftClock ? 0 : (THE_PANEL_WIDTH - (8 * NUMBERS_FONT_WIDTH)) / 2, true);
+        DrawClock((_TheFrameNumber % 3) == 0, NUMBERS_FONT_HEIGHT + 1, _LeftClock ? 0 : (THE_PANEL_WIDTH - (8 * NUMBERS_FONT_WIDTH)) / 2, true, 0, 3);
     }
 
     if (_TheLastKey != GEN_KEY_PRESS::KEY_NONE) {
