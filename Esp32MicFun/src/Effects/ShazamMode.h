@@ -9,20 +9,17 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
     bool resetTextPos = false;
     uint32_t timeSinceLastDetection = now - _LastSongDetectionTime;
 
-    if ((now - _LastSongDisplayTime) > 20000) {
+    if ((now - _LastSongDisplayTime) > 20000 && timeSinceLastDetection < 65000) {
       _DisplayingSongName = true;
       _LastSongDisplayTime = now;
       resetTextPos = true;
-      // if (timeSinceLastDetection > 65000) {
-      //   _DetectedSongName = "Esperant Detecci\xF3...";
-      // }
     }
 
     if (_DisplayingSongName) {
       if (timeSinceLastDetection < 65000) {
         DrawSongName(_DetectedSongName.c_str(), _SongDesconeguda, resetTextPos);  // update text position....
       } else {
-        DrawSongName("Esperant Detecci\xF3...", true, resetTextPos);  // update text position....
+        _DisplayingSongName = false;
       }
     }
 

@@ -314,7 +314,7 @@ bool drawDiv(uint8_t varIntens)
     }
     if (division.remainder != 0) {
         requiredBaseline += stepSpacing;
-        requiredBottom = std::max(requiredBottom, requiredBaseline);
+        requiredBottom = std::max(requiredBottom, (int16_t)(requiredBaseline + 1));
     }
     if (requiredBottom >= THE_PANEL_HEIGHT) {
         return false;
@@ -350,7 +350,7 @@ bool drawDiv(uint8_t varIntens)
         std::string subtractionText = std::to_string(step.subtractionValue);
         uint8_t subtractionWidth = _u8g2.getStrWidth(subtractionText.c_str());
         DrawCalcTextAt(subtractionText, baseline, alignRight - subtractionWidth + 1, (uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 128, 190);
-        DrawCalcHorizontalLine(baseline + 1, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
+        DrawCalcHorizontalLine(baseline, alignRight, std::max(currentWidth, subtractionWidth) + 2, CHSV((uint8_t)(HSVHue::HUE_RED + (stepIdx * 12)), 180, varIntens));
     }
 
     if (visibleSteps == division.steps.size() && division.remainder != 0) {
@@ -358,7 +358,7 @@ bool drawDiv(uint8_t varIntens)
         std::string remainderText = std::to_string(division.remainder);
         uint8_t remainderWidth = _u8g2.getStrWidth(remainderText.c_str());
         int16_t alignRight = dividendX + ((division.steps.back().dividendIndex + 1) * NUMBERS_FONT_WIDTH) - 1;
-        DrawCalcTextAt(remainderText, baseline, alignRight - remainderWidth + 1, HSVHue::HUE_YELLOW, 128, 190);
+        DrawCalcTextAt(remainderText, baseline + 1, alignRight - remainderWidth + 1, HSVHue::HUE_YELLOW, 128, 190);
     }
 
     return true;
@@ -459,13 +459,14 @@ void drawSumaResta(uint8_t varIntens)
         THE_PANEL_WIDTH - lenLastNum - lenOp1, 0, HSVHue::HUE_RED, varIntens, false, 164);
 
     maxWidth = (uint8_t)std::max((uint8_t)maxWidth, lenRes) + 2;
-    uint16_t rowBase = maxLine * THE_PANEL_WIDTH;
+    int16_t separatorLineY = std::max<int16_t>(0, (int16_t)maxLine - 1);
+    uint16_t rowBase = separatorLineY * THE_PANEL_WIDTH;
     for (uint8_t i = 0; i < maxWidth; i++) {
         _TheLeds[LedIndexFlat(rowBase + (THE_PANEL_WIDTH - i - 2))] = CHSV(HSVHue::HUE_RED, 128, varIntens);
     }
 
     _u8g2.clearBuffer();
-    _u8g2.drawStr(0, maxLine + NUMBERS_FONT_HEIGHT + 1, sRes.c_str());
+    _u8g2.drawStr(0, maxLine + NUMBERS_FONT_HEIGHT + 2, sRes.c_str());
     _ThePanel.DrawScreenBufferXY(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), 0, 3,
         THE_PANEL_WIDTH - lenRes - 2, 0, HSVHue::HUE_YELLOW, 128, false, 64);
 }

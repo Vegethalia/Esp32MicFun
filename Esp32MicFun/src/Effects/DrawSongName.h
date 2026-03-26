@@ -3,13 +3,11 @@
 
 void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = false) {
   static int16_t textPos = THE_PANEL_WIDTH - 2;
-  static int16_t inc = -1;
   static bool alreadyDrawedText = false;
   static int8_t vert = 0;
 
   if (resetTextPos) {
     textPos = THE_PANEL_WIDTH - 2;
-    inc = -1;
     alreadyDrawedText = false;
   }
   if (!alreadyDrawedText) {
@@ -34,17 +32,10 @@ void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = fal
   bool painting = _ThePanel.DrawScreenBufferXY(_u8g2LongText.getBufferPtr(), _u8g2LongText.getBufferTileWidth(), 0, 1,
                                                textPos, CLOCK_VERT_PIXELS + vert, HSVHue::HUE_YELLOW, intensity, false, 128);
 
-  // if (_numFrames & 0x01 == 1) { //anem a mitja velocitat
-  textPos += inc;
-  //}
+  textPos--;
 
-  if (!painting || (inc < 0 && textPos < (-THE_PANEL_WIDTH * 4)) || (inc > 0 && textPos > THE_PANEL_WIDTH)) {
-    if (inc < 0 && textPos < (-THE_PANEL_WIDTH * 4)) {
-      inc = 1;  // change direction
-    } else if (inc > 0 && textPos > THE_PANEL_WIDTH) {
-      inc = -1;  // change direction
-      _DisplayingSongName = false;
-      log_d("Finished displaying SongName=%s", pSongName);
-    }
+  if (!painting || textPos < (-THE_PANEL_WIDTH * 4)) {
+    _DisplayingSongName = false;
+    log_d("Finished displaying SongName=%s", pSongName);
   }
 }
