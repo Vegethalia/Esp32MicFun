@@ -147,21 +147,13 @@ void vTaskReceiveIR(void* pvParameters) {
           break;
         case IR_KEY_FADE3:
           if (_ShazamSongs) {
-            _ShazamSongs = false;
-            SendDebugMessage("Shazam Mode OFF!!");
+            ApplyShazamModeSetting(false);
           } else {
-            _ShazamSongs = true;
-            SendDebugMessage("Shazam Mode ON!!");
-            _ShazamActivationTime = millis();
+            ApplyShazamModeSetting(true);
           }
           break;
         case IR_KEY_FLASH: //activem Shazam mode i enviem missatge al servei per a que es reconegui l'audio ASAP
-          SendDebugMessage("Shazam Mode ON (ASAP)!!");
-          _ShazamSongs = true;
-          _ShazamActivationTime = millis();
-          _DisplayAsapIndicator = true; // show the ASAP indicator on the display
-          _AsapDetectionTime = millis(); // set the ASAP detection so it is active
-          _ThePubSub.publish(TOPIC_RECOGNIZE_ASAP, "1", false);
+          TriggerShazamRecognizeAsap();
           break;
         case IR_KEY_FADE7:
           if (allowStyleChange) {

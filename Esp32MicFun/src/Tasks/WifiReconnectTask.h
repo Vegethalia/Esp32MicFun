@@ -1,3 +1,5 @@
+#include "ConfigWebServer.h"
+
 // Advanced declarations
 /// @brief  Connects to the MQTT broquer if not connected.
 void Connect2MQTT();
@@ -57,6 +59,8 @@ void vTaskWifiReconnect(void* pvParameters) {
       _OTA.Begin();
     }
     if (_Connected2Wifi) {
+      ConfigWebServer::SetupIfNeeded();
+      ConfigWebServer::HandleClient();
       _ThePubSub.loop();  // allow the pubsubclient to process incoming messages
       _OTA.Process();
       // _TheNTPClient.update();
@@ -178,6 +182,9 @@ void Connect2MQTT() {
       }
       if (!_ThePubSub.subscribe(TOPIC_STYLE)) {
         // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_STYLE);
+      }
+      if (!_ThePubSub.subscribe(TOPIC_BASEHUE)) {
+        // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_BASEHUE);
       }
       if (!_ThePubSub.subscribe(TOPIC_RESET)) {
         // log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_RESET);
@@ -370,36 +377,18 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
   }
 
   if (theTopic.find(TOPIC_INTENSITY) != std::string::npos) {
-    auto origIntensity = _MAX_MILLIS;
-    auto newIntensity = min(std::atoi(theMsg.c_str()), 255);  //(int)MAX_MILLIS);
-    _MAX_MILLIS = newIntensity;
-
-    if (newIntensity != origIntensity) {
-      // FastLED.setMaxPowerInVoltsAndMilliamps(5, _MAX_MILLIS);
-      FastLED.setBrightness(_MAX_MILLIS);
-      UpdatePref(Prefs::PR_INTENSITY);
-
-      //     // log_d("Changing led intensity=%d", newIntensity);
-      //     _Intensity = newIntensity;
-      //     float percentPower = (float)_Intensity / (float)MAX_INTENSITY;
-      //     _IntensityMAmps = (uint32_t)(((MAX_TARGET_CURRENT - MIN_TARGET_CURRENT) * percentPower) + MIN_TARGET_CURRENT);
-      //     FastLED.setMaxPowerInVoltsAndMilliamps(5, _IntensityMAmps); // FastLED power management set at 5V, 1500mA
-      //     _ThePubSub.publish(TOPIC_INTENSITY, Utils::string_format("%d", _Intensity).c_str(), true);
-      SendDebugMessage(Utils::string_format("Updated intensity=%dmAhs", _MAX_MILLIS).c_str());
-    }
+    ApplyIntensitySetting(std::atoi(theMsg.c_str()));
   } else if (theTopic.find(TOPIC_STYLE) != std::string::npos) {
-    ChangeDrawStyle((DRAW_STYLE)max(min(std::atoi(theMsg.c_str()), (int)DRAW_STYLE::MAX_STYLE), 1));
+    ChangeDrawStyle(ClampDrawStyle(std::atoi(theMsg.c_str())));
+  } else if (theTopic.find(TOPIC_BASEHUE) != std::string::npos) {
+    ApplyDesiredHueSetting(std::atoi(theMsg.c_str()));
   } else if (theTopic.find(TOPIC_RESET) != std::string::npos) {
     bool resetNow = std::atoi(theMsg.c_str()) != 0;
     if (resetNow) {
       ESP.restart();
     }
   } else if (theTopic.find(TOPIC_NIGHTMODE) != std::string::npos) {
-    byte nightOn = std::atoi(theMsg.c_str()) != 0;
-    _ThePrefs.putBool(PREF_NIGHTMODE, nightOn);
-    SetNightMode(nightOn);
-    UpdatePref(Prefs::PR_NIGHTMODE);
-    SendDebugMessage(Utils::string_format("Updated Nightmode=%d", (int)nightOn).c_str());
+    ApplyNightModeSetting(std::atoi(theMsg.c_str()) != 0);
   } else if (theTopic.find(TOPIC_GROUPMINUTS) != std::string::npos) {
     int minuts = std::atoi(theMsg.c_str());
     _AgrupaConsumsPerMinuts = (uint16_t)max(min(minuts, (int)60), 1);
@@ -434,23 +423,9 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     }
     _TimeThumbnailReceived = millis();
   } else if (theTopic.find(TOPIC_SHAZAM_MODE) != std::string::npos) {
-    auto newMode = std::atoi(theMsg.c_str()) != 0;
-    if (newMode) {
-      _ShazamSongs = newMode;
-      _ShazamActivationTime = millis();
-      SendDebugMessage("Shazam Mode ON!!");
-    } else {
-      SendDebugMessage("Shazam Mode OFF!!");
-      _ShazamSongs = newMode;
-    }
+    ApplyShazamModeSetting(std::atoi(theMsg.c_str()) != 0);
   } else if (theTopic.find(TOPIC_PIANO_MODE) != std::string::npos) {
-    byte modeOn = std::atoi(theMsg.c_str()) != 0;
-    if (modeOn != _pianoMode) {
-      _pianoMode = modeOn;
-      UpdatePref(Prefs::PR_PIANOMODE);
-
-      SendDebugMessage(Utils::string_format("Piano Mode %s!!", _pianoMode ? "ON" : "OFF").c_str());
-    }
+    ApplyPianoModeSetting(std::atoi(theMsg.c_str()) != 0);
   } else if (theTopic.find(TOPIC_DEBUG_MODE) != std::string::npos) {
     auto newMode = std::atoi(theMsg.c_str()) != 0;
     if (newMode) {
@@ -461,11 +436,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
       _DebugMode = newMode;
     }
   } else if (theTopic.find(TOPIC_FADINGWAVE_MODE) != std::string::npos) {
-    auto newMode = std::atoi(theMsg.c_str()) != 0;
-    if (newMode != _FadingWaveMode) {
-      _FadingWaveMode = newMode;
-      SendDebugMessage(Utils::string_format("Fading Wave Mode %s!!", _FadingWaveMode ? "ON" : "OFF").c_str());
-    }
+    ApplyFadingWaveModeSetting(std::atoi(theMsg.c_str()) != 0);
   } else {
     log_w("Unknown topic [%s] with message [%s]", theTopic.c_str(), theMsg.c_str());
   }

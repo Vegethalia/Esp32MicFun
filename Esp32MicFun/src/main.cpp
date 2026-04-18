@@ -41,15 +41,41 @@
 //----------------------
 /// @brief Sets default parameters for night mode on/off
 /// @param nightOn
-void SetNightMode(bool nightOn);
+void SetNightMode(bool nightOn, bool persistStyle = true);
 /// @brief Persists a given preference value.
 void UpdatePref(Prefs thePref);
 /// @brief Processes a change in the drawing style, restoring the required parameters.
 void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle);
 /// @brief Changes the drawing style. Calls ProcessStyleChange.
-bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange = false);
+bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange = false, bool persist = true);
 /// @brief Applies queued style changes from DrawerTask frame boundary.
 void ProcessPendingStyleChanges();
+/// @brief Clamps a draw style to the supported range.
+DRAW_STYLE ClampDrawStyle(int styleValue, DRAW_STYLE maxStyle = DRAW_STYLE::MAX_STYLE);
+/// @brief Clamps bar grouping to a safe range.
+uint8_t ClampBinGrouping(int value);
+/// @brief Returns the maximum safe bar spacing for a grouping.
+uint8_t GetMaxBarSpacingForGrouping(uint8_t grouping);
+/// @brief Applies led intensity and optionally persists it.
+bool ApplyIntensitySetting(int intensity, bool persist = true);
+/// @brief Applies the selected base hue and optionally persists it.
+bool ApplyDesiredHueSetting(int hue, bool persist = true);
+/// @brief Applies piano mode and optionally persists it.
+bool ApplyPianoModeSetting(bool enabled, bool persist = true);
+/// @brief Applies bin grouping in memory.
+bool ApplyBinGroupingSetting(int value);
+/// @brief Applies bar spacing in memory.
+bool ApplyBarSpacingSetting(int value);
+/// @brief Applies bar alter draw in memory.
+bool ApplyBarAlterDrawSetting(int value);
+/// @brief Applies fading wave mode in memory.
+bool ApplyFadingWaveModeSetting(bool enabled);
+/// @brief Applies Shazam mode in memory only.
+bool ApplyShazamModeSetting(bool enabled);
+/// @brief Applies night mode and optionally persists it.
+bool ApplyNightModeSetting(bool enabled, bool persist = true);
+/// @brief Requests an ASAP recognition to the Shazam service.
+void TriggerShazamRecognizeAsap();
 
 #include "Effects.h"  //uses some of the vars declared in Global
 #include "Tasks.h"    //tasks might call some of the functions declared above
@@ -284,11 +310,11 @@ void UpdatePref(Prefs thePref) {
   }
 }
 
-void SetNightMode(bool nightOn) {
+void SetNightMode(bool nightOn, bool persistStyle) {
   _NightMode = nightOn;
   if (nightOn) {
     _MAX_MILLIS = NIGHT_MILLIS;
-    ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true);
+    ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true, persistStyle);
     _barAlterDraw = ALTERDRAW::ODD;
     _FadingWaveMode = false;  // no volem fer fading en aquest mode
     _barSpacing = 4;
@@ -296,7 +322,7 @@ void SetNightMode(bool nightOn) {
     _ShazamSongs = false;  // no volem detectar cançons en mode nit
   } else if (!nightOn) {
     _MAX_MILLIS = DEFAULT_MILLIS;
-    ChangeDrawStyle(DRAW_STYLE::VERT_FIRE, true);
+    ChangeDrawStyle(DRAW_STYLE::VERT_FIRE, true, persistStyle);
     _ShazamSongs = true;  // volem detectar cançons en mode dia
   }
   FastLED.setBrightness(_MAX_MILLIS);
@@ -315,13 +341,13 @@ void ProcessStyleChange(DRAW_STYLE oldStyle, DRAW_STYLE newStyle) {
 }
 
 namespace {
-bool ApplyDrawStyleChange(DRAW_STYLE style, bool forceChange) {
+bool ApplyDrawStyleChange(DRAW_STYLE style, bool forceChange, bool persist) {
   bool allowStyleChange = _TheDrawStyle != DRAW_STYLE::CALC_MODE || forceChange;
 
   if (allowStyleChange && _TheDrawStyle != style) {
     ProcessStyleChange(_TheDrawStyle, style);
     _TheDrawStyle = style;
-    if (style != DRAW_STYLE::CALC_MODE) {
+    if (style != DRAW_STYLE::CALC_MODE && persist) {
       UpdatePref(Prefs::PR_STYLE);
     } else {
       _LastCalcKeyPressed = millis();
@@ -334,9 +360,167 @@ bool ApplyDrawStyleChange(DRAW_STYLE style, bool forceChange) {
     SendDebugMessage(Utils::string_format("Updated DrawStyle=%d", (int)_TheDrawStyle).c_str());
     return true;
   }
+
+  if (allowStyleChange && persist && style != DRAW_STYLE::CALC_MODE) {
+    UpdatePref(Prefs::PR_STYLE);
+  }
   return false;
 }
 }  // namespace
+
+DRAW_STYLE ClampDrawStyle(int styleValue, DRAW_STYLE maxStyle) {
+  return (DRAW_STYLE)max(min(styleValue, (int)maxStyle), (int)DRAW_STYLE::BARS_WITH_TOP);
+}
+
+uint8_t ClampBinGrouping(int value) {
+  return (uint8_t)max(min(value, 8), 1);
+}
+
+uint8_t GetMaxBarSpacingForGrouping(uint8_t grouping) {
+  return grouping > 1 ? (grouping - 1) : 0;
+}
+
+bool ApplyIntensitySetting(int intensity, bool persist) {
+  uint16_t newIntensity = (uint16_t)max(min(intensity, 255), 0);
+  if (_MAX_MILLIS == newIntensity) {
+    if (persist) {
+      UpdatePref(Prefs::PR_INTENSITY);
+    }
+    return false;
+  }
+
+  _MAX_MILLIS = newIntensity;
+  FastLED.setBrightness(_MAX_MILLIS);
+  if (persist) {
+    UpdatePref(Prefs::PR_INTENSITY);
+  }
+  SendDebugMessage(Utils::string_format("Updated intensity=%d", _MAX_MILLIS).c_str());
+  return true;
+}
+
+bool ApplyDesiredHueSetting(int hue, bool persist) {
+  int16_t newHue = (int16_t)max(min(hue, 255), -1);
+  if (_TheDesiredHue == newHue) {
+    if (persist) {
+      UpdatePref(Prefs::PR_CUSTOM_HUE);
+    }
+    return false;
+  }
+
+  _TheDesiredHue = newHue;
+  _DesiredHueLastSet = millis();
+  if (persist) {
+    UpdatePref(Prefs::PR_CUSTOM_HUE);
+  }
+  SendDebugMessage(Utils::string_format("Updated Hue=%d", _TheDesiredHue).c_str());
+  return true;
+}
+
+bool ApplyPianoModeSetting(bool enabled, bool persist) {
+  if (_pianoMode == enabled) {
+    if (persist) {
+      UpdatePref(Prefs::PR_PIANOMODE);
+    }
+    return false;
+  }
+
+  _pianoMode = enabled;
+  if (persist) {
+    UpdatePref(Prefs::PR_PIANOMODE);
+  }
+  SendDebugMessage(Utils::string_format("Piano Mode %s!!", _pianoMode ? "ON" : "OFF").c_str());
+  return true;
+}
+
+bool ApplyBinGroupingSetting(int value) {
+  uint8_t newGrouping = ClampBinGrouping(value);
+  bool changed = _binGrouping != newGrouping;
+
+  _binGrouping = newGrouping;
+  uint8_t maxSpacing = GetMaxBarSpacingForGrouping(_binGrouping);
+  if (_barSpacing > maxSpacing) {
+    _barSpacing = maxSpacing;
+    changed = true;
+  }
+
+  if (changed) {
+    SendDebugMessage(Utils::string_format("BinGrouping=%d", (int)_binGrouping).c_str());
+  }
+  return changed;
+}
+
+bool ApplyBarSpacingSetting(int value) {
+  uint8_t maxSpacing = GetMaxBarSpacingForGrouping(_binGrouping);
+  uint8_t newSpacing = (uint8_t)max(min(value, (int)maxSpacing), 0);
+  if (_barSpacing == newSpacing) {
+    return false;
+  }
+
+  _barSpacing = newSpacing;
+  SendDebugMessage(Utils::string_format("BarSpacing=%d", (int)_barSpacing).c_str());
+  return true;
+}
+
+bool ApplyBarAlterDrawSetting(int value) {
+  ALTERDRAW newAlter = (ALTERDRAW)max(min(value, (int)ALTERDRAW::ALTERNATE), (int)ALTERDRAW::NO_ALTER);
+  if (_barAlterDraw == newAlter) {
+    return false;
+  }
+
+  _barAlterDraw = newAlter;
+  SendDebugMessage(Utils::string_format("BarAlterDraw=%d", (int)_barAlterDraw).c_str());
+  return true;
+}
+
+bool ApplyFadingWaveModeSetting(bool enabled) {
+  if (_FadingWaveMode == enabled) {
+    return false;
+  }
+
+  _FadingWaveMode = enabled;
+  SendDebugMessage(Utils::string_format("Fading Wave Mode %s!!", _FadingWaveMode ? "ON" : "OFF").c_str());
+  return true;
+}
+
+bool ApplyShazamModeSetting(bool enabled) {
+  if (_ShazamSongs == enabled) {
+    return false;
+  }
+
+  _ShazamSongs = enabled;
+  if (enabled) {
+    _ShazamActivationTime = millis();
+    SendDebugMessage("Shazam Mode ON!!");
+  } else {
+    _DisplayAsapIndicator = false;
+    SendDebugMessage("Shazam Mode OFF!!");
+  }
+  return true;
+}
+
+bool ApplyNightModeSetting(bool enabled, bool persist) {
+  if (_NightMode == enabled) {
+    if (persist) {
+      UpdatePref(Prefs::PR_NIGHTMODE);
+    }
+    return false;
+  }
+
+  SetNightMode(enabled, persist);
+  if (persist) {
+    UpdatePref(Prefs::PR_NIGHTMODE);
+  }
+  SendDebugMessage(Utils::string_format("Updated Nightmode=%d", (int)enabled).c_str());
+  return true;
+}
+
+void TriggerShazamRecognizeAsap() {
+  ApplyShazamModeSetting(true);
+  SendDebugMessage("Shazam Mode ON (ASAP)!!");
+  _DisplayAsapIndicator = true;
+  _AsapDetectionTime = millis();
+  _ThePubSub.publish(TOPIC_RECOGNIZE_ASAP, "1", false);
+}
 
 void ProcessPendingStyleChanges() {
   if (!_xQueStyleChange) {
@@ -344,16 +528,17 @@ void ProcessPendingStyleChanges() {
   }
   DrawStyleChangeRequest req;
   while (xQueueReceive(_xQueStyleChange, &req, 0) == pdPASS) {
-    ApplyDrawStyleChange(req.style, req.forceChange);
+    ApplyDrawStyleChange(req.style, req.forceChange, req.persist);
   }
 }
 
-bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange) {
+bool ChangeDrawStyle(DRAW_STYLE style, bool forceChange, bool persist) {
   if (!_xQueStyleChange) {
-    return ApplyDrawStyleChange(style, forceChange);
+    return ApplyDrawStyleChange(style, forceChange, persist);
   }
   DrawStyleChangeRequest req;
   req.style = style;
   req.forceChange = forceChange;
+  req.persist = persist;
   return xQueueOverwrite(_xQueStyleChange, &req) == pdPASS;
 }

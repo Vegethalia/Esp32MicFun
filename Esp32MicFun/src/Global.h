@@ -374,6 +374,7 @@ enum DRAW_STYLE {
 struct DrawStyleChangeRequest {
   DRAW_STYLE style;
   bool forceChange;
+  bool persist;
 };
 DRAW_STYLE _TheDrawStyle = DRAW_STYLE::DEFAULT_STYLE;
 int16_t _TheDesiredHue = -1;               // el custom color a aplicar. -1 -> color per defecte.
