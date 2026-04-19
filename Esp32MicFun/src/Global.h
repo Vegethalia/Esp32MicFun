@@ -175,6 +175,7 @@ bool _SongDesconeguda = false;        // true if we are displaying the "Desconeg
 uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was requested.
 bool _DebugMode = false;              // true if we want to send debug information via MQTT
 bool _FadingWaveMode = false;         // true if we want to display the fading wave effect
+bool _ClockZebraMode = false;         // true if we want to display the clock as a "zebra" (every other line is on, so it looks like a zebra pattern)
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 

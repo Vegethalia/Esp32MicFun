@@ -70,6 +70,8 @@ bool ApplyBarSpacingSetting(int value);
 bool ApplyBarAlterDrawSetting(int value);
 /// @brief Applies fading wave mode in memory.
 bool ApplyFadingWaveModeSetting(bool enabled);
+/// @brief Applies clock zebra mode in memory.
+bool ApplyClockZebraModeSetting(bool enabled);
 /// @brief Applies Shazam mode in memory only.
 bool ApplyShazamModeSetting(bool enabled);
 /// @brief Applies night mode and optionally persists it.

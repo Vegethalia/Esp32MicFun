@@ -127,6 +127,8 @@ String BuildStateJson() {
   json += String((int)_barAlterDraw);
   json += F(",\"fadingWave\":");
   json += (_FadingWaveMode ? F("true") : F("false"));
+  json += F(",\"clockZebra\":");
+  json += (_ClockZebraMode ? F("true") : F("false"));
   json += F("}");
   return json;
 }
@@ -187,6 +189,10 @@ bool ApplyPreviewControl(const String& control, const String& value) {
     ApplyFadingWaveModeSetting(value == "1");
     return true;
   }
+  if (control == "clockZebra") {
+    _ClockZebraMode = (value == "1");
+    return true;
+  }
   return false;
 }
 
@@ -225,7 +231,6 @@ String BuildPage(const String& statusMessage = "") {
       "h1{margin-bottom:6px;}form{background:#1d1d1d;padding:18px;border-radius:12px;}"
       "label{display:block;margin-top:14px;font-weight:bold;}"
       "select,input{width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #444;background:#222;color:#f5f5f5;box-sizing:border-box;}"
-      "input[type='range']{padding:0;}"
       ".checks{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;}"
       ".checks label{display:flex;align-items:center;gap:8px;margin:0;font-weight:normal;}"
       ".checks input{width:auto;margin:0;}"
@@ -272,28 +277,29 @@ String BuildPage(const String& statusMessage = "") {
   }
   html += F("</select>");
 
-  html += F("<label for='intensity'>Intensity <span id='intensityValue' class='value'>");
-  html += String((int)GetDisplayableIntensity());
-  html += F("</span></label>");
-  html += F("<input id='intensity' name='intensity' type='range' min='1' max='128' value='");
-  html += String((int)GetDisplayableIntensity());
-  html += F("'>");
+  html += F("<label for='intensity'>Intensity</label><select id='intensity' name='intensity'>");
+  {
+    const int intensityVals[] = {1, 2, 4, 8, 16, 32, 64, 128};
+    for (int v : intensityVals) {
+      String s = String(v);
+      AppendSelectOption(html, v, s.c_str(), (int)GetDisplayableIntensity());
+    }
+  }
+  html += F("</select>");
 
-  html += F("<label for='binGrouping'>Bin grouping <span id='binGroupingValue' class='value'>");
-  html += String((int)_binGrouping);
-  html += F("</span></label>");
-  html += F("<input id='binGrouping' type='range' min='1' max='8' value='");
-  html += String((int)_binGrouping);
-  html += F("'>");
+  html += F("<label for='binGrouping'>Bin grouping</label><select id='binGrouping'>");
+  for (int v = 1; v <= 8; v++) {
+    String s = String(v);
+    AppendSelectOption(html, v, s.c_str(), (int)_binGrouping);
+  }
+  html += F("</select>");
 
-  html += F("<label for='barSpacing'>Bar spacing <span id='barSpacingValue' class='value'>");
-  html += String((int)_barSpacing);
-  html += F("</span></label>");
-  html += F("<input id='barSpacing' type='range' min='0' max='");
-  html += String((int)GetMaxBarSpacingForGrouping(_binGrouping));
-  html += F("' value='");
-  html += String((int)_barSpacing);
-  html += F("'>");
+  html += F("<label for='barSpacing'>Bar spacing</label><select id='barSpacing'>");
+  for (int v = 0; v <= 7; v++) {
+    String s = String(v);
+    AppendSelectOption(html, v, s.c_str(), (int)_barSpacing);
+  }
+  html += F("</select>");
 
   html += F("<label for='barAlterDraw'>Bar alter draw</label><select id='barAlterDraw'>");
   AppendSelectOption(html, (int)ALTERDRAW::NO_ALTER, GetBarAlterDrawName(ALTERDRAW::NO_ALTER), (int)_barAlterDraw);
@@ -322,6 +328,11 @@ String BuildPage(const String& statusMessage = "") {
     html += F(" checked");
   }
   html += F(">Fading wave mode</label>");
+  html += F("<label for='clockZebra'><input id='clockZebra' type='checkbox'");
+  if (_ClockZebraMode) {
+    html += F(" checked");
+  }
+  html += F(">Clock zebra mode</label>");
   html += F("</div>");
 
   html += F("<p class='muted'>Els canvis s'apliquen al moment al control modificat. El boto Guardar nomes persisteix estil, hue, intensity, piano i night mode.</p>");
@@ -346,25 +357,48 @@ String BuildPage(const String& statusMessage = "") {
       "const nightInput=document.getElementById('night');"
       "const shazamInput=document.getElementById('shazam');"
       "const fadingWaveInput=document.getElementById('fadingWave');"
-      "const rangeLabels={intensity:document.getElementById('intensityValue'),binGrouping:document.getElementById('binGroupingValue'),barSpacing:document.getElementById('barSpacingValue')};"
-      "const previewTimers={};"
+      "const clockZebraInput=document.getElementById('clockZebra');"
       "function showLiveStatus(msg){liveStatus.textContent=msg;liveStatus.style.display='block';}"
-      "function updateRangeLabels(){rangeLabels.intensity.textContent=intensityInput.value;rangeLabels.binGrouping.textContent=binGroupingInput.value;rangeLabels.barSpacing.textContent=barSpacingInput.value;}"
-      "function syncUi(){const maxSpacing=Math.max(Number(binGroupingInput.value)-1,0);barSpacingInput.max=String(maxSpacing);if(Number(barSpacingInput.value)>maxSpacing){barSpacingInput.value=String(maxSpacing);}barSpacingInput.disabled=maxSpacing===0;intensityInput.disabled=nightInput.checked;updateRangeLabels();}"
-      "function applyState(state){styleInput.value=String(state.style);hueInput.value=String(state.hue);intensityInput.value=String(state.intensity);pianoInput.checked=!!state.piano;nightInput.checked=!!state.night;shazamInput.checked=!!state.shazam;binGroupingInput.value=String(state.binGrouping);barSpacingInput.max=String(state.barSpacingMax);barSpacingInput.value=String(state.barSpacing);barAlterDrawInput.value=String(state.barAlterDraw);fadingWaveInput.checked=!!state.fadingWave;syncUi();}"
+      "function syncBarSpacing(maxVal){"
+        "const sel=barSpacingInput;"
+        "for(let i=0;i<sel.options.length;i++){const v=Number(sel.options[i].value);sel.options[i].disabled=v>maxVal;sel.options[i].hidden=v>maxVal;}"
+        "if(Number(sel.value)>maxVal){sel.value=String(maxVal);}"
+        "sel.disabled=maxVal===0;"
+      "}"
+      "function syncUi(){"
+        "const maxSpacing=Math.max(Number(binGroupingInput.value)-1,0);"
+        "syncBarSpacing(maxSpacing);"
+        "intensityInput.disabled=nightInput.checked;"
+      "}"
+      "function applyState(state){"
+        "styleInput.value=String(state.style);"
+        "hueInput.value=String(state.hue);"
+        "intensityInput.value=String(state.intensity);"
+        "pianoInput.checked=!!state.piano;"
+        "nightInput.checked=!!state.night;"
+        "shazamInput.checked=!!state.shazam;"
+        "binGroupingInput.value=String(state.binGrouping);"
+        "syncBarSpacing(state.barSpacingMax);"
+        "barSpacingInput.value=String(state.barSpacing);"
+        "barAlterDrawInput.value=String(state.barAlterDraw);"
+        "fadingWaveInput.checked=!!state.fadingWave;"
+        "clockZebraInput.checked=!!state.clockZebra;"
+        "syncUi();"
+      "}"
       "async function fetchState(){const res=await fetch('/state',{cache:'no-store'});if(!res.ok)throw new Error('state');applyState(await res.json());}"
       "async function previewControl(control,value){const body=new URLSearchParams();body.set('control',control);body.set('value',value);const res=await fetch('/preview',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});if(!res.ok)throw new Error('preview');applyState(await res.json());showLiveStatus('Canvi aplicat en viu.');}"
-      "function schedulePreview(control,value){clearTimeout(previewTimers[control]);previewTimers[control]=setTimeout(()=>{previewControl(control,value).catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.'));},120);}"
-      "styleInput.addEventListener('change',()=>previewControl('style',styleInput.value).catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "hueInput.addEventListener('change',()=>previewControl('hue',hueInput.value).catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "pianoInput.addEventListener('change',()=>previewControl('piano',pianoInput.checked?'1':'0').catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "nightInput.addEventListener('change',()=>previewControl('night',nightInput.checked?'1':'0').catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "shazamInput.addEventListener('change',()=>previewControl('shazam',shazamInput.checked?'1':'0').catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "barAlterDrawInput.addEventListener('change',()=>previewControl('barAlterDraw',barAlterDrawInput.value).catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "fadingWaveInput.addEventListener('change',()=>previewControl('fadingWave',fadingWaveInput.checked?'1':'0').catch(()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.')));"
-      "intensityInput.addEventListener('input',()=>{updateRangeLabels();schedulePreview('intensity',intensityInput.value);});"
-      "binGroupingInput.addEventListener('input',()=>{updateRangeLabels();schedulePreview('binGrouping',binGroupingInput.value);});"
-      "barSpacingInput.addEventListener('input',()=>{updateRangeLabels();schedulePreview('barSpacing',barSpacingInput.value);});"
+      "const noErr=()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.');"
+      "styleInput.addEventListener('change',()=>previewControl('style',styleInput.value).catch(noErr));"
+      "hueInput.addEventListener('change',()=>previewControl('hue',hueInput.value).catch(noErr));"
+      "intensityInput.addEventListener('change',()=>previewControl('intensity',intensityInput.value).catch(noErr));"
+      "pianoInput.addEventListener('change',()=>previewControl('piano',pianoInput.checked?'1':'0').catch(noErr));"
+      "nightInput.addEventListener('change',()=>previewControl('night',nightInput.checked?'1':'0').catch(noErr));"
+      "shazamInput.addEventListener('change',()=>previewControl('shazam',shazamInput.checked?'1':'0').catch(noErr));"
+      "binGroupingInput.addEventListener('change',()=>{syncUi();previewControl('binGrouping',binGroupingInput.value).catch(noErr);});"
+      "barSpacingInput.addEventListener('change',()=>previewControl('barSpacing',barSpacingInput.value).catch(noErr));"
+      "barAlterDrawInput.addEventListener('change',()=>previewControl('barAlterDraw',barAlterDrawInput.value).catch(noErr));"
+      "fadingWaveInput.addEventListener('change',()=>previewControl('fadingWave',fadingWaveInput.checked?'1':'0').catch(noErr));"
+      "clockZebraInput.addEventListener('change',()=>previewControl('clockZebra',clockZebraInput.checked?'1':'0').catch(noErr));"
       "document.getElementById('reloadConfigBtn').addEventListener('click',async()=>{try{await fetchState();showLiveStatus('Configuracio rellegida.');}catch{showLiveStatus('No s\\'ha pogut rellegir la configuracio.');}});"
       "document.getElementById('recognizeAsapBtn').addEventListener('click',async()=>{try{const res=await fetch('/shazam-asap',{method:'POST'});if(!res.ok)throw new Error('asap');applyState(await res.json());showLiveStatus('Shazam ASAP enviat.');}catch{showLiveStatus('No s\\'ha pogut enviar el Shazam ASAP.');}});"
       "syncUi();"

@@ -84,6 +84,6 @@ void DrawClock(
   if (intensityDivisor > 1) {
     intensity = (uint8_t)max(1, (int)intensity / intensityDivisor);
   }
-  _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, intensity, sat);
+  _ThePanel.DrawScreenBuffer(_u8g2.getBufferPtr(), _u8g2.getBufferTileWidth(), THE_PANEL_WIDTH, 2, baseHue++, intensity, sat, _ClockZebraMode);
   //        FastLED.show();
 }
