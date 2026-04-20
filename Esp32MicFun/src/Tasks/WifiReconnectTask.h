@@ -216,6 +216,12 @@ void Connect2MQTT() {
       if (!_ThePubSub.subscribe(TOPIC_FADINGWAVE_MODE)) {
         //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_FADINGWAVE_MODE);
       }
+      if (!_ThePubSub.subscribe(TOPIC_TEMP_TERRASSA)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_TEMP_TERRASSA);
+      }
+      if (!_ThePubSub.subscribe(TOPIC_TEMP_INTERIOR)) {
+        //   log_e("ERROR!! PubSubClient was not able to subscribe to [%s]", TOPIC_TEMP_INTERIOR);
+      }
     }
   }
 }
@@ -437,6 +443,12 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     }
   } else if (theTopic.find(TOPIC_FADINGWAVE_MODE) != std::string::npos) {
     ApplyFadingWaveModeSetting(std::atoi(theMsg.c_str()) != 0);
+  } else if (theTopic.find(TOPIC_TEMP_TERRASSA) != std::string::npos) {
+    _LastTempTerrassa = std::strtof(theMsg.c_str(), nullptr);
+    SendDebugMessage(Utils::string_format("Updated Temp Terrassa=%.2f°C", _LastTempTerrassa).c_str());
+  } else if (theTopic.find(TOPIC_TEMP_INTERIOR) != std::string::npos) {
+    _LastTempInterior = std::strtof(theMsg.c_str(), nullptr);
+    SendDebugMessage(Utils::string_format("Updated Temp Interior=%.2f°C", _LastTempInterior).c_str());
   } else {
     log_w("Unknown topic [%s] with message [%s]", theTopic.c_str(), theMsg.c_str());
   }

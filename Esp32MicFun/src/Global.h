@@ -176,6 +176,8 @@ uint32_t _AsapDetectionTime = 0;      // time when the ASAP detection was reques
 bool _DebugMode = false;              // true if we want to send debug information via MQTT
 bool _FadingWaveMode = false;         // true if we want to display the fading wave effect
 bool _ClockZebraMode = false;         // true if we want to display the clock as a "zebra" (every other line is on, so it looks like a zebra pattern)
+float _LastTempTerrassa = 0.0f;       // last temperature value from caseta/tempgrabber/temp2
+float _LastTempInterior = 0.0f;       // last temperature value from caseta/tempgrabber/temp3
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
@@ -218,6 +220,8 @@ bool _ClockZebraMode = false;         // true if we want to display the clock as
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
+#define TOPIC_TEMP_TERRASSA "caseta/tempgrabber/temp2"
+#define TOPIC_TEMP_INTERIOR "caseta/tempgrabber/temp3"
 
 #elif defined(PANEL_SIZE_96x54)
 #define OTA_PORT 3636
@@ -253,6 +257,8 @@ bool _ClockZebraMode = false;         // true if we want to display the clock as
 #define TOPIC_CPU_DRAWER "caseta/spectrometreBig/cpudrawer"
 #define TOPIC_CURRENT_WH "caseta/spectrometreBig/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometreBig/liveaudio"
+#define TOPIC_TEMP_TERRASSA "caseta/tempgrabber/temp2"
+#define TOPIC_TEMP_INTERIOR "caseta/tempgrabber/temp3"
 #endif
 
 // Preferences related
