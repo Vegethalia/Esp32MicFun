@@ -36,6 +36,7 @@ void vTaskDrawer(void* pvParameters) {
   MsgAudio2Draw mad;
   WiFiUDP myUdp;
   uint8_t calcDBs[THE_PANEL_WIDTH];
+  bool prevDisplayingClockScroll = false;
   // WiFiClient myTcp;
 
   while (true) {
@@ -106,12 +107,22 @@ void vTaskDrawer(void* pvParameters) {
           //_DemoMode = false;
         }
       } else {
+        // Check every 5 minutes if we should display date+temp scroll (only when no song is showing)
+        if ((millis() - _LastClockScrollTime) > (5 * 60 * 1000) && !_DisplayingSongName) {
+          _DisplayingClockScroll = true;
+          _LastClockScrollTime = millis();
+        }
+        bool clockScrollJustStarted = _DisplayingClockScroll && !prevDisplayingClockScroll;
+
         switch (_TheDrawStyle) {
           case DRAW_STYLE::BARS_WITH_TOP:
             FastLED.clear();
             DrawWave(mad);
             DrawLedBars(mad);
             DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
             break;
           case DRAW_STYLE::VERT_FIRE:
             FastLED.clear();
@@ -121,6 +132,9 @@ void vTaskDrawer(void* pvParameters) {
               DrawPulses(mad);
             }
             DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
             break;
           case DRAW_STYLE::HORIZ_FIRE:
             DrawHorizSpectrogram(mad);
@@ -134,6 +148,9 @@ void vTaskDrawer(void* pvParameters) {
             DrawWave(mad);
             DrawCurrentGraph(mad);
             DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
             break;
           case DRAW_STYLE::MATRIX_FFT:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
@@ -141,6 +158,9 @@ void vTaskDrawer(void* pvParameters) {
             DrawWave(mad);
             DrawMatrixFFT(mad);
             DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
             break;
           case DRAW_STYLE::DISCO_LIGHTS:
             //_ThePubSub.publish(TOPIC_DEBUG, "Current", false);
@@ -151,6 +171,9 @@ void vTaskDrawer(void* pvParameters) {
             DrawMatrixFFT(mad);
             DrawDiscoLights(mad);
             DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
             break;
           case DRAW_STYLE::CALC_MODE:
             FastLED.clear();
@@ -173,6 +196,7 @@ void vTaskDrawer(void* pvParameters) {
         }
       }
 
+      prevDisplayingClockScroll = _DisplayingClockScroll;
       ProcessShazamMode(mad);
 
       // DrawGrays();

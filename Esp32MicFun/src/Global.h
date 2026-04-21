@@ -178,6 +178,8 @@ bool _FadingWaveMode = false;         // true if we want to display the fading w
 bool _ClockZebraMode = false;         // true if we want to display the clock as a "zebra" (every other line is on, so it looks like a zebra pattern)
 float _LastTempTerrassa = 0.0f;       // last temperature value from caseta/tempgrabber/temp2
 float _LastTempInterior = 0.0f;       // last temperature value from caseta/tempgrabber/temp3
+uint32_t _LastClockScrollTime = 0;    // last time clock scroll was displayed (every 5 minutes)
+bool _DisplayingClockScroll = false;  // true if we are displaying the clock scroll with data and temperatures
 
 // esp_adc_cal_characteristics_t* _adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
@@ -457,6 +459,26 @@ bool _ThumbnailReady = false;                      // true if the thumbnail imag
 DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received
 uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in place before displaying the thumbnail
+
+struct SongEntry {
+  std::string name;
+  uint32_t detectionMillis;
+  time_t detectionWallTime;
+};
+
+constexpr uint8_t MAX_SONG_HISTORY = 10;
+std::vector<SongEntry> _SongHistory;
+
+inline void AddSongToHistory(const std::string& name) {
+  SongEntry entry;
+  entry.name = name;
+  entry.detectionMillis = millis();
+  entry.detectionWallTime = time(nullptr);
+  _SongHistory.insert(_SongHistory.begin(), entry);
+  if (_SongHistory.size() > MAX_SONG_HISTORY) {
+    _SongHistory.resize(MAX_SONG_HISTORY);
+  }
+}
 
 void SendDebugMessage(const char* msg) {
   if (_DebugMode && _ThePubSub.connected()) {

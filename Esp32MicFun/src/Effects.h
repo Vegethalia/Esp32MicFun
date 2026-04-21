@@ -9,6 +9,7 @@
 #include "Effects/CalcMode.h"
 #include "Effects/CurrentGraph.h"
 #include "Effects/DiscoLights.h"
+#include "Effects/DrawClockWithDataAndTemp.h"
 #include "Effects/DrawSongName.h"
 #include "Effects/DrawThumbnail.h"
 #include "Effects/Frame.h"

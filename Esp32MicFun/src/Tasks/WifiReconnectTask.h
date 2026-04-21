@@ -20,7 +20,7 @@ void vTaskWifiReconnect(void* pvParameters) {
   auto lastCheck = millis();
   // WiFiClientFixed httpWifiClient;
   // HTTPClient theHttpClient;
-  WiFiClientSecure* __httpWifiClient = new WiFiClientSecure();
+  //WiFiClientSecure* __httpWifiClient = new WiFiClientSecure();
   HTTPClient* __theHttpClient = new HTTPClient();
   std::string theUrl;
   time_t now;
@@ -85,7 +85,7 @@ void vTaskWifiReconnect(void* pvParameters) {
                                     CONSUM_ELECTRICITAT_URL, (int64_t)now, (THE_PANEL_WIDTH - 1), _MaxWhToShow, mapMax, _AgrupaConsumsPerMinuts, CONSUM_ELECTRICITAT_KEY);
       SendDebugMessage(Utils::string_format("ConsumURL=[%s]", theUrl.c_str()).c_str());
 
-      __httpWifiClient->setInsecure();
+      //__httpWifiClient->setInsecure();
 
       __theHttpClient->setConnectTimeout(2000);
       //__theHttpClient->setReuse(false);
@@ -418,6 +418,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     }
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
+    AddSongToHistory(_DetectedSongName);
     SendDebugMessage(Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str());
   } else if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
     SendDebugMessage(Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str());

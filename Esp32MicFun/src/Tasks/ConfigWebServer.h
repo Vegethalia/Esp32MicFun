@@ -219,9 +219,97 @@ void PersistRequestValues() {
   }
 }
 
+String FormatDetectionTime(time_t t) {
+  if (t == 0) return "--:--:--";
+  struct tm* ti = localtime(&t);
+  char buf[10];
+  snprintf(buf, sizeof(buf), "%02d:%02d:%02d", ti->tm_hour, ti->tm_min, ti->tm_sec);
+  return String(buf);
+}
+
+String BuildSongHistoryHtml() {
+  if (_SongHistory.empty()) return "";
+
+  String html;
+  html.reserve(2048);
+
+  bool nowPlaying = (millis() - _SongHistory[0].detectionMillis) < 3 * 60 * 1000UL;
+
+  html += F("<h2 style='margin-top:32px;'>Can&#231;ons reconegudes</h2>");
+
+  uint8_t listStart = 0;
+  if (nowPlaying) {
+    listStart = 1;
+    const SongEntry& s = _SongHistory[0];
+    html += F("<div class='nowplaying-box'>");
+    html += F("<div class='nowplaying-title'>&#127925; Est&agrave; sonant</div>");
+    html += "<div class='nowplaying-name'>" + String(s.name.c_str()) + "</div>";
+    html += "<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>";
+    if (_ThumbnailReady && (int)_ThumbnailImg.size() >= THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT) {
+      html += F("<img src='/thumbnail.bmp' class='nowplaying-img' alt='portada'>");
+    }
+    html += F("</div>");
+  }
+
+  if ((uint8_t)_SongHistory.size() > listStart) {
+    html += F("<ul class='song-history'>");
+    for (uint8_t i = listStart; i < (uint8_t)_SongHistory.size(); i++) {
+      html += F("<li><span class='song-time'>");
+      html += FormatDetectionTime(_SongHistory[i].detectionWallTime);
+      html += F("</span><span class='song-name'>");
+      html += String(_SongHistory[i].name.c_str());
+      html += F("</span></li>");
+    }
+    html += F("</ul>");
+  }
+  return html;
+}
+
+void HandleThumbnail() {
+  if (!_ThumbnailReady || (int)_ThumbnailImg.size() < THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT) {
+    _server.send(404, "text/plain", "No thumbnail");
+    return;
+  }
+
+  const int rowStride = THUMBNAIL_WIDTH * 3;  // 72*3=216 and 52*3=156 are both multiples of 4
+  const uint32_t pixelDataSize = (uint32_t)rowStride * THUMBNAIL_HEIGHT;
+  const uint32_t fileSize = 54 + pixelDataSize;
+
+  auto le32 = [](uint8_t* p, uint32_t v) {
+    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
+  };
+
+  uint8_t bmpHeader[54] = {};
+  bmpHeader[0] = 'B'; bmpHeader[1] = 'M';
+  le32(&bmpHeader[2], fileSize);
+  bmpHeader[10] = 54;  // pixel data offset
+  bmpHeader[14] = 40;  // DIB header size
+  le32(&bmpHeader[18], (uint32_t)THUMBNAIL_WIDTH);
+  le32(&bmpHeader[22], (uint32_t)THUMBNAIL_HEIGHT);
+  bmpHeader[26] = 1;   // color planes
+  bmpHeader[28] = 24;  // bits per pixel (RGB888)
+  le32(&bmpHeader[34], pixelDataSize);
+
+  _server.sendHeader("Cache-Control", "no-store");
+  _server.setContentLength(fileSize);
+  _server.send(200, "image/bmp", "");
+  _server.sendContent(reinterpret_cast<const char*>(bmpHeader), 54);
+
+  std::vector<uint8_t> rowBuf(rowStride);
+  for (int row = THUMBNAIL_HEIGHT - 1; row >= 0; row--) {
+    for (int col = 0; col < THUMBNAIL_WIDTH; col++) {
+      const CRGB& c = _ThumbnailImg[row * THUMBNAIL_WIDTH + col];
+      rowBuf[col * 3 + 0] = c.b;
+      rowBuf[col * 3 + 1] = c.g;
+      rowBuf[col * 3 + 2] = c.r;
+    }
+    _server.sendContent(reinterpret_cast<const char*>(rowBuf.data()), rowStride);
+  }
+}
+
 String BuildPage(const String& statusMessage = "") {
   String html;
-  html.reserve(11000);
+  html.reserve(13000);
   html += F(
       "<!doctype html><html><head><meta charset='utf-8'>"
       "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -240,6 +328,16 @@ String BuildPage(const String& statusMessage = "") {
       "#recognizeAsapBtn{background:#7c3aed;}"
       "#reloadConfigBtn{background:#4b5563;}"
       ".status{background:#173b22;color:#c7ffd8;padding:10px 12px;border-radius:8px;margin-bottom:16px;}"
+      ".nowplaying-box{background:#1e1b4b;border:1px solid #6d28d9;border-radius:12px;padding:18px;margin-top:24px;}"
+      ".nowplaying-title{color:#a78bfa;font-weight:bold;font-size:1.05rem;margin-bottom:10px;}"
+      ".nowplaying-name{font-size:1.3rem;font-weight:bold;margin-bottom:4px;word-break:break-word;}"
+      ".nowplaying-time{color:#bbb;font-size:.9rem;margin-bottom:4px;}"
+      ".nowplaying-img{display:block;max-width:288px;width:100%;border-radius:6px;image-rendering:pixelated;margin-top:12px;}"
+      ".song-history{list-style:none;padding:0;margin:14px 0 0 0;}"
+      ".song-history li{display:flex;gap:14px;padding:8px 2px;border-bottom:1px solid #2a2a2a;}"
+      ".song-history li:last-child{border-bottom:none;}"
+      ".song-time{color:#888;font-size:.9rem;white-space:nowrap;min-width:68px;}"
+      ".song-name{color:#e5e5e5;}"
       ".muted{color:#bbb;font-size:.95rem;}"
       ".value{color:#93c5fd;font-weight:normal;}"
       "</style></head><body><h1>MicFun config</h1>");
@@ -342,6 +440,8 @@ String BuildPage(const String& statusMessage = "") {
       "<button id='recognizeAsapBtn' type='button'>Shazam recognize ASAP</button>"
       "<button type='submit'>Guardar</button>"
       "</div></form>");
+
+  html += BuildSongHistoryHtml();
 
   html += F(
       "<script>"
@@ -452,6 +552,7 @@ inline void SetupIfNeeded() {
   _server.on("/preview", HTTP_POST, []() { HandlePreview(); });
   _server.on("/save", HTTP_POST, []() { HandleSave(); });
   _server.on("/shazam-asap", HTTP_POST, []() { HandleShazamRecognizeAsap(); });
+  _server.on("/thumbnail.bmp", HTTP_GET, []() { HandleThumbnail(); });
   _server.on("/favicon.ico", HTTP_GET, []() { _server.send(204); });
   _server.onNotFound([]() {
     _server.sendHeader("Location", "/", true);
