@@ -90,6 +90,14 @@ bool IsNamedHue(int16_t hue) {
   return false;
 }
 
+void SendChunk(const char* s) {
+  _server.sendContent(s);
+}
+
+void SendChunk(const String& s) {
+  _server.sendContent(s);
+}
+
 void AppendSelectOption(String& html, int value, const char* label, int selectedValue) {
   html += F("<option value='");
   html += String(value);
@@ -100,6 +108,19 @@ void AppendSelectOption(String& html, int value, const char* label, int selected
   html += ">";
   html += label;
   html += F("</option>");
+}
+
+void SendSelectOption(int value, const char* label, int selectedValue) {
+  String opt;
+  opt.reserve(64);
+  opt += F("<option value='");
+  opt += String(value);
+  opt += '\'';
+  if (value == selectedValue) opt += F(" selected");
+  opt += '>';
+  opt += label;
+  opt += F("</option>");
+  SendChunk(opt);
 }
 
 String BuildStateJson() {
@@ -234,59 +255,49 @@ String SanitizeSongName(const std::string& name) {
   return s;
 }
 
-String BuildSongHistoryHtml() {
-  if (_SongHistory.empty()) return "";
+void StreamSongEntry(const SongEntry& s) {
+  SendChunk("<li><span class='song-name'>" + SanitizeSongName(s.name) +
+            "</span>"
+            "<span class='song-time'>" +
+            FormatDetectionTime(s.detectionWallTime) + "</span>");
+  if (!s.artworkUrl.empty()) {
+    SendChunk("<img src='" + String(s.artworkUrl.c_str()) + "' class='nowplaying-img' alt=''>");
+  }
+  SendChunk(F("</li>"));
+}
 
-  String html;
-  html.reserve(2048);
+void StreamSongHistory() {
+  if (_SongHistory.empty()) return;
 
   bool nowPlaying = (millis() - _SongHistory[0].detectionMillis) < 3 * 60 * 1000UL;
-  bool hasThumbnail = _ThumbnailReady && (int)_ThumbnailImg.size() >= THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT;
 
-  html += F("<h2 style='margin-top:32px;'>Can&#231;ons reconegudes</h2>");
+  SendChunk(F("<h2 style='margin-top:32px;'>Can&#231;ons reconegudes</h2>"));
 
   if (nowPlaying) {
     const SongEntry& s = _SongHistory[0];
-    html += F("<div class='nowplaying-box'>");
-    html += F("<div class='nowplaying-title'>&#127925; Est&agrave; sonant</div>");
-    html += F("<div class='nowplaying-layout'>");
-
-    // Columna esquerra: nom, hora i imatge
-    html += F("<div class='nowplaying-left'>");
-    html += "<div class='nowplaying-name'>" + SanitizeSongName(s.name) + "</div>";
-    html += "<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>";
-    if (hasThumbnail) {
-      html += F("<img src='/thumbnail.bmp' class='nowplaying-img' alt='portada'>");
+    SendChunk(F("<div class='nowplaying-box'>"));
+    SendChunk(F("<div class='nowplaying-title'>&#127925; Est&agrave; sonant</div>"));
+    SendChunk("<div class='nowplaying-name'>" + SanitizeSongName(s.name) + "</div>");
+    SendChunk("<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>");
+    if (!s.artworkUrl.empty()) {
+      SendChunk("<img src='" + String(s.artworkUrl.c_str()) + "' class='nowplaying-img' alt='portada'>");
     }
-    html += F("</div>");
+    SendChunk(F("</div>"));
 
-    // Columna dreta: llista de cançons anteriors
     if (_SongHistory.size() > 1) {
-      html += F("<div class='nowplaying-right'><ul class='song-history-inline'>");
+      SendChunk(F("<ul class='song-history'>"));
       for (uint8_t i = 1; i < (uint8_t)_SongHistory.size(); i++) {
-        html += F("<li><span class='song-time'>");
-        html += FormatDetectionTime(_SongHistory[i].detectionWallTime);
-        html += F("</span><span class='song-name'>");
-        html += SanitizeSongName(_SongHistory[i].name);
-        html += F("</span></li>");
+        StreamSongEntry(_SongHistory[i]);
       }
-      html += F("</ul></div>");
+      SendChunk(F("</ul>"));
     }
-
-    html += F("</div></div>");  // tanca nowplaying-layout + nowplaying-box
   } else {
-    // Sense "ara sonant": llista simple de totes les cançons
-    html += F("<ul class='song-history'>");
+    SendChunk(F("<ul class='song-history'>"));
     for (uint8_t i = 0; i < (uint8_t)_SongHistory.size(); i++) {
-      html += F("<li><span class='song-time'>");
-      html += FormatDetectionTime(_SongHistory[i].detectionWallTime);
-      html += F("</span><span class='song-name'>");
-      html += SanitizeSongName(_SongHistory[i].name);
-      html += F("</span></li>");
+      StreamSongEntry(_SongHistory[i]);
     }
-    html += F("</ul>");
+    SendChunk(F("</ul>"));
   }
-  return html;
 }
 
 void HandleThumbnail() {
@@ -300,11 +311,15 @@ void HandleThumbnail() {
   const uint32_t fileSize = 54 + pixelDataSize;
 
   auto le32 = [](uint8_t* p, uint32_t v) {
-    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
+    p[0] = v & 0xFF;
+    p[1] = (v >> 8) & 0xFF;
+    p[2] = (v >> 16) & 0xFF;
+    p[3] = (v >> 24) & 0xFF;
   };
 
   uint8_t bmpHeader[54] = {};
-  bmpHeader[0] = 'B'; bmpHeader[1] = 'M';
+  bmpHeader[0] = 'B';
+  bmpHeader[1] = 'M';
   le32(&bmpHeader[2], fileSize);
   bmpHeader[10] = 54;  // pixel data offset
   bmpHeader[14] = 40;  // DIB header size
@@ -331,13 +346,15 @@ void HandleThumbnail() {
   }
 }
 
-String BuildPage(const String& statusMessage = "") {
-  String html;
-  html.reserve(13000);
-  html += F(
+void StreamPage(const String& statusMessage = "") {
+  _server.sendHeader("Cache-Control", "no-store");
+  _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  _server.send(200, "text/html", "");
+
+  SendChunk(F(
       "<!doctype html><html><head><meta charset='utf-8'>"
       "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-      "<title>MicFun config</title>"
+      "<title>FlipaLeds Config</title>"
       "<style>"
       "body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:20px;background:#111;color:#f5f5f5;}"
       "h1{margin-bottom:6px;}form{background:#1d1d1d;padding:18px;border-radius:12px;}"
@@ -352,198 +369,181 @@ String BuildPage(const String& statusMessage = "") {
       "#recognizeAsapBtn{background:#7c3aed;}"
       "#reloadConfigBtn{background:#4b5563;}"
       ".status{background:#173b22;color:#c7ffd8;padding:10px 12px;border-radius:8px;margin-bottom:16px;}"
-      ".nowplaying-box{background:#1e1b4b;border:1px solid #6d28d9;border-radius:12px;padding:18px;margin-top:24px;}"
+      ".nowplaying-box{background:#1e1b4b;border:1px solid #6d28d9;border-radius:12px;padding:18px;margin-top:24px;text-align:center;}"
       ".nowplaying-title{color:#a78bfa;font-weight:bold;font-size:1.05rem;margin-bottom:10px;}"
       ".nowplaying-name{font-size:1.3rem;font-weight:bold;margin-bottom:4px;word-break:break-word;}"
       ".nowplaying-time{color:#bbb;font-size:.9rem;margin-bottom:4px;}"
-      ".nowplaying-img{display:block;width:100%;border-radius:6px;image-rendering:pixelated;margin-top:12px;}"
-      ".nowplaying-layout{display:flex;gap:18px;align-items:flex-start;margin-top:10px;}"
-      ".nowplaying-left{flex:0 0 50%;min-width:0;box-sizing:border-box;}"
-      ".nowplaying-right{flex:1;min-width:0;}"
-      ".song-history-inline{list-style:none;padding:0;margin:0;}"
-      ".song-history-inline li{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #3a3a5c;align-items:baseline;}"
-      ".song-history-inline li:last-child{border-bottom:none;}"
+      ".nowplaying-img{display:block;width:50%;margin:12px auto 0;border-radius:6px;}"
       ".song-history{list-style:none;padding:0;margin:14px 0 0 0;}"
-      ".song-history li{display:flex;gap:14px;padding:8px 2px;border-bottom:1px solid #2a2a2a;}"
+      ".song-history li{padding:12px 2px;border-bottom:1px solid #2a2a2a;text-align:center;}"
       ".song-history li:last-child{border-bottom:none;}"
-      ".song-time{color:#888;font-size:.9rem;white-space:nowrap;min-width:68px;}"
-      ".song-name{color:#e5e5e5;}"
+      ".song-time{color:#888;font-size:.9rem;}"
+      ".song-name{color:#e5e5e5;font-weight:bold;display:block;margin-bottom:4px;}"
       ".muted{color:#bbb;font-size:.95rem;}"
       ".value{color:#93c5fd;font-weight:normal;}"
-      "</style></head><body><h1>MicFun config</h1>");
+      "</style></head><body><h1>FlipaLeds Config</h1>"));
 
-  html += F("<p class='muted'>IP actual: ");
-  html += WiFi.localIP().toString();
-  html += F("</p>");
-
-  if (statusMessage.length() > 0) {
-    html += F("<div class='status'>");
-    html += statusMessage;
-    html += F("</div>");
+  {
+    uint32_t totalMin = millis() / 60000UL;
+    char uptime[10];
+    snprintf(uptime, sizeof(uptime), "%02lu:%02lu", totalMin / 60, totalMin % 60);
+    SendChunk(F("<p class='muted'>IP actual: "));
+    SendChunk(WiFi.localIP().toString());
+    SendChunk(F(" &nbsp;|&nbsp; Actiu: "));
+    SendChunk(uptime);
+    SendChunk(F("</p>"));
   }
 
-  html += F("<div id='liveStatus' class='status' style='display:none;'></div>");
-  html += F("<form id='configForm' method='post' action='/save'>");
+  if (statusMessage.length() > 0) {
+    SendChunk(F("<div class='status'>"));
+    SendChunk(statusMessage);
+    SendChunk(F("</div>"));
+  }
 
-  html += F("<label for='style'>Estil</label><select id='style' name='style'>");
-  AppendSelectOption(html, (int)DRAW_STYLE::BARS_WITH_TOP, GetStyleName(DRAW_STYLE::BARS_WITH_TOP), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::VERT_FIRE, GetStyleName(DRAW_STYLE::VERT_FIRE), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::HORIZ_FIRE, GetStyleName(DRAW_STYLE::HORIZ_FIRE), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::VISUAL_CURRENT, GetStyleName(DRAW_STYLE::VISUAL_CURRENT), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::MATRIX_FFT, GetStyleName(DRAW_STYLE::MATRIX_FFT), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::DISCO_LIGHTS, GetStyleName(DRAW_STYLE::DISCO_LIGHTS), (int)GetDisplayableStyle());
-  AppendSelectOption(html, (int)DRAW_STYLE::ANALOG_CLOCK, GetStyleName(DRAW_STYLE::ANALOG_CLOCK), (int)GetDisplayableStyle());
-  html += F("</select>");
+  SendChunk(F("<div id='liveStatus' class='status' style='display:none;'></div>"));
+  SendChunk(F("<form id='configForm' method='post' action='/save'>"));
 
-  html += F("<label for='hue'>Basic Hue</label><select id='hue' name='hue'>");
+  SendChunk(F("<label for='style'>Estil</label><select id='style' name='style'>"));
+  SendSelectOption((int)DRAW_STYLE::BARS_WITH_TOP, GetStyleName(DRAW_STYLE::BARS_WITH_TOP), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::VERT_FIRE, GetStyleName(DRAW_STYLE::VERT_FIRE), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::HORIZ_FIRE, GetStyleName(DRAW_STYLE::HORIZ_FIRE), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::VISUAL_CURRENT, GetStyleName(DRAW_STYLE::VISUAL_CURRENT), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::MATRIX_FFT, GetStyleName(DRAW_STYLE::MATRIX_FFT), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::DISCO_LIGHTS, GetStyleName(DRAW_STYLE::DISCO_LIGHTS), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::ANALOG_CLOCK, GetStyleName(DRAW_STYLE::ANALOG_CLOCK), (int)GetDisplayableStyle());
+  SendChunk(F("</select>"));
+
+  SendChunk(F("<label for='hue'>Basic Hue</label><select id='hue' name='hue'>"));
   for (const auto& option : _hueOptions) {
-    AppendSelectOption(html, option.value, option.label, _TheDesiredHue);
+    SendSelectOption(option.value, option.label, _TheDesiredHue);
   }
   if (!IsNamedHue(_TheDesiredHue)) {
     String customLabel = String("CUSTOM_") + String(_TheDesiredHue);
-    AppendSelectOption(html, _TheDesiredHue, customLabel.c_str(), _TheDesiredHue);
+    SendSelectOption(_TheDesiredHue, customLabel.c_str(), _TheDesiredHue);
   }
-  html += F("</select>");
+  SendChunk(F("</select>"));
 
-  html += F("<label for='intensity'>Intensity</label><select id='intensity' name='intensity'>");
-  {
-    const int intensityVals[] = {1, 2, 4, 8, 16, 32, 64, 128};
-    for (int v : intensityVals) {
-      String s = String(v);
-      AppendSelectOption(html, v, s.c_str(), (int)GetDisplayableIntensity());
-    }
+  SendChunk(F("<label for='intensity'>Intensity</label><select id='intensity' name='intensity'>"));
+  for (int v : {1, 2, 4, 8, 16, 32, 64, 128}) {
+    SendSelectOption(v, String(v).c_str(), (int)GetDisplayableIntensity());
   }
-  html += F("</select>");
+  SendChunk(F("</select>"));
 
-  html += F("<label for='binGrouping'>Bin grouping</label><select id='binGrouping'>");
-  for (int v = 1; v <= 8; v++) {
-    String s = String(v);
-    AppendSelectOption(html, v, s.c_str(), (int)_binGrouping);
-  }
-  html += F("</select>");
+  SendChunk(F("<label for='binGrouping'>Bin grouping</label><select id='binGrouping'>"));
+  for (int v = 1; v <= 8; v++) SendSelectOption(v, String(v).c_str(), (int)_binGrouping);
+  SendChunk(F("</select>"));
 
-  html += F("<label for='barSpacing'>Bar spacing</label><select id='barSpacing'>");
-  for (int v = 0; v <= 7; v++) {
-    String s = String(v);
-    AppendSelectOption(html, v, s.c_str(), (int)_barSpacing);
-  }
-  html += F("</select>");
+  SendChunk(F("<label for='barSpacing'>Bar spacing</label><select id='barSpacing'>"));
+  for (int v = 0; v <= 7; v++) SendSelectOption(v, String(v).c_str(), (int)_barSpacing);
+  SendChunk(F("</select>"));
 
-  html += F("<label for='barAlterDraw'>Bar alter draw</label><select id='barAlterDraw'>");
-  AppendSelectOption(html, (int)ALTERDRAW::NO_ALTER, GetBarAlterDrawName(ALTERDRAW::NO_ALTER), (int)_barAlterDraw);
-  AppendSelectOption(html, (int)ALTERDRAW::ODD, GetBarAlterDrawName(ALTERDRAW::ODD), (int)_barAlterDraw);
-  AppendSelectOption(html, (int)ALTERDRAW::ALTERNATE, GetBarAlterDrawName(ALTERDRAW::ALTERNATE), (int)_barAlterDraw);
-  html += F("</select>");
+  SendChunk(F("<label for='barAlterDraw'>Bar alter draw</label><select id='barAlterDraw'>"));
+  SendSelectOption((int)ALTERDRAW::NO_ALTER, GetBarAlterDrawName(ALTERDRAW::NO_ALTER), (int)_barAlterDraw);
+  SendSelectOption((int)ALTERDRAW::ODD, GetBarAlterDrawName(ALTERDRAW::ODD), (int)_barAlterDraw);
+  SendSelectOption((int)ALTERDRAW::ALTERNATE, GetBarAlterDrawName(ALTERDRAW::ALTERNATE), (int)_barAlterDraw);
+  SendChunk(F("</select>"));
 
-  html += F("<div class='checks'>");
-  html += F("<label for='piano'><input id='piano' name='piano' type='checkbox'");
-  if (_pianoMode) {
-    html += F(" checked");
-  }
-  html += F(">Piano mode</label>");
-  html += F("<label for='night'><input id='night' name='night' type='checkbox'");
-  if (_NightMode) {
-    html += F(" checked");
-  }
-  html += F(">Night mode</label>");
-  html += F("<label for='shazam'><input id='shazam' type='checkbox'");
-  if (_ShazamSongs) {
-    html += F(" checked");
-  }
-  html += F(">Shazam mode</label>");
-  html += F("<label for='fadingWave'><input id='fadingWave' type='checkbox'");
-  if (_FadingWaveMode) {
-    html += F(" checked");
-  }
-  html += F(">Fading wave mode</label>");
-  html += F("<label for='clockZebra'><input id='clockZebra' type='checkbox'");
-  if (_ClockZebraMode) {
-    html += F(" checked");
-  }
-  html += F(">Clock zebra mode</label>");
-  html += F("</div>");
+  SendChunk(F("<div class='checks'>"));
+  SendChunk(F("<label for='piano'><input id='piano' name='piano' type='checkbox'"));
+  if (_pianoMode) SendChunk(F(" checked"));
+  SendChunk(F(">Piano mode</label>"));
+  SendChunk(F("<label for='night'><input id='night' name='night' type='checkbox'"));
+  if (_NightMode) SendChunk(F(" checked"));
+  SendChunk(F(">Night mode</label>"));
+  SendChunk(F("<label for='shazam'><input id='shazam' type='checkbox'"));
+  if (_ShazamSongs) SendChunk(F(" checked"));
+  SendChunk(F(">Shazam mode</label>"));
+  SendChunk(F("<label for='fadingWave'><input id='fadingWave' type='checkbox'"));
+  if (_FadingWaveMode) SendChunk(F(" checked"));
+  SendChunk(F(">Fading wave mode</label>"));
+  SendChunk(F("<label for='clockZebra'><input id='clockZebra' type='checkbox'"));
+  if (_ClockZebraMode) SendChunk(F(" checked"));
+  SendChunk(F(">Clock zebra mode</label>"));
+  SendChunk(F("</div>"));
 
-  html += F("<p class='muted'>Els canvis s'apliquen al moment al control modificat. El boto Guardar nomes persisteix estil, hue, intensity, piano i night mode.</p>");
-  html += F(
+  SendChunk(F("<p class='muted'>Els canvis s'apliquen al moment al control modificat. El boto Guardar nomes persisteix estil, hue, intensity, piano i night mode.</p>"));
+  SendChunk(F(
       "<div class='actions'>"
       "<button id='reloadConfigBtn' type='button'>Rellegeix configuracio</button>"
       "<button id='recognizeAsapBtn' type='button'>Shazam recognize ASAP</button>"
       "<button type='submit'>Guardar</button>"
-      "</div></form>");
+      "</div></form>"));
 
-  html += BuildSongHistoryHtml();
+  StreamSongHistory();
 
-  html += F(
+  SendChunk(F(
       "<script>"
-      "const liveStatus=document.getElementById('liveStatus');"
-      "const form=document.getElementById('configForm');"
-      "const styleInput=document.getElementById('style');"
-      "const hueInput=document.getElementById('hue');"
-      "const intensityInput=document.getElementById('intensity');"
-      "const binGroupingInput=document.getElementById('binGrouping');"
-      "const barSpacingInput=document.getElementById('barSpacing');"
-      "const barAlterDrawInput=document.getElementById('barAlterDraw');"
-      "const pianoInput=document.getElementById('piano');"
-      "const nightInput=document.getElementById('night');"
-      "const shazamInput=document.getElementById('shazam');"
-      "const fadingWaveInput=document.getElementById('fadingWave');"
-      "const clockZebraInput=document.getElementById('clockZebra');"
+      "const g=id=>document.getElementById(id);"
+      "const liveStatus=g('liveStatus');"
+      "const styleInput=g('style');"
+      "const hueInput=g('hue');"
+      "const intensityInput=g('intensity');"
+      "const binGroupingInput=g('binGrouping');"
+      "const barSpacingInput=g('barSpacing');"
+      "const barAlterDrawInput=g('barAlterDraw');"
+      "const pianoInput=g('piano');"
+      "const nightInput=g('night');"
+      "const shazamInput=g('shazam');"
+      "const fadingWaveInput=g('fadingWave');"
+      "const clockZebraInput=g('clockZebra');"
       "function showLiveStatus(msg){liveStatus.textContent=msg;liveStatus.style.display='block';}"
       "function syncBarSpacing(maxVal){"
-        "const sel=barSpacingInput;"
-        "for(let i=0;i<sel.options.length;i++){const v=Number(sel.options[i].value);sel.options[i].disabled=v>maxVal;sel.options[i].hidden=v>maxVal;}"
-        "if(Number(sel.value)>maxVal){sel.value=String(maxVal);}"
-        "sel.disabled=maxVal===0;"
+      "const sel=barSpacingInput;"
+      "for(let i=0;i<sel.options.length;i++){const v=Number(sel.options[i].value);sel.options[i].disabled=v>maxVal;sel.options[i].hidden=v>maxVal;}"
+      "if(Number(sel.value)>maxVal){sel.value=String(maxVal);}"
+      "sel.disabled=maxVal===0;"
       "}"
       "function syncUi(){"
-        "const maxSpacing=Math.max(Number(binGroupingInput.value)-1,0);"
-        "syncBarSpacing(maxSpacing);"
-        "intensityInput.disabled=nightInput.checked;"
+      "const maxSpacing=Math.max(Number(binGroupingInput.value)-1,0);"
+      "syncBarSpacing(maxSpacing);"
+      "intensityInput.disabled=nightInput.checked;"
       "}"
       "function applyState(state){"
-        "styleInput.value=String(state.style);"
-        "hueInput.value=String(state.hue);"
-        "intensityInput.value=String(state.intensity);"
-        "pianoInput.checked=!!state.piano;"
-        "nightInput.checked=!!state.night;"
-        "shazamInput.checked=!!state.shazam;"
-        "binGroupingInput.value=String(state.binGrouping);"
-        "syncBarSpacing(state.barSpacingMax);"
-        "barSpacingInput.value=String(state.barSpacing);"
-        "barAlterDrawInput.value=String(state.barAlterDraw);"
-        "fadingWaveInput.checked=!!state.fadingWave;"
-        "clockZebraInput.checked=!!state.clockZebra;"
-        "syncUi();"
+      "styleInput.value=String(state.style);"
+      "hueInput.value=String(state.hue);"
+      "intensityInput.value=String(state.intensity);"
+      "pianoInput.checked=!!state.piano;"
+      "nightInput.checked=!!state.night;"
+      "shazamInput.checked=!!state.shazam;"
+      "binGroupingInput.value=String(state.binGrouping);"
+      "syncBarSpacing(state.barSpacingMax);"
+      "barSpacingInput.value=String(state.barSpacing);"
+      "barAlterDrawInput.value=String(state.barAlterDraw);"
+      "fadingWaveInput.checked=!!state.fadingWave;"
+      "clockZebraInput.checked=!!state.clockZebra;"
+      "syncUi();"
       "}"
       "async function fetchState(){const res=await fetch('/state',{cache:'no-store'});if(!res.ok)throw new Error('state');applyState(await res.json());}"
       "async function previewControl(control,value){const body=new URLSearchParams();body.set('control',control);body.set('value',value);const res=await fetch('/preview',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});if(!res.ok)throw new Error('preview');applyState(await res.json());showLiveStatus('Canvi aplicat en viu.');}"
       "const noErr=()=>showLiveStatus('No s\\'ha pogut aplicar el canvi.');"
-      "styleInput.addEventListener('change',()=>previewControl('style',styleInput.value).catch(noErr));"
-      "hueInput.addEventListener('change',()=>previewControl('hue',hueInput.value).catch(noErr));"
-      "intensityInput.addEventListener('change',()=>previewControl('intensity',intensityInput.value).catch(noErr));"
-      "pianoInput.addEventListener('change',()=>previewControl('piano',pianoInput.checked?'1':'0').catch(noErr));"
-      "nightInput.addEventListener('change',()=>previewControl('night',nightInput.checked?'1':'0').catch(noErr));"
-      "shazamInput.addEventListener('change',()=>previewControl('shazam',shazamInput.checked?'1':'0').catch(noErr));"
-      "binGroupingInput.addEventListener('change',()=>{syncUi();previewControl('binGrouping',binGroupingInput.value).catch(noErr);});"
-      "barSpacingInput.addEventListener('change',()=>previewControl('barSpacing',barSpacingInput.value).catch(noErr));"
-      "barAlterDrawInput.addEventListener('change',()=>previewControl('barAlterDraw',barAlterDrawInput.value).catch(noErr));"
-      "fadingWaveInput.addEventListener('change',()=>previewControl('fadingWave',fadingWaveInput.checked?'1':'0').catch(noErr));"
-      "clockZebraInput.addEventListener('change',()=>previewControl('clockZebra',clockZebraInput.checked?'1':'0').catch(noErr));"
-      "document.getElementById('reloadConfigBtn').addEventListener('click',async()=>{try{await fetchState();showLiveStatus('Configuracio rellegida.');}catch{showLiveStatus('No s\\'ha pogut rellegir la configuracio.');}});"
-      "document.getElementById('recognizeAsapBtn').addEventListener('click',async()=>{try{const res=await fetch('/shazam-asap',{method:'POST'});if(!res.ok)throw new Error('asap');applyState(await res.json());showLiveStatus('Shazam ASAP enviat.');}catch{showLiveStatus('No s\\'ha pogut enviar el Shazam ASAP.');}});"
+      "const on=(el,fn)=>el.addEventListener('change',fn);"
+      "on(styleInput,()=>previewControl('style',styleInput.value).catch(noErr));"
+      "on(hueInput,()=>previewControl('hue',hueInput.value).catch(noErr));"
+      "on(intensityInput,()=>previewControl('intensity',intensityInput.value).catch(noErr));"
+      "on(pianoInput,()=>previewControl('piano',pianoInput.checked?'1':'0').catch(noErr));"
+      "on(nightInput,()=>previewControl('night',nightInput.checked?'1':'0').catch(noErr));"
+      "on(shazamInput,()=>previewControl('shazam',shazamInput.checked?'1':'0').catch(noErr));"
+      "on(binGroupingInput,()=>{syncUi();previewControl('binGrouping',binGroupingInput.value).catch(noErr);});"
+      "on(barSpacingInput,()=>previewControl('barSpacing',barSpacingInput.value).catch(noErr));"
+      "on(barAlterDrawInput,()=>previewControl('barAlterDraw',barAlterDrawInput.value).catch(noErr));"
+      "on(fadingWaveInput,()=>previewControl('fadingWave',fadingWaveInput.checked?'1':'0').catch(noErr));"
+      "on(clockZebraInput,()=>previewControl('clockZebra',clockZebraInput.checked?'1':'0').catch(noErr));"
+      "g('reloadConfigBtn').addEventListener('click',async()=>{try{await fetchState();showLiveStatus('Configuracio rellegida.');}catch{showLiveStatus('No s\\'ha pogut rellegir la configuracio.');}});"
+      "g('recognizeAsapBtn').addEventListener('click',async()=>{try{const res=await fetch('/shazam-asap',{method:'POST'});if(!res.ok)throw new Error('asap');applyState(await res.json());showLiveStatus('Shazam ASAP enviat.');}catch{showLiveStatus('No s\\'ha pogut enviar el Shazam ASAP.');}});"
       "syncUi();"
-      "</script></body></html>");
+      "</script></body></html>"));
 
-  return html;
+  // Finalitza el chunked transfer
+  _server.sendContent("", 0);
 }
 
 void SendPage(const String& statusMessage = "") {
   _server.sendHeader("Cache-Control", "no-store");
-  _server.send(200, "text/html", BuildPage(statusMessage));
+  _server.send(200, "text/html", "");
 }
 
 void HandlePageRequest() {
-  SendPage(GetStatusMessageFromQuery());
+  StreamPage(GetStatusMessageFromQuery());
 }
 
 void HandlePreview() {

@@ -109,7 +109,7 @@ void vTaskWifiReconnect(void* pvParameters) {
       }
       __theHttpClient->end();
     }
-    delay(2000);
+    delay(50);
   }
 }
 
@@ -408,7 +408,14 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     ConfigureNTP();
     SendDebugMessage(Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str());
   } else if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
-    _DetectedSongName = theMsg;
+    std::string artworkUrl;
+    auto sep = theMsg.find("@@");
+    if (sep != std::string::npos) {
+      _DetectedSongName = theMsg.substr(0, sep);
+      artworkUrl = theMsg.substr(sep + 2);
+    } else {
+      _DetectedSongName = theMsg;
+    }
     _ShazamSongs = true;  // force to show the song name
     _DisplayAsapIndicator = false;
     _SongDesconeguda = false;
@@ -418,7 +425,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     }
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
-    if (!_SongDesconeguda) AddSongToHistory(_DetectedSongName);
+    if (!_SongDesconeguda) AddSongToHistory(_DetectedSongName, artworkUrl);
     SendDebugMessage(Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str());
   } else if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
     SendDebugMessage(Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str());

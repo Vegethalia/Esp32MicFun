@@ -22,7 +22,7 @@ void DrawClockWithDataAndTemp(bool resetTextPos = false) {
 
     _u8g2LongText.clearBuffer();
 #if defined(PANEL_SIZE_96x54)
-    vert = 2;
+    vert = 10;                                  // 10 pixels per pintar per sota la wave
     _u8g2LongText.setFont(u8g2_font_t0_12_tf);  // Same font as song name
 #elif defined(PANEL_SIZE_64x32)
     _u8g2LongText.setFont(u8g2_font_5x7_tf);

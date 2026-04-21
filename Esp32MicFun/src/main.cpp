@@ -167,7 +167,7 @@ void setup() {
   //  // xTaskCreatePinnedToCore(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle, 0);
   //  //	xTaskCreate(vTaskDrawLeds, "Draw Leds", 2048, (void*)&_TaskParams, 2, &_showLedsTaskHandle);
 
-  xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 6500, nullptr, 4, &_wifiReconnectTaskHandle, 1);  // 4096
+  xTaskCreatePinnedToCore(vTaskWifiReconnect, "Wifi Reconnect", 3500, nullptr, 4, &_wifiReconnectTaskHandle, 1);  // HWM min free: ~4200 of 6500 → peak ~2300
   // xTaskCreate(vTaskWifiReconnect, "Wifi Reconnect", 5000, nullptr, 4, &_wifiReconnectTaskHandle); // 4096
 
   // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);

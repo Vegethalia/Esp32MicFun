@@ -177,7 +177,7 @@ bool _DebugMode = false;              // true if we want to send debug informati
 bool _FadingWaveMode = false;         // true if we want to display the fading wave effect
 bool _ClockZebraMode = false;         // true if we want to display the clock as a "zebra" (every other line is on, so it looks like a zebra pattern)
 float _LastTempTerrassa = 0.0f;       // last temperature value from caseta/tempgrabber/temp2
-float _LastTempInterior = 0.0f;       // last temperature value from caseta/tempgrabber/temp3
+float _LastTempInterior = 0.0f;       // last temperature value from caseta/tempgrabber/temp3 o /temp1
 uint32_t _LastClockScrollTime = 0;    // last time clock scroll was displayed (every 5 minutes)
 bool _DisplayingClockScroll = false;  // true if we are displaying the clock scroll with data and temperatures
 
@@ -223,7 +223,7 @@ bool _DisplayingClockScroll = false;  // true if we are displaying the clock scr
 #define TOPIC_CURRENT_WH "caseta/spectrometre/currentwh"
 #define TOPIC_LIVEAUDIO "caseta/spectrometre/liveaudio"
 #define TOPIC_TEMP_TERRASSA "caseta/tempgrabber/temp2"
-#define TOPIC_TEMP_INTERIOR "caseta/tempgrabber/temp3"
+#define TOPIC_TEMP_INTERIOR "caseta/tempgrabber/temp1"
 
 #elif defined(PANEL_SIZE_96x54)
 #define OTA_PORT 3636
@@ -455,13 +455,14 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 #define THUMBNAIL_WIDTH 52
 #endif
 std::vector<CRGB> _ThumbnailImg;                   // vector of CRGB to store the thumbnail image (gamma-corrected, for LEDs)
-bool _ThumbnailReady = false;// true if the thumbnail image is ready to be displayed
+bool _ThumbnailReady = false;                      // true if the thumbnail image is ready to be displayed
 DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received
 uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in place before displaying the thumbnail
 
 struct SongEntry {
   std::string name;
+  std::string artworkUrl;
   uint32_t detectionMillis;
   time_t detectionWallTime;
 };
@@ -469,9 +470,10 @@ struct SongEntry {
 constexpr uint8_t MAX_SONG_HISTORY = 10;
 std::vector<SongEntry> _SongHistory;
 
-inline void AddSongToHistory(const std::string& name) {
+inline void AddSongToHistory(const std::string& name, const std::string& artworkUrl) {
   SongEntry entry;
   entry.name = name;
+  entry.artworkUrl = artworkUrl;
   entry.detectionMillis = millis();
   entry.detectionWallTime = time(nullptr);
   _SongHistory.insert(_SongHistory.begin(), entry);
