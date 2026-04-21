@@ -418,7 +418,7 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     }
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
-    AddSongToHistory(_DetectedSongName);
+    if (!_SongDesconeguda) AddSongToHistory(_DetectedSongName);
     SendDebugMessage(Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str());
   } else if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
     SendDebugMessage(Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str());

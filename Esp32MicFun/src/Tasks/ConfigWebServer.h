@@ -227,6 +227,13 @@ String FormatDetectionTime(time_t t) {
   return String(buf);
 }
 
+String SanitizeSongName(const std::string& name) {
+  String s(name.c_str());
+  s.replace("<", "[");
+  s.replace(">", "]");
+  return s;
+}
+
 String BuildSongHistoryHtml() {
   if (_SongHistory.empty()) return "";
 
@@ -234,30 +241,47 @@ String BuildSongHistoryHtml() {
   html.reserve(2048);
 
   bool nowPlaying = (millis() - _SongHistory[0].detectionMillis) < 3 * 60 * 1000UL;
+  bool hasThumbnail = _ThumbnailReady && (int)_ThumbnailImg.size() >= THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT;
 
   html += F("<h2 style='margin-top:32px;'>Can&#231;ons reconegudes</h2>");
 
-  uint8_t listStart = 0;
   if (nowPlaying) {
-    listStart = 1;
     const SongEntry& s = _SongHistory[0];
     html += F("<div class='nowplaying-box'>");
     html += F("<div class='nowplaying-title'>&#127925; Est&agrave; sonant</div>");
-    html += "<div class='nowplaying-name'>" + String(s.name.c_str()) + "</div>";
+    html += F("<div class='nowplaying-layout'>");
+
+    // Columna esquerra: nom, hora i imatge
+    html += F("<div class='nowplaying-left'>");
+    html += "<div class='nowplaying-name'>" + SanitizeSongName(s.name) + "</div>";
     html += "<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>";
-    if (_ThumbnailReady && (int)_ThumbnailImg.size() >= THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT) {
+    if (hasThumbnail) {
       html += F("<img src='/thumbnail.bmp' class='nowplaying-img' alt='portada'>");
     }
     html += F("</div>");
-  }
 
-  if ((uint8_t)_SongHistory.size() > listStart) {
+    // Columna dreta: llista de cançons anteriors
+    if (_SongHistory.size() > 1) {
+      html += F("<div class='nowplaying-right'><ul class='song-history-inline'>");
+      for (uint8_t i = 1; i < (uint8_t)_SongHistory.size(); i++) {
+        html += F("<li><span class='song-time'>");
+        html += FormatDetectionTime(_SongHistory[i].detectionWallTime);
+        html += F("</span><span class='song-name'>");
+        html += SanitizeSongName(_SongHistory[i].name);
+        html += F("</span></li>");
+      }
+      html += F("</ul></div>");
+    }
+
+    html += F("</div></div>");  // tanca nowplaying-layout + nowplaying-box
+  } else {
+    // Sense "ara sonant": llista simple de totes les cançons
     html += F("<ul class='song-history'>");
-    for (uint8_t i = listStart; i < (uint8_t)_SongHistory.size(); i++) {
+    for (uint8_t i = 0; i < (uint8_t)_SongHistory.size(); i++) {
       html += F("<li><span class='song-time'>");
       html += FormatDetectionTime(_SongHistory[i].detectionWallTime);
       html += F("</span><span class='song-name'>");
-      html += String(_SongHistory[i].name.c_str());
+      html += SanitizeSongName(_SongHistory[i].name);
       html += F("</span></li>");
     }
     html += F("</ul>");
@@ -298,10 +322,10 @@ void HandleThumbnail() {
   std::vector<uint8_t> rowBuf(rowStride);
   for (int row = THUMBNAIL_HEIGHT - 1; row >= 0; row--) {
     for (int col = 0; col < THUMBNAIL_WIDTH; col++) {
-      const CRGB& c = _ThumbnailImg[row * THUMBNAIL_WIDTH + col];
-      rowBuf[col * 3 + 0] = c.b;
-      rowBuf[col * 3 + 1] = c.g;
-      rowBuf[col * 3 + 2] = c.r;
+      const CRGB& px = _ThumbnailImg[row * THUMBNAIL_WIDTH + col];
+      rowBuf[col * 3 + 0] = px.b;
+      rowBuf[col * 3 + 1] = px.g;
+      rowBuf[col * 3 + 2] = px.r;
     }
     _server.sendContent(reinterpret_cast<const char*>(rowBuf.data()), rowStride);
   }
@@ -332,7 +356,13 @@ String BuildPage(const String& statusMessage = "") {
       ".nowplaying-title{color:#a78bfa;font-weight:bold;font-size:1.05rem;margin-bottom:10px;}"
       ".nowplaying-name{font-size:1.3rem;font-weight:bold;margin-bottom:4px;word-break:break-word;}"
       ".nowplaying-time{color:#bbb;font-size:.9rem;margin-bottom:4px;}"
-      ".nowplaying-img{display:block;max-width:288px;width:100%;border-radius:6px;image-rendering:pixelated;margin-top:12px;}"
+      ".nowplaying-img{display:block;width:100%;border-radius:6px;image-rendering:pixelated;margin-top:12px;}"
+      ".nowplaying-layout{display:flex;gap:18px;align-items:flex-start;margin-top:10px;}"
+      ".nowplaying-left{flex:0 0 50%;min-width:0;box-sizing:border-box;}"
+      ".nowplaying-right{flex:1;min-width:0;}"
+      ".song-history-inline{list-style:none;padding:0;margin:0;}"
+      ".song-history-inline li{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #3a3a5c;align-items:baseline;}"
+      ".song-history-inline li:last-child{border-bottom:none;}"
       ".song-history{list-style:none;padding:0;margin:14px 0 0 0;}"
       ".song-history li{display:flex;gap:14px;padding:8px 2px;border-bottom:1px solid #2a2a2a;}"
       ".song-history li:last-child{border-bottom:none;}"

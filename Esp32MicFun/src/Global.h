@@ -454,8 +454,8 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 #define THUMBNAIL_HEIGHT 32
 #define THUMBNAIL_WIDTH 52
 #endif
-std::vector<CRGB> _ThumbnailImg;                   // vector of CRGB to store the thumbnail image
-bool _ThumbnailReady = false;                      // true if the thumbnail image is ready to be displayed
+std::vector<CRGB> _ThumbnailImg;                   // vector of CRGB to store the thumbnail image (gamma-corrected, for LEDs)
+bool _ThumbnailReady = false;// true if the thumbnail image is ready to be displayed
 DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received
 uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in place before displaying the thumbnail
