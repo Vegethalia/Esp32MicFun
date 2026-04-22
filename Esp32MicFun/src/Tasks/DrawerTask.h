@@ -34,7 +34,6 @@ void vTaskDrawer(void* pvParameters) {
   uint32_t samplesDrawn = 0;
   uint16_t missedFrames = 0;
   MsgAudio2Draw mad;
-  WiFiUDP myUdp;
   uint8_t calcDBs[THE_PANEL_WIDTH];
   bool prevDisplayingClockScroll = false;
   // WiFiClient myTcp;
@@ -121,7 +120,7 @@ void vTaskDrawer(void* pvParameters) {
             DrawLedBars(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
-              DrawClockWithDataAndTemp(clockScrollJustStarted);
+              DrawClockWithDataAndTemp(clockScrollJustStarted, CLOCK_VERT_PIXELS + 2);
             }
             break;
           case DRAW_STYLE::VERT_FIRE:
@@ -133,7 +132,7 @@ void vTaskDrawer(void* pvParameters) {
             }
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
-              DrawClockWithDataAndTemp(clockScrollJustStarted);
+              DrawClockWithDataAndTemp(clockScrollJustStarted, CLOCK_VERT_PIXELS + 2);
             }
             break;
           case DRAW_STYLE::HORIZ_FIRE:
@@ -170,6 +169,14 @@ void vTaskDrawer(void* pvParameters) {
 #endif
             DrawMatrixFFT(mad);
             DrawDiscoLights(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
+          case DRAW_STYLE::FRACTAL_AUDIO:
+            FastLED.clear();
+            DrawFractalAudio(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);

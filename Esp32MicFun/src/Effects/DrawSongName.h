@@ -1,7 +1,7 @@
 
 // #include "GlobalDefines.h"
 
-void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = false) {
+void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = false, int16_t drawYOverride = -1) {
   static int16_t textPos = THE_PANEL_WIDTH - 2;
   static bool alreadyDrawedText = false;
   static int8_t vert = 0;
@@ -30,7 +30,7 @@ void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = fal
   }
   uint8_t intensity = std::min(std::max((uint8_t)(75), _1stBarValue), (uint8_t)(200));
   bool painting = _ThePanel.DrawScreenBufferXY(_u8g2LongText.getBufferPtr(), _u8g2LongText.getBufferTileWidth(), 0, 1,
-                                               textPos, CLOCK_VERT_PIXELS + vert, HSVHue::HUE_YELLOW, intensity, false, 128);
+                                               textPos, (drawYOverride >= 0 ? drawYOverride : CLOCK_VERT_PIXELS + vert), HSVHue::HUE_YELLOW, intensity, false, 128);
 
   textPos--;
 

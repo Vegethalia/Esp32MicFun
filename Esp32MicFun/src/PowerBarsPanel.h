@@ -485,6 +485,7 @@ class PowerBarsPanel {
     }
     _pTheLeds = pTheLeds;
     _pTheMapping = pTheMapping;
+    InitCircles();  // pre-alloc while heap is clean (avoids lazy alloc crash)
 
     return true;
   }
@@ -787,40 +788,36 @@ class PowerBarsPanel {
   }
 
   void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, CHSV color) {
-    if (_TheCircles.size() == 0) {  // lets create the circles!!
-      _TheCircles.push_back(new PreDrawmCircle(1));
-      _TheCircles.push_back(new PreDrawmCircle(2));
-      _TheCircles.push_back(new PreDrawmCircle(3));
-      //            _ThePubSub.publish(TOPIC_DEBUG, "Before Pushback", false);
-      _TheCircles.push_back(new PreDrawmCircle(4));
-      //            _ThePubSub.publish(TOPIC_DEBUG, "After Pushback", false);
-      _TheCircles.push_back(new PreDrawmCircle(5));
-      _TheCircles.push_back(new PreDrawmCircle(6));
-      _TheCircles.push_back(new PreDrawmCircle(7));
-      _TheCircles.push_back(new PreDrawmCircle(8));
-      _TheCircles.push_back(new PreDrawmCircle(8));
-#if defined(PANEL_SIZE_96x54)
-      _TheCircles.push_back(new PreDrawmCircle(9));
-      _TheCircles.push_back(new PreDrawmCircle(10));
-      _TheCircles.push_back(new PreDrawmCircle(11));
-      _TheCircles.push_back(new PreDrawmCircle(12));
-#endif
-    }
-    if (radius > 0) {
-      auto r = min((uint8_t)(radius - 1), (uint8_t)(_TheCircles.size() - 1));
-      auto pBuff = _TheCircles[r]->GetCircleBuffer();
+    if (radius == 0 || _TheCircles.empty()) return;
+    auto r = min((uint8_t)(radius - 1), (uint8_t)(_TheCircles.size() - 1));
+    auto* pCircle = _TheCircles[r];
+    if (!pCircle) return;
+    auto pBuff = pCircle->GetCircleBuffer();
 
-      for (int i = 0; i < pBuff->size(); i++) {
-        for (int j = 0; j < (*pBuff)[i].size(); j++) {
-          if ((*pBuff)[i][j] != 0) {
-            (*_pTheLeds)[_pTheMapping->XY(i + x - radius, j + y - radius)] = color;
-          }
+    for (int i = 0; i < pBuff->size(); i++) {
+      for (int j = 0; j < (*pBuff)[i].size(); j++) {
+        if ((*pBuff)[i][j] != 0) {
+          (*_pTheLeds)[_pTheMapping->XY(i + x - radius, j + y - radius)] = color;
         }
       }
     }
   }
 
  private:
+  void InitCircles() {
+    if (!_TheCircles.empty()) return;  // already initialized
+    constexpr uint8_t MAX_R =
+#if defined(PANEL_SIZE_96x54)
+      12;
+#else
+      8;
+#endif
+    _TheCircles.reserve(MAX_R);
+    for (uint8_t r = 1; r <= MAX_R; r++) {
+      _TheCircles.push_back(new (std::nothrow) PreDrawmCircle(r));
+    }
+  }
+
   CRGBArray<TOTAL_LEDS>* _pTheLeds;                        // The FastLed object
   CRGBArray<TOTAL_LEDS> _AuxLeds;                          // Buffer auxiliar per mantenir estat dels efectes sense tocar el buffer principal.
   IPanelMapping<PANEL_WIDTH, PANEL_HEIGHT>* _pTheMapping;  // The class that will provide the mapping coordinates

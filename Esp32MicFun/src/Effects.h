@@ -13,6 +13,7 @@
 #include "Effects/DrawSongName.h"
 #include "Effects/DrawThumbnail.h"
 #include "Effects/Frame.h"
+#include "Effects/FractalAudio.h"
 #include "Effects/HorizSpectrogram.h"
 #include "Effects/InitDemoParametric.h"
 #include "Effects/LedBars.h"

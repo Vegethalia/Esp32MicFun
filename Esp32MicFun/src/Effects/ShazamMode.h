@@ -17,7 +17,8 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
 
     if (_DisplayingSongName) {
       if (timeSinceLastDetection < 65000) {
-        DrawSongName(_DetectedSongName.c_str(), _SongDesconeguda, resetTextPos);  // update text position....
+        DrawSongName(_DetectedSongName.c_str(), _SongDesconeguda, resetTextPos,
+                    (_TheDrawStyle == DRAW_STYLE::FRACTAL_AUDIO) ? (THE_PANEL_HEIGHT - 14) : -1);  // update text position....
       } else {
         _DisplayingSongName = false;
       }
