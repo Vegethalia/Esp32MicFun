@@ -182,6 +182,14 @@ void vTaskDrawer(void* pvParameters) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);
             }
             break;
+          case DRAW_STYLE::MANDELBROT_AUDIO:
+            FastLED.clear();
+            DrawMandelbrot(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
           case DRAW_STYLE::CALC_MODE:
             FastLED.clear();
             // DrawFrame(HUE_PURPLE, std::max((uint8_t)(100), _1stBarValue));
