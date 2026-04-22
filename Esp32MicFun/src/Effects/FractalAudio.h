@@ -20,8 +20,9 @@
 void DrawFractalAudio(MsgAudio2Draw& mad) {
   static uint8_t persist[THE_PANEL_WIDTH * THE_PANEL_HEIGHT] = {};  // glow buffer (BSS)
   static float   fx = 0.5f, fy = 0.3f;                             // running attractor point
-  static uint8_t baseHue = 80;
-  static float   sBass = 0.0f, sMid = 0.0f, sHiMid = 0.0f;        // smoothed bands
+  static uint8_t baseHue   = 80;
+  static float   sBass     = 0.0f, sMid = 0.0f, sHiMid = 0.0f;    // smoothed bands
+  static float   sVolFrac  = 0.7f;   // smooth scale factor (0.3 silent → 1.0 loud)
 
   // ---- 1. Per-band energy (pDBs is 0-255, THE_PANEL_WIDTH bins) ----
   const uint8_t BASS_END  =  6;
@@ -56,6 +57,9 @@ void DrawFractalAudio(MsgAudio2Draw& mad) {
   // ---- 3. Hue rotates slowly; treble accelerates it ----
   baseHue += 1 + (uint8_t)(treble * 5.0f);
 
+  // ---- 3b. Volume scale: shrinks when silent, expands when loud ----
+  sVolFrac += 0.04f * (0.3f + (_1stBarValue / 255.0f) * 0.7f - sVolFrac);
+
   // ---- 4. Fade glow buffer — integer fast path (≈×0.85 per frame) ----
   const uint16_t TOTAL_PX = THE_PANEL_WIDTH * THE_PANEL_HEIGHT;
   for (uint16_t i = 0; i < TOTAL_PX; i++) {
@@ -66,16 +70,21 @@ void DrawFractalAudio(MsgAudio2Draw& mad) {
   // ---- 5. Iterate attractor and accumulate brightness ----
   // Louder audio → more iterations → denser, brighter fractal
   const uint16_t iters  = 220 + _1stBarValue;            // 220-475 per frame
-  const float    xScale = (THE_PANEL_WIDTH  - 1) * 0.2f; // maps [-2.5,2.5] → [0, W-1]
-  const float    yScale = (THE_PANEL_HEIGHT - 1) * 0.2f; // maps [-2.5,2.5] → [0, H-1]
+  // Scale: sVolFrac maps attractor [-2.5,2.5] to a fraction of the panel.
+  // Centre at panel centre (+5px Y offset); shrinks when silent, fills when loud.
+  const float xScale = (THE_PANEL_WIDTH  - 1) * 0.2f * sVolFrac;
+  const float yScale = (THE_PANEL_HEIGHT - 1) * 0.2f * sVolFrac;
+  const float xOff   = THE_PANEL_WIDTH  * 0.5f;
+  const float yOff   = THE_PANEL_HEIGHT * 0.5f + 5.0f;  // centre 5px lower
 
   for (uint16_t i = 0; i < iters; i++) {
     float nx = sinf(a * fy) + c * cosf(a * fx);
     float ny = sinf(b * fx) + d * cosf(b * fy);
     fx = nx;
     fy = ny;
-    int16_t px = (int16_t)((fx + 2.5f) * xScale + 0.5f);
-    int16_t py = (int16_t)((fy + 2.5f) * yScale + 0.5f) + 5;  // centre 5px lower
+    // Projection: centred on panel, scaled by volume
+    int16_t px = (int16_t)(fx * xScale + xOff + 0.5f);
+    int16_t py = (int16_t)(fy * yScale + yOff + 0.5f);
     // Cast to uint16_t: negative values wrap to large numbers, failing the range check
     if ((uint16_t)px < THE_PANEL_WIDTH && (uint16_t)py < THE_PANEL_HEIGHT) {
       uint16_t idx = (uint16_t)py * THE_PANEL_WIDTH + (uint16_t)px;
