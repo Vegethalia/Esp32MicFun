@@ -1,7 +1,20 @@
 
 void DrawDiscoLights(MsgAudio2Draw& mad) {
-  // 32-64-128-256-512  --> 192Hz 384Hz 768Hz 1536Hz 3072Hz
-  const uint16_t bins[] = {110 / HZ_PER_BIN, 240 / HZ_PER_BIN, 500 / HZ_PER_BIN, 1500 / HZ_PER_BIN, mad.sizeFftMagVector};
+  // Frequency bands (with HZ_PER_BIN = 6 Hz/bin, sizeFftMagVector = 512 → max ~3072 Hz):
+  //  0 -   80 Hz : sub-bass    (kick drum fundamental)
+  //  80 -  300 Hz: bass        (bass guitar, bass drum body)
+  //  300 - 1000 Hz: low-mid   (guitar, vocals body)
+  //  1000 - 2500 Hz: mid-high (presence, harmonics, snare)
+  //  2500 Hz+    : treble      (hi-hats, cymbals, air)
+  // Guard: cap bins[3] to sizeFftMagVector-1 to avoid out-of-bounds reads.
+  const uint16_t maxBin = mad.sizeFftMagVector;
+  const uint16_t bins[] = {
+    80   / HZ_PER_BIN,
+    300  / HZ_PER_BIN,
+    1000 / HZ_PER_BIN,
+    min((uint16_t)(2500 / HZ_PER_BIN), (uint16_t)(maxBin - 1u)),
+    maxBin
+  };
 #if defined(PANEL_SIZE_96x54)
   const uint8_t max_circle = 9;
   const uint8_t yPos0 = (THE_PANEL_HEIGHT - (max_circle * 2)) + 2;
@@ -10,8 +23,8 @@ void DrawDiscoLights(MsgAudio2Draw& mad) {
   const uint8_t yPos0 = 17;
 #endif
   const uint8_t totalLights = sizeof(bins) / sizeof(uint16_t);
-  const HSVHue hues[totalLights] = {HSVHue::HUE_RED, HSVHue::HUE_BLUE, HSVHue::HUE_GREEN, HSVHue::HUE_PINK, HSVHue::HUE_YELLOW};
-  const uint8_t intensityOff[totalLights] = {40, 45, 40, 50, 50};
+  const HSVHue hues[totalLights] = {HSVHue::HUE_RED, HSVHue::HUE_ORANGE, HSVHue::HUE_GREEN, HSVHue::HUE_AQUA, HSVHue::HUE_PURPLE};
+  const uint8_t intensityOff[totalLights] = {40, 40, 40, 45, 45};
   uint8_t dbRange = abs((MAX_FFT_DB - MIN_FFT_DB));
   const uint8_t dbs_x_circle = abs((MAX_FFT_DB - MIN_FFT_DB) / (int)(max_circle));
   uint16_t currentBin = 0;
