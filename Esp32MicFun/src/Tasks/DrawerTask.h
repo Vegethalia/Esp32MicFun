@@ -81,6 +81,7 @@ void vTaskDrawer(void* pvParameters) {
         // Cleanup on exit — but not when just hiding behind the thumbnail
         if (styleBeforeChange == DRAW_STYLE::FRACTAL_AUDIO    && !toThumb) CleanupFractalAudio();
         if (styleBeforeChange == DRAW_STYLE::MANDELBROT_AUDIO && !toThumb) CleanupMandelbrot();
+        if (styleBeforeChange == DRAW_STYLE::LISSAJOUS_AUDIO  && !toThumb) CleanupParametric();
 
         // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
         const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
@@ -93,6 +94,7 @@ void vTaskDrawer(void* pvParameters) {
           _ThePanel.FreeAuxLeds();  // safe: FreeAuxLeds is a no-op if already null
           if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO)    CleanupFractalAudio();
           if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
+          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO)  CleanupParametric();
         }
       }
       _TheFrameNumber++;
@@ -212,6 +214,14 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::MANDELBROT_AUDIO:
             FastLED.clear();
             DrawMandelbrot(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
+          case DRAW_STYLE::LISSAJOUS_AUDIO:
+            FastLED.clear();
+            DrawParametric(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);

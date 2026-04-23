@@ -11,26 +11,19 @@
 // modulation on top so the shape "breathes" with the music.
 //
 // Rotation: slow spin, speed driven by bass.
-// Memory:   heap-allocated only while demo is active (~15 KB).
+// Memory:   heap-allocated only while active (~10 KB; no curve arrays needed).
 
 #if defined(PANEL_SIZE_96x54)
-#define MOVING_PARAMETRIC_POINTS 256
 #define MOVING_PARAMETRIC_STEPS 360
 constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
 constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
 #else
-#define MOVING_PARAMETRIC_POINTS 64
 #define MOVING_PARAMETRIC_STEPS 252
 constexpr float PARAM_XAMP = (THE_PANEL_WIDTH / 2.0) - 0.5;
 constexpr float PARAM_YAMP = (THE_PANEL_HEIGHT / 2.0) - 0.5;
 #endif
-constexpr float MOVING_STEP = (2.0 * M_PI) / MOVING_PARAMETRIC_STEPS;
-
-struct ParametricCurve {
-  uint16_t initialPoints[MOVING_PARAMETRIC_POINTS];
-  float xCoord[MOVING_PARAMETRIC_STEPS];
-  float yCoord[MOVING_PARAMETRIC_STEPS];
-};
+constexpr float MOVING_STEP   = (2.0 * M_PI) / MOVING_PARAMETRIC_STEPS;
+constexpr float MOVING_NEG_PI = -(float)M_PI;
 
 // Demo evolution: Lissajous phase targets (xFreq : yFreq)
 #define MAX_DEMO_PHASES 5
@@ -39,9 +32,8 @@ static constexpr float DEMO_PHASE_Y[MAX_DEMO_PHASES] = {1.0f, 2.0f, 3.0f, 3.0f, 
 static constexpr uint16_t DEMO_FRAMES_PER_PHASE = 250;
 
 struct DrawParametricData {
-  ParametricCurve TheCurrentCurve;
+  uint16_t curveOffset = 0;  // animation phase: all steps drawn, offset crawls each frame
   bool initialized = false;
-  float steps[MOVING_PARAMETRIC_STEPS];
   float delta = 0.0f;
   uint8_t hue = 0;
   float xMag = 1.0f;
@@ -62,6 +54,14 @@ struct DrawParametricData {
 };
 
 DrawParametricData* __dpd = nullptr;
+
+void CleanupParametric() {
+  if (__dpd) {
+    delete __dpd;
+    __dpd = nullptr;
+  }
+}
+
 void DrawParametric(MsgAudio2Draw& mad) {
   if (!__dpd) {
     __dpd = new DrawParametricData();
@@ -89,21 +89,13 @@ void DrawParametric(MsgAudio2Draw& mad) {
   bool newPhase = false;
 
   if (!__dpd->initialized) {
-    float every = (float)MOVING_PARAMETRIC_STEPS / (float)MOVING_PARAMETRIC_POINTS;
-    for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
-      __dpd->TheCurrentCurve.initialPoints[i] = (uint16_t)(every * i);
-    }
-    double menysPI = -PI;
-    for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
-      __dpd->steps[i] = (float)(menysPI + (i * MOVING_STEP));
-    }
     memset(__dpd->persist, 0, sizeof(__dpd->persist));
     memset(__dpd->hueBuf,  0, sizeof(__dpd->hueBuf));
     __dpd->initialized = true;
   }
 
   // ---- 2. Demo mode: smooth Lissajous evolution ----
-  if ((_DemoMode && _Connected2Wifi) || (_TheFrameNumber > 200)) {
+  if (_DemoMode && (_Connected2Wifi || _TheFrameNumber > 200)) {
     if (_DemoModeFrame == 0) {
       __dpd->currentPhase = 0;
       __dpd->xMag = DEMO_PHASE_X[0];
@@ -144,67 +136,67 @@ void DrawParametric(MsgAudio2Draw& mad) {
     displayX = __dpd->xMag + __dpd->sBass * 0.35f;
     displayY = __dpd->yMag + __dpd->sMid  * 0.35f;
   } else {
-    const float t = __dpd->rotAngle * 0.06f;
-    const float targetX = 1.0f + 0.7f * fabsf(sinf(t * 0.4f))        + __dpd->sBass * 1.8f;
-    const float targetY = 2.0f + 0.7f * fabsf(cosf(t * 0.3f + 1.2f)) + __dpd->sMid  * 1.8f;
-    __dpd->xMag += 0.04f * (targetX - __dpd->xMag);
-    __dpd->yMag += 0.04f * (targetY - __dpd->yMag);
+    // Autonomous drift ensures varied ratios even in silence; audio amplifies the swings.
+    // Bass modulates X freq, treble modulates Y freq → different instruments change different axes.
+    const float af = (float)__dpd->animFrame * 0.001f;
+    const float targetX = 1.0f + 0.7f * fabsf(sinf(af * 0.4f))        + __dpd->sBass   * 3.0f;
+    const float targetY = 2.0f + 0.7f * fabsf(cosf(af * 0.3f + 1.2f)) + __dpd->sTreble * 5.0f;
+    __dpd->xMag += 0.05f * (targetX - __dpd->xMag);
+    __dpd->yMag += 0.05f * (targetY - __dpd->yMag);
     displayX = __dpd->xMag;
     displayY = __dpd->yMag;
   }
 
-  // ---- 4. Rotation angle driven by bass ----
+  const float cx = PARAM_XAMP;
+  const float cy = PARAM_YAMP;
+
+  // ---- 4. Rotation ----
   __dpd->rotAngle += 0.012f + __dpd->sBass * 0.06f;
   const float cosR = cosf(__dpd->rotAngle);
   const float sinR = sinf(__dpd->rotAngle);
-  const float cx = PARAM_XAMP;
-  const float cy = PARAM_YAMP;
 
   // ---- 5. Hue drift with treble ----
   __dpd->baseHue += 1 + (uint8_t)(__dpd->sTreble * 2.0f);
 
   // ---- 6. Fade persistence trails ----
+  const uint8_t fadeCoeff = 210u;
   const uint16_t TOTAL_PX = THE_PANEL_WIDTH * THE_PANEL_HEIGHT;
   if (__dpd->fastFadeFrames > 0) {
     for (uint16_t i = 0; i < TOTAL_PX; i++) __dpd->persist[i] = (__dpd->persist[i] * 154u) >> 8;
     __dpd->fastFadeFrames--;
   } else {
     for (uint16_t i = 0; i < TOTAL_PX; i++) {
-      if (__dpd->persist[i] > 4)  __dpd->persist[i] = (__dpd->persist[i] * 210u) >> 8;
+      if (__dpd->persist[i] > 4)  __dpd->persist[i] = (__dpd->persist[i] * fadeCoeff) >> 8;
       else if (__dpd->persist[i]) __dpd->persist[i]--;
     }
   }
 
-  // ---- 7. Recompute curve ----
-  for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
-    __dpd->TheCurrentCurve.xCoord[i] = PARAM_XAMP * sinf(displayX * __dpd->steps[i] + HALF_PI) + PARAM_XAMP;
-    __dpd->TheCurrentCurve.yCoord[i] = PARAM_YAMP * sinf(displayY * __dpd->steps[i] + __dpd->delta) + PARAM_YAMP;
-  }
-  __dpd->delta += MOVING_STEP * (1.0f + __dpd->sTreble * 1.5f);
-  if (__dpd->delta >= TWO_PI) __dpd->delta -= TWO_PI;
-
-  // ---- 8. Draw curve with persistence + rotation ----
+  // ---- 7+8. Compute + draw in one pass: sin/cos inline, no intermediate arrays ----
   const uint8_t addBright = 35 + (_1stBarValue >> 2);
+  const uint16_t yMinClip = 0u;
+
+  // Advance crawl offset every 2 frames
+  if ((__dpd->animFrame % 2) == 0) {
+    __dpd->curveOffset = (__dpd->curveOffset + 1) % MOVING_PARAMETRIC_STEPS;
+  }
+
   uint8_t theHue = __dpd->baseHue;
-
-  for (uint16_t i = 0; i < MOVING_PARAMETRIC_POINTS; i++) {
-    // Crawl along curve every 2 frames (always active)
-    if ((__dpd->animFrame % 2) == 0) {
-      __dpd->TheCurrentCurve.initialPoints[i] = (__dpd->TheCurrentCurve.initialPoints[i] + 1) % MOVING_PARAMETRIC_STEPS;
-    }
-    const uint16_t coord = __dpd->TheCurrentCurve.initialPoints[i];
-
-    // Rotate rendered position around centre
-    const float dx = __dpd->TheCurrentCurve.xCoord[coord] - cx;
-    const float dy = __dpd->TheCurrentCurve.yCoord[coord] - cy;
+  for (uint16_t i = 0; i < MOVING_PARAMETRIC_STEPS; i++) {
+    const uint16_t step = (__dpd->curveOffset + i) % MOVING_PARAMETRIC_STEPS;
+    const float t = MOVING_NEG_PI + step * (float)MOVING_STEP;
+    // Lissajous: x = A·cos(fx·t),  y = B·sin(fy·t + δ)   [cosf = sinf + HALF_PI]
+    const float rawX = PARAM_XAMP    * cosf(displayX * t) + PARAM_XAMP;
+    const float rawY = PARAM_YAMP * sinf(displayY * t + __dpd->delta) + PARAM_YAMP;
+    // Rotate around curve centre
+    const float dx = rawX - cx;
+    const float dy = rawY - cy;
     const int16_t rx = (int16_t)(dx * cosR - dy * sinR + cx + 0.5f);
     const int16_t ry = (int16_t)(dx * sinR + dy * cosR + cy + 0.5f);
-
-    if ((uint16_t)rx < THE_PANEL_WIDTH && (uint16_t)ry < THE_PANEL_HEIGHT) {
+    if ((uint16_t)rx < THE_PANEL_WIDTH && (uint16_t)ry >= yMinClip && (uint16_t)ry < THE_PANEL_HEIGHT) {
       const uint16_t idx = (uint16_t)ry * THE_PANEL_WIDTH + (uint16_t)rx;
       const uint16_t br = __dpd->persist[idx] + addBright;
       __dpd->persist[idx] = (br > 255u) ? 255u : (uint8_t)br;
-      __dpd->hueBuf[idx] = theHue;  // direct write: latest segment owns this pixel
+      __dpd->hueBuf[idx] = theHue;
     }
 #if defined(PANEL_SIZE_96x54)
     theHue++;
@@ -212,6 +204,8 @@ void DrawParametric(MsgAudio2Draw& mad) {
     theHue += 4;
 #endif
   }
+  __dpd->delta += (float)MOVING_STEP * (1.0f + __dpd->sTreble * 1.5f);
+  if (__dpd->delta >= TWO_PI) __dpd->delta -= TWO_PI;
   __dpd->animFrame++;
 
   // ---- 9. Render from persistence buffer ----
@@ -228,7 +222,8 @@ void DrawParametric(MsgAudio2Draw& mad) {
     }
   }
 
-  // ---- 10. Text overlay (status messages) ----
+  // ---- 10. Text overlay (status messages, demo mode only) ----
+  if (_DemoMode) {
   std::string test;
   if (__dpd->currentPhase == 0 && !_Connected2Wifi && !__dpd->alreadyDrawedText) {
     _u8g2.setFont(u8g2_font_oskool_tr);
@@ -267,9 +262,11 @@ void DrawParametric(MsgAudio2Draw& mad) {
     __dpd->inc = (-1);
   }
   __dpd->hue++;
+  }  // end demo-only text overlay
 
-  // Free heap once demo mode ends (won't restart until reset).
-  if (!_DemoMode && __dpd) {
+  // Free heap once demo sequence ends (won't restart until reset).
+  // LISSAJOUS_AUDIO manages its own lifetime via CleanupParametric() called from DrawerTask.
+  if (!_DemoMode && __dpd && _TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO) {
     delete __dpd;
     __dpd = nullptr;
   }
