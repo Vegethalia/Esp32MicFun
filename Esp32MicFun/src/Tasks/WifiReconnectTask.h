@@ -408,11 +408,11 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     ConfigureNTP();
     SendDebugMessage(Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str());
   } else if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
-    std::string artworkUrl;
+    char artworkUrl[180] = {};
     auto sep = theMsg.find("@@");
     if (sep != std::string::npos) {
       _DetectedSongName = theMsg.substr(0, sep);
-      artworkUrl = theMsg.substr(sep + 2);
+      strncpy(artworkUrl, theMsg.c_str() + sep + 2, sizeof(artworkUrl) - 1);
     } else {
       _DetectedSongName = theMsg;
     }

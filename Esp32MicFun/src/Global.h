@@ -213,6 +213,7 @@ bool _DisplayingClockScroll = false;  // true if we are displaying the clock scr
 
 #define TOPIC_FREEHEAP "caseta/spectrometre/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometre/largestfreeblock"
+#define TOPIC_FREERAM "caseta/spectrometre/freeram"
 #define TOPIC_HIWATER_READER "caseta/spectrometre/hiwreader"
 #define TOPIC_HIWATER_DRAWER "caseta/spectrometre/hiwdrawer"
 #define TOPIC_HIWATER_WIFI "caseta/spectrometre/hiwWIFI"
@@ -250,6 +251,7 @@ bool _DisplayingClockScroll = false;  // true if we are displaying the clock scr
 
 #define TOPIC_FREEHEAP "caseta/spectrometreBig/freeheap"
 #define TOPIC_BIGGESTFREEBLOCK "caseta/spectrometreBig/largestfreeblock"
+#define TOPIC_FREERAM "caseta/spectrometreBig/freeram"
 #define TOPIC_HIWATER_READER "caseta/spectrometreBig/hiwreader"
 #define TOPIC_HIWATER_DRAWER "caseta/spectrometreBig/hiwdrawer"
 #define TOPIC_HIWATER_WIFI "caseta/spectrometreBig/hiwWIFI"
@@ -464,7 +466,7 @@ uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in plac
 
 struct SongEntry {
   std::string name;
-  std::string artworkUrl;
+  char artworkUrl[180];
   uint32_t detectionMillis;
   time_t detectionWallTime;
 };
@@ -472,10 +474,11 @@ struct SongEntry {
 constexpr uint8_t MAX_SONG_HISTORY = 10;
 std::vector<SongEntry> _SongHistory;
 
-inline void AddSongToHistory(const std::string& name, const std::string& artworkUrl) {
+inline void AddSongToHistory(const std::string& name, const char* artworkUrl) {
   SongEntry entry;
   entry.name = name;
-  entry.artworkUrl = artworkUrl;
+  strncpy(entry.artworkUrl, artworkUrl, sizeof(entry.artworkUrl) - 1);
+  entry.artworkUrl[sizeof(entry.artworkUrl) - 1] = '\0';
   entry.detectionMillis = millis();
   entry.detectionWallTime = time(nullptr);
   _SongHistory.insert(_SongHistory.begin(), entry);

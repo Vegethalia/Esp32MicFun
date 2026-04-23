@@ -174,7 +174,7 @@ void setup() {
   //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
   xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 2500, nullptr, 2, &_receiveIRTaskHandle, 1);
 
-  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetAuxLeds(), 2, &_vertFireTaskHandle);
+  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetAuxLedsRef(), 2, &_vertFireTaskHandle);
 
   ////  xTaskCreatePinnedToCore(vTaskResetWhenHung, "Reset When Hung", 2048, nullptr, 2, &_resetWhenHungTaskHandle, 1);
 }
@@ -237,6 +237,7 @@ void loop() {
   if (_DebugMode && _ThePubSub.connected()) {
     _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", esp_get_free_heap_size()).c_str());
     _ThePubSub.publish(TOPIC_BIGGESTFREEBLOCK, Utils::string_format("%d", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)).c_str());
+    _ThePubSub.publish(TOPIC_FREERAM, Utils::string_format("%d", heap_caps_get_free_size(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_WIFI, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_wifiReconnectTaskHandle)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_DRAWER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_drawTaskHandle)).c_str());

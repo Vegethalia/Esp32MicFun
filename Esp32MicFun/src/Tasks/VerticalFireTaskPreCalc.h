@@ -1,9 +1,10 @@
 
 
 /// @brief This task processes in background the vertical scrolling of the Vertical fire effect.
-/// @param pvParameters
+/// @param pvParameters  Pointer to CRGB* (double-pointer) so the task always
+///                      sees the current allocation after alloc/free cycles.
 void vTaskVertFire(void *pvParameters) {
-  CRGBArray<NUM_LEDS> *pTheAuxLeds = (CRGBArray<NUM_LEDS> *)pvParameters;
+  CRGB **ppAuxLeds = (CRGB **)pvParameters;
 
   while (true) {
     EventBits_t bits = xEventGroupWaitBits(
@@ -14,6 +15,8 @@ void vTaskVertFire(void *pvParameters) {
         portMAX_DELAY);
 
     if (bits & BIT_0) {
+      CRGB *pLeds = *ppAuxLeds;
+      if (pLeds == nullptr) continue;
       int ledDest = 0;
       uint8_t baseFade = 5;  //_pianoMode ? 1 : 5; // 5
 #if defined(PANEL_SIZE_96x54)
@@ -25,8 +28,8 @@ void vTaskVertFire(void *pvParameters) {
         for (int x = 0; x < THE_PANEL_WIDTH; x++) {
           ledDest = _TheMapping.XY(x, iLine);
 
-          (*pTheAuxLeds)[ledDest] = (*pTheAuxLeds)[_TheMapping.XY(x, iLine + 1)];
-          (*pTheAuxLeds)[ledDest].subtractFromRGB(baseFade);
+          pLeds[ledDest] = pLeds[_TheMapping.XY(x, iLine + 1)];
+          pLeds[ledDest].subtractFromRGB(baseFade);
         }
       }
     }

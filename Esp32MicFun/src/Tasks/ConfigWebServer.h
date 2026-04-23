@@ -98,6 +98,22 @@ void SendChunk(const String& s) {
   _server.sendContent(s);
 }
 
+// Sends a PROGMEM (F()) string in small stack-allocated chunks — no heap alloc.
+void SendChunk(const __FlashStringHelper* fstr) {
+  const char* p = reinterpret_cast<const char*>(fstr);
+  char buf[128];
+  bool done = false;
+  while (!done) {
+    uint8_t len = 0;
+    while (len < (sizeof(buf) - 1)) {
+      char c = pgm_read_byte(p++);
+      if (!c) { done = true; break; }
+      buf[len++] = c;
+    }
+    if (len > 0) _server.sendContent(buf, len);
+  }
+}
+
 void AppendSelectOption(String& html, int value, const char* label, int selectedValue) {
   html += F("<option value='");
   html += String(value);
@@ -260,8 +276,8 @@ void StreamSongEntry(const SongEntry& s) {
             "</span>"
             "<span class='song-time'>" +
             FormatDetectionTime(s.detectionWallTime) + "</span>");
-  if (!s.artworkUrl.empty()) {
-    SendChunk("<img src='" + String(s.artworkUrl.c_str()) + "' class='nowplaying-img' alt=''>");
+  if (s.artworkUrl[0] != '\0') {
+    SendChunk("<img src='" + String(s.artworkUrl) + "' class='nowplaying-img' alt=''>");
   }
   SendChunk(F("</li>"));
 }
@@ -279,8 +295,8 @@ void StreamSongHistory() {
     SendChunk(F("<div class='nowplaying-title'>&#127925; Est&agrave; sonant</div>"));
     SendChunk("<div class='nowplaying-name'>" + SanitizeSongName(s.name) + "</div>");
     SendChunk("<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>");
-    if (!s.artworkUrl.empty()) {
-      SendChunk("<img src='" + String(s.artworkUrl.c_str()) + "' class='nowplaying-img' alt='portada'>");
+    if (s.artworkUrl[0] != '\0') {
+      SendChunk("<img src='" + String(s.artworkUrl) + "' class='nowplaying-img' alt='portada'>");
     }
     SendChunk(F("</div>"));
 

@@ -46,6 +46,8 @@ void vTaskDrawer(void* pvParameters) {
 
       if (_numFrames == 0) {
         _InitTime = millis();
+        // Alloc aux buffer if starting directly in VERT_FIRE
+        if (_TheDrawStyle == DRAW_STYLE::VERT_FIRE) _ThePanel.AllocAuxLeds();
       }
 
       //_TaskParams.newDataReady = false;
@@ -67,7 +69,32 @@ void vTaskDrawer(void* pvParameters) {
         continue;
       }
       _Drawing = true;
+      const DRAW_STYLE styleBeforeChange = _TheDrawStyle;
       ProcessPendingStyleChanges();
+      // Free heap buffers of effects we just left.
+      // Effects that have heap state are kept alive across DRAW_THUMBNAIL transitions
+      // so their visual state is preserved when returning (and race conditions avoided).
+      if (_TheDrawStyle != styleBeforeChange) {
+        const bool toThumb   = (_TheDrawStyle == DRAW_STYLE::DRAW_THUMBNAIL);
+        const bool fromThumb = (styleBeforeChange == DRAW_STYLE::DRAW_THUMBNAIL);
+
+        // Cleanup on exit — but not when just hiding behind the thumbnail
+        if (styleBeforeChange == DRAW_STYLE::FRACTAL_AUDIO    && !toThumb) CleanupFractalAudio();
+        if (styleBeforeChange == DRAW_STYLE::MANDELBROT_AUDIO && !toThumb) CleanupMandelbrot();
+
+        // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
+        const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
+        const bool thumbToVertFire = (fromThumb && _TheDrawStyle == DRAW_STYLE::VERT_FIRE);
+        if (styleBeforeChange == DRAW_STYLE::VERT_FIRE && !vertFireToThumb) _ThePanel.FreeAuxLeds();
+        if (_TheDrawStyle     == DRAW_STYLE::VERT_FIRE && !thumbToVertFire) _ThePanel.AllocAuxLeds();
+
+        // Leaving THUMBNAIL to a style that's not a heap-state effect: free kept buffers
+        if (fromThumb && _TheDrawStyle != DRAW_STYLE::VERT_FIRE) {
+          _ThePanel.FreeAuxLeds();  // safe: FreeAuxLeds is a no-op if already null
+          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO)    CleanupFractalAudio();
+          if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
+        }
+      }
       _TheFrameNumber++;
       bool refreshClockText = (_TheFrameNumber % 3) == 0;
 
