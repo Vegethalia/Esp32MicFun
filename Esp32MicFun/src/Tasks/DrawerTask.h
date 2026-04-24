@@ -83,6 +83,7 @@ void vTaskDrawer(void* pvParameters) {
         if (styleBeforeChange == DRAW_STYLE::MANDELBROT_AUDIO && !toThumb) CleanupMandelbrot();
         if (styleBeforeChange == DRAW_STYLE::LISSAJOUS_AUDIO && !toThumb) CleanupParametric();
         if (styleBeforeChange == DRAW_STYLE::PLASMA_AUDIO && !toThumb) CleanupPlasma();
+        if (styleBeforeChange == DRAW_STYLE::RADIAL_SPECTRUM && !toThumb) CleanupRadialSpectrum();
 
         // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
         const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
@@ -97,6 +98,7 @@ void vTaskDrawer(void* pvParameters) {
           if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
           if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO) CleanupParametric();
           if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO) CleanupPlasma();
+          if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM) CleanupRadialSpectrum();
         }
       }
       _TheFrameNumber++;
@@ -234,6 +236,15 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::PLASMA_AUDIO:
             FastLED.clear();
             DrawPlasma(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
+          case DRAW_STYLE::RADIAL_SPECTRUM:
+            FastLED.clear();
+            DrawMatrixFFT(mad);
+            DrawRadialSpectrum(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);

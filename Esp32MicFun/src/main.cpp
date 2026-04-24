@@ -35,9 +35,9 @@
 #include "SharedUtils\Utils.h"
 // Global variables and functions. need the previous includes to work properly
 #include "Global.h"
-
 #include "SettingsFunctions.h"  // ApplySetting helpers, style management, preferences
 
+// Efects and tasks depend on global
 #include "Effects.h"  //uses some of the vars declared in Global
 #include "Tasks.h"    //tasks might call some of the functions declared above
 
@@ -216,10 +216,10 @@ void loop() {
       log_d("Randomized barAlterDraw=%d", (int)_barAlterDraw);
       SendDebugMessage(Utils::string_format("Randomized barAlterDraw=%d", (int)_barAlterDraw).c_str());
 
-      if (_TheDrawStyle != DRAW_STYLE::CALC_MODE) {
-        auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::ANALOG_CLOCK)) + 1);  // randomize style every hour
-        if (newStyle == DRAW_STYLE::HORIZ_FIRE) {
-          newStyle = DRAW_STYLE::BARS_WITH_TOP;  // avoid audiostreamer mode
+      if (_TheDrawStyle != DRAW_STYLE::CALC_MODE && _TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
+        auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::MAX_STYLE)) + 1);  // randomize style every hour
+        if (newStyle == DRAW_STYLE::HORIZ_FIRE || newStyle == DRAW_STYLE::DRAW_THUMBNAIL || newStyle == DRAW_STYLE::CALC_MODE) {
+          newStyle = DRAW_STYLE::BARS_WITH_TOP;  // els stils "specials" els ignorem al canviar de mode.
         }
         log_d("Randomized DrawStyle=%d", (int)newStyle);
         SendDebugMessage(Utils::string_format("Randomized DrawStyle=%d", (int)newStyle).c_str());
@@ -244,4 +244,3 @@ void loop() {
     _ThePubSub.publish(TOPIC_HIWATER_IRDECO, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_receiveIRTaskHandle)).c_str());
   }
 }
-
