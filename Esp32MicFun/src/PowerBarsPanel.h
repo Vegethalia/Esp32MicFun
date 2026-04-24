@@ -671,11 +671,16 @@ class PowerBarsPanel {
       _CurrentBaseHue++;
       _SubCounter = 0;
     }
+    // Pre-calculem el color base (1 sola conversió HSV→RGB per frame)
+    CRGB baseColor;
+    hsv2rgb_rainbow(CHSV(_CurrentBaseHue, 255, 255), baseColor);
     // Renderitzem el buffer (row-major) als LEDs amb el mapeig XY
     for (int y = 0; y < PANEL_HEIGHT; y++) {
       const uint8_t* row = _pFireBuffer + y * PANEL_WIDTH;
       for (int x = 0; x < PANEL_WIDTH; x++) {
-        (*_pTheLeds)[_pTheMapping->XY(x, y)] += CHSV(_CurrentBaseHue, 255, row[x]);
+        const uint8_t v = row[x];
+        if (v == 0) continue;
+        (*_pTheLeds)[_pTheMapping->XY(x, y)] += CRGB(scale8(baseColor.r, v), scale8(baseColor.g, v), scale8(baseColor.b, v));
       }
     }
     // Indiquem a la background task que pot fer el scroll+fade

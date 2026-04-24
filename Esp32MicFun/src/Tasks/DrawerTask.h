@@ -157,7 +157,7 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::VERT_FIRE:
             FastLED.clear();
             DrawWave(mad);
-            DrawVertSpectrogram(mad, VertSpectrogramStyle::FIRE);  // El pintem primer ja que matxaca lo que ja existeix a _TheLeds per velocitat
+            DrawVertSpectrogram(mad);  // El pintem primer ja que matxaca lo que ja existeix a _TheLeds per velocitat
             if (_pianoMode) {
               DrawPulses(mad);
             }
