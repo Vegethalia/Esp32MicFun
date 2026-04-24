@@ -140,6 +140,7 @@ void DrawMandelbrot(MsgAudio2Draw& mad) {
     const uint8_t panelY = MANDEL_Y_START + py;
     const uint8_t* rowPtr = _mandelbrotData->escBuf + (uint16_t)py * THE_PANEL_WIDTH;
     for (uint8_t px = 0; px < THE_PANEL_WIDTH; px++) {
+      if (rowPtr[px] <= 2) continue;  // interior + zona limítrofe: deixa veure el fons
       _TheLeds[_TheMapping.XY(px, panelY)] = lut[rowPtr[px]];
     }
   }

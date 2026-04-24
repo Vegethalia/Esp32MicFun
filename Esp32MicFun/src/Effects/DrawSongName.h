@@ -34,7 +34,7 @@ void DrawSongName(const char* pSongName, bool smallFont, bool resetTextPos = fal
 
   textPos--;
 
-  if (!painting || textPos < (-THE_PANEL_WIDTH * 4)) {
+  if (!painting || textPos < (-THE_PANEL_WIDTH * 8)) {
     _DisplayingSongName = false;
     log_d("Finished displaying SongName=%s", pSongName);
   }

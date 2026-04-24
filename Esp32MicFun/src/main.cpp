@@ -174,7 +174,7 @@ void setup() {
   //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
   xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 2500, nullptr, 2, &_receiveIRTaskHandle, 1);
 
-  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetAuxLedsRef(), 2, &_vertFireTaskHandle);
+  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetFireBufferRef(), 2, &_vertFireTaskHandle);
 
   ////  xTaskCreatePinnedToCore(vTaskResetWhenHung, "Reset When Hung", 2048, nullptr, 2, &_resetWhenHungTaskHandle, 1);
 }

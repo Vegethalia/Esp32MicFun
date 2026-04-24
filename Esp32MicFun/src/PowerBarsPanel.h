@@ -462,26 +462,22 @@ class PowerBarsPanel {
       : _CurrentBaseHue(HSVHue::HUE_AQUA), _ColorScheme(COLOR_SCHEME::CS1), _pTheLeds(nullptr), _pTheMapping(nullptr) {};
   virtual ~PowerBarsPanel() {};
 
-  CRGBArray<TOTAL_LEDS>* GetAuxLeds() {
-    return reinterpret_cast<CRGBArray<TOTAL_LEDS>*>(_pAuxLeds);
-  }
-
   // Returns address of the internal pointer — pass to vTaskVertFire so it
   // always reads the current allocation even after alloc/free cycles.
-  CRGB** GetAuxLedsRef() { return &_pAuxLeds; }
+  uint8_t** GetFireBufferRef() { return &_pFireBuffer; }
 
   void AllocAuxLeds() {
-    if (_pAuxLeds == nullptr) {
-      _pAuxLeds = new CRGB[TOTAL_LEDS];
-      memset(_pAuxLeds, 0, sizeof(CRGB) * TOTAL_LEDS);
-      log_d("AllocAuxLeds: %u bytes", (unsigned)(sizeof(CRGB) * TOTAL_LEDS));
+    if (_pFireBuffer == nullptr) {
+      _pFireBuffer = new uint8_t[TOTAL_LEDS];
+      memset(_pFireBuffer, 0, TOTAL_LEDS);
+      log_d("AllocAuxLeds: %u bytes", (unsigned)TOTAL_LEDS);
     }
   }
 
   void FreeAuxLeds() {
-    if (_pAuxLeds != nullptr) {
-      delete[] _pAuxLeds;
-      _pAuxLeds = nullptr;
+    if (_pFireBuffer != nullptr) {
+      delete[] _pFireBuffer;
+      _pFireBuffer = nullptr;
       log_d("FreeAuxLeds");
     }
   }
@@ -663,69 +659,26 @@ class PowerBarsPanel {
     _CurrentBaseHue++;
   }
 
-  // shifts all lines to the top and inserts the new one. The values are interpreted as the intensity (V) in HSV
-  // The array is supposed to hold PANEL_WIDTH values
-  // The values inside the "window" ignoreFromX,0,PANEL_WIDTH-1,ignoreToY-1 will be painted in black.
-  // To ignore the "window" pass very big X and 0
-  void PushLine(const uint8_t* pTheValues, uint16_t ignoreFromX = 10000, uint8_t ignoreToY = 0) {
-    int ledDest = 0;
-    uint8_t baseFade = 5;  //_pianoMode ? 1 : 5; // 5
-    int fromY = 0;
-#if defined(PANEL_SIZE_96x54)
-    baseFade = 4;  // 2
-    fromY = PANEL_HEIGHT / 4;
-#endif
-
-    if (_pAuxLeds == nullptr) return;
-    // shift all columns to the top
-    for (int iLine = fromY; iLine < PANEL_HEIGHT - 1; iLine++) {
+  /// @brief Insereix una nova línia d'àudio al buffer de foc (row-major uint8_t) i renderitza
+  ///        tot el buffer cap a _TheLeds via el mapeig XY. La background task s'encarrega
+  ///        de fer el scroll i el fade de forma asíncrona.
+  void PushLineWithPrecalcFire(const uint8_t* pTheValues) {
+    if (_pFireBuffer == nullptr) return;
+    // Escrivim la nova fila a la part inferior del buffer (fila H-1)
+    memcpy(_pFireBuffer + (PANEL_HEIGHT - 1) * PANEL_WIDTH, pTheValues, PANEL_WIDTH);
+    _SubCounter++;
+    if (_SubCounter > 4) {
+      _CurrentBaseHue++;
+      _SubCounter = 0;
+    }
+    // Renderitzem el buffer (row-major) als LEDs amb el mapeig XY
+    for (int y = 0; y < PANEL_HEIGHT; y++) {
+      const uint8_t* row = _pFireBuffer + y * PANEL_WIDTH;
       for (int x = 0; x < PANEL_WIDTH; x++) {
-        ledDest = _pTheMapping->XY(x, iLine);
-
-        _pAuxLeds[ledDest] = _pAuxLeds[_pTheMapping->XY(x, iLine + 1)];
-        if (x < ignoreFromX || iLine >= ignoreToY) {
-          _pAuxLeds[ledDest].subtractFromRGB(baseFade);
-        } else {
-          _pAuxLeds[ledDest].subtractFromRGB(192);
-        }
-        (*_pTheLeds)[ledDest] += _pAuxLeds[ledDest];
+        (*_pTheLeds)[_pTheMapping->XY(x, y)] += CHSV(_CurrentBaseHue, 255, row[x]);
       }
     }
-    // i ara pintem la nova fila
-    for (int x = 0; x < PANEL_WIDTH; x++) {
-      ledDest = _pTheMapping->XY(x, PANEL_HEIGHT - 1);
-      CHSV pixel(_CurrentBaseHue, 255, pTheValues[x]);
-      _pAuxLeds[ledDest] = pixel;
-      (*_pTheLeds)[ledDest] += pixel;
-    }
-    _SubCounter++;
-    if (_SubCounter > 4) {
-      _CurrentBaseHue++;
-      _SubCounter = 0;
-    }
-  }
-
-  /// @brief Com la funció PushLine, però amb els valors ja calculats per la funció de fire en la task VerticalFireTaskPrecalc.
-  /// @param pTheValues
-  void PushLineWithPrecalcFire(const uint8_t* pTheValues) {
-    if (_pAuxLeds == nullptr) return;
-    // pintem la nova fila
-    for (int x = 0; x < PANEL_WIDTH; x++) {
-      _pAuxLeds[_pTheMapping->XY(x, PANEL_HEIGHT - 1)].setHSV(_CurrentBaseHue, 255, pTheValues[x]);
-    }
-    _SubCounter++;
-    if (_SubCounter > 4) {
-      _CurrentBaseHue++;
-      _SubCounter = 0;
-    }
-
-    // i ara restaurem el buffer auxiliar en l'array de leds
-    for (int z = 0; z < PANEL_HEIGHT * PANEL_WIDTH; z++) {
-      (*_pTheLeds)[z] += _pAuxLeds[z];
-      // (*_pTheLeds)[z] += _AuxLeds[z];
-    }
-
-    // indiquem a la background task que pot anar actualitzant el buffer auxiliar
+    // Indiquem a la background task que pot fer el scroll+fade
     xEventGroupSetBits(_xTheEventForBackTasks, BIT_0);
   }
 
@@ -841,7 +794,7 @@ class PowerBarsPanel {
   }
 
   CRGBArray<TOTAL_LEDS>* _pTheLeds;                        // The FastLed object
-  CRGB* _pAuxLeds = nullptr;                               // Buffer auxiliar heap-alloc (alloc on VERT_FIRE enter, freed on exit).
+  uint8_t* _pFireBuffer = nullptr;                         // Buffer intensitat foc (row-major, 1 byte/LED). Heap-alloc en VERT_FIRE, alliberat en sortir.
   IPanelMapping<PANEL_WIDTH, PANEL_HEIGHT>* _pTheMapping;  // The class that will provide the mapping coordinates
   Column _TheColumns[PANEL_WIDTH];
 

@@ -75,26 +75,28 @@ void vTaskDrawer(void* pvParameters) {
       // Effects that have heap state are kept alive across DRAW_THUMBNAIL transitions
       // so their visual state is preserved when returning (and race conditions avoided).
       if (_TheDrawStyle != styleBeforeChange) {
-        const bool toThumb   = (_TheDrawStyle == DRAW_STYLE::DRAW_THUMBNAIL);
+        const bool toThumb = (_TheDrawStyle == DRAW_STYLE::DRAW_THUMBNAIL);
         const bool fromThumb = (styleBeforeChange == DRAW_STYLE::DRAW_THUMBNAIL);
 
         // Cleanup on exit — but not when just hiding behind the thumbnail
-        if (styleBeforeChange == DRAW_STYLE::FRACTAL_AUDIO    && !toThumb) CleanupFractalAudio();
+        if (styleBeforeChange == DRAW_STYLE::FRACTAL_AUDIO && !toThumb) CleanupFractalAudio();
         if (styleBeforeChange == DRAW_STYLE::MANDELBROT_AUDIO && !toThumb) CleanupMandelbrot();
-        if (styleBeforeChange == DRAW_STYLE::LISSAJOUS_AUDIO  && !toThumb) CleanupParametric();
+        if (styleBeforeChange == DRAW_STYLE::LISSAJOUS_AUDIO && !toThumb) CleanupParametric();
+        if (styleBeforeChange == DRAW_STYLE::PLASMA_AUDIO && !toThumb) CleanupPlasma();
 
         // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
         const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
         const bool thumbToVertFire = (fromThumb && _TheDrawStyle == DRAW_STYLE::VERT_FIRE);
         if (styleBeforeChange == DRAW_STYLE::VERT_FIRE && !vertFireToThumb) _ThePanel.FreeAuxLeds();
-        if (_TheDrawStyle     == DRAW_STYLE::VERT_FIRE && !thumbToVertFire) _ThePanel.AllocAuxLeds();
+        if (_TheDrawStyle == DRAW_STYLE::VERT_FIRE && !thumbToVertFire) _ThePanel.AllocAuxLeds();
 
         // Leaving THUMBNAIL to a style that's not a heap-state effect: free kept buffers
         if (fromThumb && _TheDrawStyle != DRAW_STYLE::VERT_FIRE) {
           _ThePanel.FreeAuxLeds();  // safe: FreeAuxLeds is a no-op if already null
-          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO)    CleanupFractalAudio();
+          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO) CleanupFractalAudio();
           if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
-          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO)  CleanupParametric();
+          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO) CleanupParametric();
+          if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO) CleanupPlasma();
         }
       }
       _TheFrameNumber++;
@@ -213,6 +215,7 @@ void vTaskDrawer(void* pvParameters) {
             break;
           case DRAW_STYLE::MANDELBROT_AUDIO:
             FastLED.clear();
+            DrawWave(mad);
             DrawMandelbrot(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
@@ -222,6 +225,15 @@ void vTaskDrawer(void* pvParameters) {
           case DRAW_STYLE::LISSAJOUS_AUDIO:
             FastLED.clear();
             DrawParametric(mad);
+            DrawWave(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
+          case DRAW_STYLE::PLASMA_AUDIO:
+            FastLED.clear();
+            DrawPlasma(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);

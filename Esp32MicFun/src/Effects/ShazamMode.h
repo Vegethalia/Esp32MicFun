@@ -4,8 +4,7 @@ void ProcessShazamMode(MsgAudio2Draw& mad) {
   static int8_t _inc = 1;
   static uint8_t _intensity = 1;
 
-  if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE
-      && _TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
+  if (_ShazamSongs && !_DemoMode && _TheDrawStyle != DRAW_STYLE::CALC_MODE) {
     auto now = millis();
     bool resetTextPos = false;
     uint32_t timeSinceLastDetection = now - _LastSongDetectionTime;
