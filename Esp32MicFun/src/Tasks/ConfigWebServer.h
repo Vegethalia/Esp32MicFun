@@ -45,6 +45,16 @@ const char* GetStyleName(DRAW_STYLE style) {
       return "Thumbnail";
     case DRAW_STYLE::CALC_MODE:
       return "Calc mode";
+    case DRAW_STYLE::FRACTAL_AUDIO:
+      return "Fractal audio";
+    case DRAW_STYLE::MANDELBROT_AUDIO:
+      return "Mandelbrot audio";
+    case DRAW_STYLE::LISSAJOUS_AUDIO:
+      return "Lissajous audio";
+    case DRAW_STYLE::PLASMA_AUDIO:
+      return "Plasma audio";
+    case DRAW_STYLE::RADIAL_SPECTRUM:
+      return "Radial spectrum";
     default:
       return "Unknown";
   }
@@ -64,11 +74,13 @@ const char* GetBarAlterDrawName(ALTERDRAW alterDraw) {
 }
 
 DRAW_STYLE GetDisplayableStyle() {
-  return _TheDrawStyle <= DRAW_STYLE::ANALOG_CLOCK ? _TheDrawStyle : DRAW_STYLE::DEFAULT_STYLE;
+  if (_TheDrawStyle == DRAW_STYLE::DRAW_THUMBNAIL || _TheDrawStyle == DRAW_STYLE::CALC_MODE)
+    return DRAW_STYLE::DEFAULT_STYLE;
+  return _TheDrawStyle;
 }
 
 uint8_t GetDisplayableIntensity() {
-  return (uint8_t)max(min((int)_MAX_MILLIS, 128), 1);
+  return (uint8_t)max(min((int)_MAX_MILLIS, 100), 1);
 }
 
 String GetStatusMessageFromQuery() {
@@ -179,15 +191,15 @@ int ClampWebIntensity(long value) {
   if (value < 1) {
     return 1;
   }
-  if (value > 128) {
-    return 128;
+  if (value > 100) {
+    return 100;
   }
   return (int)value;
 }
 
 bool ApplyPreviewControl(const String& control, const String& value) {
   if (control == "style") {
-    ChangeDrawStyle(ClampDrawStyle(value.toInt(), DRAW_STYLE::ANALOG_CLOCK), false, false);
+    ChangeDrawStyle(ClampDrawStyle(value.toInt()), false, false);
     return true;
   }
   if (control == "hue") {
@@ -241,7 +253,7 @@ void PersistRequestValues() {
   }
 
   if (_server.hasArg("style")) {
-    ChangeDrawStyle(ClampDrawStyle(_server.arg("style").toInt(), DRAW_STYLE::ANALOG_CLOCK), false, true);
+    ChangeDrawStyle(ClampDrawStyle(_server.arg("style").toInt()), false, true);
   }
   if (_server.hasArg("hue")) {
     ApplyDesiredHueSetting(_server.arg("hue").toInt(), true);
@@ -395,6 +407,11 @@ void StreamPage(const String& statusMessage = "") {
   SendSelectOption((int)DRAW_STYLE::MATRIX_FFT, GetStyleName(DRAW_STYLE::MATRIX_FFT), (int)GetDisplayableStyle());
   SendSelectOption((int)DRAW_STYLE::DISCO_LIGHTS, GetStyleName(DRAW_STYLE::DISCO_LIGHTS), (int)GetDisplayableStyle());
   SendSelectOption((int)DRAW_STYLE::ANALOG_CLOCK, GetStyleName(DRAW_STYLE::ANALOG_CLOCK), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::FRACTAL_AUDIO, GetStyleName(DRAW_STYLE::FRACTAL_AUDIO), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::MANDELBROT_AUDIO, GetStyleName(DRAW_STYLE::MANDELBROT_AUDIO), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::LISSAJOUS_AUDIO, GetStyleName(DRAW_STYLE::LISSAJOUS_AUDIO), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::PLASMA_AUDIO, GetStyleName(DRAW_STYLE::PLASMA_AUDIO), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::RADIAL_SPECTRUM, GetStyleName(DRAW_STYLE::RADIAL_SPECTRUM), (int)GetDisplayableStyle());
   SendChunk(F("</select>"));
 
   SendChunk(F("<label for='hue'>Basic Hue</label><select id='hue' name='hue'>"));
@@ -408,7 +425,10 @@ void StreamPage(const String& statusMessage = "") {
   SendChunk(F("</select>"));
 
   SendChunk(F("<label for='intensity'>Intensity</label><select id='intensity' name='intensity'>"));
-  for (int v : {1, 2, 4, 8, 16, 32, 64, 128}) {
+  for (int v : {1, 2, 5}) {
+    SendSelectOption(v, String(v).c_str(), (int)GetDisplayableIntensity());
+  }
+  for (int v = 10; v <= 100; v += 5) {
     SendSelectOption(v, String(v).c_str(), (int)GetDisplayableIntensity());
   }
   SendChunk(F("</select>"));

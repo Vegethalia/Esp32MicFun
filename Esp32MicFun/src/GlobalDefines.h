@@ -5,4 +5,4 @@
 #define BIT_2 (1 << 2)
 
 #define PANEL_SIZE_96x54
-// #define PANEL_SIZE_64x32
+//#define PANEL_SIZE_64x32
