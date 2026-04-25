@@ -235,7 +235,7 @@ void loop() {
   delay(10000);
   log_d("Main: Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
   if (_DebugMode && _ThePubSub.connected()) {
-    _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", ESP.getPsramSize()).c_str());  // esp_get_free_heap_size()
+    _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", esp_get_free_heap_size()).c_str());
     _ThePubSub.publish(TOPIC_BIGGESTFREEBLOCK, Utils::string_format("%d", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_FREERAM, Utils::string_format("%d", heap_caps_get_free_size(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());

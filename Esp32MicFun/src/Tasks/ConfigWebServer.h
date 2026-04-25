@@ -365,10 +365,16 @@ void StreamPage(const String& statusMessage = "") {
     uint32_t totalMin = millis() / 60000UL;
     char uptime[10];
     snprintf(uptime, sizeof(uptime), "%02lu:%02lu", totalMin / 60, totalMin % 60);
+    char ramInfo[40];
+    snprintf(ramInfo, sizeof(ramInfo), "%lu KB (max block %lu KB)",
+             esp_get_free_heap_size() / 1024,
+             heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) / 1024);
     SendChunk(F("<p class='muted'>IP actual: "));
     SendChunk(WiFi.localIP().toString());
     SendChunk(F(" &nbsp;|&nbsp; Actiu: "));
     SendChunk(uptime);
+    SendChunk(F(" &nbsp;|&nbsp; RAM: "));
+    SendChunk(ramInfo);
     SendChunk(F("</p>"));
   }
 

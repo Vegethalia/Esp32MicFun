@@ -1,12 +1,16 @@
 
-// Decode one RGB565 pixel from the raw buffer to CRGB (90% brightness scale)
+#include "../ColorUtils.h"
+
+// Decode one RGB565 pixel from the raw buffer to CRGB with gamma + color adjustments
 static inline CRGB ThumbPixel(uint16_t pixIdx) {
   const uint16_t p = ((uint16_t)_ThumbnailRaw[pixIdx * 2] << 8) | _ThumbnailRaw[pixIdx * 2 + 1];
-  return CRGB(
-    (uint8_t)((((p >> 11) & 0x1F) * 9u * 8u) / 10u),   // R 5-bit → 8-bit × 0.9
-    (uint8_t)((((p >>  5) & 0x3F) * 9u * 4u) / 10u),   // G 6-bit → 8-bit × 0.9
-    (uint8_t)(( (p        & 0x1F) * 9u * 8u) / 10u)    // B 5-bit → 8-bit × 0.9
-  );
+  uint8_t r = (uint8_t)((((p >> 11) & 0x1F) * 9u * 8u) / 10u);   // R 5-bit → 8-bit × 0.9
+  uint8_t g = (uint8_t)((((p >>  5) & 0x3F) * 9u * 4u) / 10u);   // G 6-bit → 8-bit × 0.9
+  uint8_t b = (uint8_t)(( (p        & 0x1F) * 9u * 8u) / 10u);   // B 5-bit → 8-bit × 0.9
+  CRGB c(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);
+  c = adjustDarkColors(c);
+  c = adjustPowerConsumption(c);
+  return c;
 }
 
 void DrawThumbnail() {

@@ -107,7 +107,7 @@ PanelMapping64x32 _TheMapping;
 
 #elif defined(PANEL_SIZE_96x54)
 #define DEFAULT_MILLIS 52
-#define THUMBNAIL_MILLIS 40
+#define THUMBNAIL_MILLIS 30
 #define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
