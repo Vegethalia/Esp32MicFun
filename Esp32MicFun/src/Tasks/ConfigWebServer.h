@@ -271,13 +271,20 @@ String SanitizeSongName(const std::string& name) {
   return s;
 }
 
+// HTML-encode a URL for use in an attribute value (escapes & → &amp;)
+String HtmlEncodeUrl(const char* url) {
+  String s(url);
+  s.replace("&", "&amp;");
+  return s;
+}
+
 void StreamSongEntry(const SongEntry& s) {
   SendChunk("<li><span class='song-name'>" + SanitizeSongName(s.name) +
             "</span>"
             "<span class='song-time'>" +
             FormatDetectionTime(s.detectionWallTime) + "</span>");
   if (s.artworkUrl[0] != '\0') {
-    SendChunk("<img src='" + String(s.artworkUrl) + "' class='nowplaying-img' alt=''>");
+    SendChunk("<img src='" + HtmlEncodeUrl(s.artworkUrl) + "' class='song-img' loading='lazy' referrerpolicy='no-referrer' alt=''>");
   }
   SendChunk(F("</li>"));
 }
@@ -296,7 +303,7 @@ void StreamSongHistory() {
     SendChunk("<div class='nowplaying-name'>" + SanitizeSongName(s.name) + "</div>");
     SendChunk("<div class='nowplaying-time'>" + FormatDetectionTime(s.detectionWallTime) + "</div>");
     if (s.artworkUrl[0] != '\0') {
-      SendChunk("<img src='" + String(s.artworkUrl) + "' class='nowplaying-img' alt='portada'>");
+      SendChunk("<img src='" + HtmlEncodeUrl(s.artworkUrl) + "' class='nowplaying-img' loading='lazy' referrerpolicy='no-referrer' alt='portada'>");
     }
     SendChunk(F("</div>"));
 
@@ -313,52 +320,6 @@ void StreamSongHistory() {
       StreamSongEntry(_SongHistory[i]);
     }
     SendChunk(F("</ul>"));
-  }
-}
-
-void HandleThumbnail() {
-  if (!_ThumbnailReady || (int)_ThumbnailImg.size() < THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT) {
-    _server.send(404, "text/plain", "No thumbnail");
-    return;
-  }
-
-  const int rowStride = THUMBNAIL_WIDTH * 3;  // 72*3=216 and 52*3=156 are both multiples of 4
-  const uint32_t pixelDataSize = (uint32_t)rowStride * THUMBNAIL_HEIGHT;
-  const uint32_t fileSize = 54 + pixelDataSize;
-
-  auto le32 = [](uint8_t* p, uint32_t v) {
-    p[0] = v & 0xFF;
-    p[1] = (v >> 8) & 0xFF;
-    p[2] = (v >> 16) & 0xFF;
-    p[3] = (v >> 24) & 0xFF;
-  };
-
-  uint8_t bmpHeader[54] = {};
-  bmpHeader[0] = 'B';
-  bmpHeader[1] = 'M';
-  le32(&bmpHeader[2], fileSize);
-  bmpHeader[10] = 54;  // pixel data offset
-  bmpHeader[14] = 40;  // DIB header size
-  le32(&bmpHeader[18], (uint32_t)THUMBNAIL_WIDTH);
-  le32(&bmpHeader[22], (uint32_t)THUMBNAIL_HEIGHT);
-  bmpHeader[26] = 1;   // color planes
-  bmpHeader[28] = 24;  // bits per pixel (RGB888)
-  le32(&bmpHeader[34], pixelDataSize);
-
-  _server.sendHeader("Cache-Control", "no-store");
-  _server.setContentLength(fileSize);
-  _server.send(200, "image/bmp", "");
-  _server.sendContent(reinterpret_cast<const char*>(bmpHeader), 54);
-
-  std::vector<uint8_t> rowBuf(rowStride);
-  for (int row = THUMBNAIL_HEIGHT - 1; row >= 0; row--) {
-    for (int col = 0; col < THUMBNAIL_WIDTH; col++) {
-      const CRGB& px = _ThumbnailImg[row * THUMBNAIL_WIDTH + col];
-      rowBuf[col * 3 + 0] = px.b;
-      rowBuf[col * 3 + 1] = px.g;
-      rowBuf[col * 3 + 2] = px.r;
-    }
-    _server.sendContent(reinterpret_cast<const char*>(rowBuf.data()), rowStride);
   }
 }
 
@@ -390,6 +351,7 @@ void StreamPage(const String& statusMessage = "") {
       ".nowplaying-name{font-size:1.3rem;font-weight:bold;margin-bottom:4px;word-break:break-word;}"
       ".nowplaying-time{color:#bbb;font-size:.9rem;margin-bottom:4px;}"
       ".nowplaying-img{display:block;width:50%;margin:12px auto 0;border-radius:6px;}"
+      ".song-img{display:block;width:50%;margin:8px auto 0;border-radius:6px;}"
       ".song-history{list-style:none;padding:0;margin:14px 0 0 0;}"
       ".song-history li{padding:12px 2px;border-bottom:1px solid #2a2a2a;text-align:center;}"
       ".song-history li:last-child{border-bottom:none;}"
@@ -598,7 +560,6 @@ inline void SetupIfNeeded() {
   _server.on("/preview", HTTP_POST, []() { HandlePreview(); });
   _server.on("/save", HTTP_POST, []() { HandleSave(); });
   _server.on("/shazam-asap", HTTP_POST, []() { HandleShazamRecognizeAsap(); });
-  _server.on("/thumbnail.bmp", HTTP_GET, []() { HandleThumbnail(); });
   _server.on("/favicon.ico", HTTP_GET, []() { _server.send(204); });
   _server.onNotFound([]() {
     _server.sendHeader("Location", "/", true);

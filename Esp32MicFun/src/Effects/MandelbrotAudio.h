@@ -42,7 +42,8 @@ void CleanupMandelbrot() {
 
 void DrawMandelbrot(MsgAudio2Draw& mad) {
   if (!_mandelbrotData) {
-    _mandelbrotData = new MandelbrotData();
+    _mandelbrotData = new (std::nothrow) MandelbrotData();
+    if (!_mandelbrotData) { log_e("Mandelbrot: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
     memset(_mandelbrotData->escBuf, 0, sizeof(_mandelbrotData->escBuf));
   }
 

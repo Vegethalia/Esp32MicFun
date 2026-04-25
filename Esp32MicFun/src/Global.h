@@ -106,7 +106,7 @@ U8G2_SSD1306_2040X16_2_2ND_4W_HW_SPI _u8g2LongText(U8G2_R0, PIN_I2C_SCL, PIN_I2C
 PanelMapping64x32 _TheMapping;
 
 #elif defined(PANEL_SIZE_96x54)
-#define DEFAULT_MILLIS 60
+#define DEFAULT_MILLIS 52
 #define THUMBNAIL_MILLIS 40
 #define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
@@ -218,6 +218,7 @@ bool _DisplayingClockScroll = false;  // true if we are displaying the clock scr
 #define TOPIC_HIWATER_DRAWER "caseta/spectrometre/hiwdrawer"
 #define TOPIC_HIWATER_WIFI "caseta/spectrometre/hiwWIFI"
 #define TOPIC_HIWATER_IRDECO "caseta/spectrometre/hiwIRdeco"
+#define TOPIC_HIWATER_VERTFIRE "caseta/spectrometre/hiwVertFire"
 #define TOPIC_CPU_WIFI "caseta/spectrometre/cpuwifi"
 #define TOPIC_CPU_READER "caseta/spectrometre/cpureader"
 #define TOPIC_CPU_DRAWER "caseta/spectrometre/cpudrawer"
@@ -256,6 +257,7 @@ bool _DisplayingClockScroll = false;  // true if we are displaying the clock scr
 #define TOPIC_HIWATER_DRAWER "caseta/spectrometreBig/hiwdrawer"
 #define TOPIC_HIWATER_WIFI "caseta/spectrometreBig/hiwWIFI"
 #define TOPIC_HIWATER_IRDECO "caseta/spectrometreBig/hiwIRdeco"
+#define TOPIC_HIWATER_VERTFIRE "caseta/spectrometreBig/hiwVertFire"
 #define TOPIC_CPU_WIFI "caseta/spectrometreBig/cpuwifi"
 #define TOPIC_CPU_READER "caseta/spectrometreBig/cpureader"
 #define TOPIC_CPU_DRAWER "caseta/spectrometreBig/cpudrawer"
@@ -455,13 +457,13 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 
 // THUMBNAIL related
 #if defined(PANEL_SIZE_96x54)
-#define THUMBNAIL_HEIGHT 54
-#define THUMBNAIL_WIDTH 72
+#define THUMBNAIL_HEIGHT 88
+#define THUMBNAIL_WIDTH  88
 #else
-#define THUMBNAIL_HEIGHT 32
-#define THUMBNAIL_WIDTH 52
+#define THUMBNAIL_HEIGHT 64
+#define THUMBNAIL_WIDTH  64
 #endif
-std::vector<CRGB> _ThumbnailImg;                   // vector of CRGB to store the thumbnail image (gamma-corrected, for LEDs)
+uint8_t* _ThumbnailRaw = nullptr;          // heap-allocated raw RGB565 bytes (2 bytes/pixel); null when no thumbnail received
 bool _ThumbnailReady = false;                      // true if the thumbnail image is ready to be displayed
 DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received
@@ -469,7 +471,7 @@ uint8_t _ThumbnailPrevIntensity = DEFAULT_MILLIS;  // intensity that was in plac
 
 struct SongEntry {
   std::string name;
-  char artworkUrl[180];
+  char artworkUrl[300];
   uint32_t detectionMillis;
   time_t detectionWallTime;
 };

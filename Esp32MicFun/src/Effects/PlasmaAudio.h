@@ -37,7 +37,8 @@ void CleanupPlasma() {
 
 void DrawPlasma(MsgAudio2Draw& mad) {
   if (!_plasmaData) {
-    _plasmaData = new PlasmaData();
+    _plasmaData = new (std::nothrow) PlasmaData();
+    if (!_plasmaData) { log_e("Plasma: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
   }
 
   // ---- 1. Per-band energy (normalised 0..1) ----

@@ -64,7 +64,8 @@ void CleanupParametric() {
 
 void DrawParametric(MsgAudio2Draw& mad) {
   if (!__dpd) {
-    __dpd = new DrawParametricData();
+    __dpd = new (std::nothrow) DrawParametricData();
+    if (!__dpd) { log_e("Parametric: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
   }
 
   // ---- 1. Per-band energy ----

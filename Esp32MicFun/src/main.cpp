@@ -156,7 +156,7 @@ void setup() {
   _ThePanel.SetEventForBackgroundTasks(_xEventVertFireNewLine);  // set the event for background tasks
 
   // start task to read samples from I2S
-  xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle, 0);  // 7000
+  xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 4500, (void*)&_TaskParams, 4, &_readerTaskHandle, 0);  // 7000
   // xTaskCreate(vTaskReader, "ReaderTask", 6000, (void*)&_TaskParams, 4, &_readerTaskHandle); // 7000
   //  // xTaskCreatePinnedToCore(vTaskReader, "ReaderTask", 2048, (void*)&_TaskParams, 2, &_readerTaskHandle, 0);
   //  start task to draw screen
@@ -172,9 +172,9 @@ void setup() {
 
   // xTaskCreate(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 20000, nullptr, 2, &_refrescarConsumTaskHandle);
   //** xTaskCreatePinnedToCore(vTaskRefrescarConsumElectricitat, "Refrescar Consum", 15000, nullptr, 2, &_refrescarConsumTaskHandle, 1);
-  xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 2500, nullptr, 2, &_receiveIRTaskHandle, 1);
+  xTaskCreatePinnedToCore(vTaskReceiveIR, "Receive IR", 2000, nullptr, 2, &_receiveIRTaskHandle, 1);
 
-  xTaskCreate(vTaskVertFire, "Vertical Fire", 2500, (void*)_ThePanel.GetFireBufferRef(), 2, &_vertFireTaskHandle);
+  xTaskCreate(vTaskVertFire, "Vertical Fire", 1000, (void*)_ThePanel.GetFireBufferRef(), 2, &_vertFireTaskHandle);
 
   ////  xTaskCreatePinnedToCore(vTaskResetWhenHung, "Reset When Hung", 2048, nullptr, 2, &_resetWhenHungTaskHandle, 1);
 }
@@ -235,12 +235,13 @@ void loop() {
   delay(10000);
   log_d("Main: Free Heap=%d largest_block=%d", esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
   if (_DebugMode && _ThePubSub.connected()) {
-    _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", esp_get_free_heap_size()).c_str());
+    _ThePubSub.publish(TOPIC_FREEHEAP, Utils::string_format("%d", ESP.getPsramSize()).c_str());  // esp_get_free_heap_size()
     _ThePubSub.publish(TOPIC_BIGGESTFREEBLOCK, Utils::string_format("%d", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_FREERAM, Utils::string_format("%d", heap_caps_get_free_size(MALLOC_CAP_DEFAULT)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_READER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_readerTaskHandle)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_WIFI, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_wifiReconnectTaskHandle)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_DRAWER, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_drawTaskHandle)).c_str());
     _ThePubSub.publish(TOPIC_HIWATER_IRDECO, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_receiveIRTaskHandle)).c_str());
+    _ThePubSub.publish(TOPIC_HIWATER_VERTFIRE, Utils::string_format("%d", uxTaskGetStackHighWaterMark(_vertFireTaskHandle)).c_str());
   }
 }

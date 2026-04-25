@@ -310,58 +310,24 @@ CRGB adjustDarkColors(CRGB& color) {
 }
 
 void DecodeThumbnail(uint8_t* pData, uint16_t dataLenght) {
-  _ThumbnailImg.resize(dataLenght / 2);  // 2 bytes per pixel (RGB565)
-  for (uint16_t i = 0; i < dataLenght / 2; i++) {
-    uint16_t pixel = (pData[i * 2] << 8) | pData[i * 2 + 1];
-    uint8_t r = (uint8_t)((pixel >> 11) & 0x1F);  // << 3;
-    uint8_t g = (uint8_t)((pixel >> 5) & 0x3F);   //<< 2;
-    uint8_t b = (uint8_t)(pixel & 0x1F);          // << 3;
-    // if (r > 3) {
-    //   r -= 3;
-    // }
-    // if (g > 3) {
-    //   g -= 3;
-    // }
-    // if (b > 3) {
-    //   b -= 3;
-    // }
-    r = (r << 3);  // Scale to 8 bits
-    g = (g << 2);  // Scale to 8 bits
-    b = (b << 3);  // Scale to 8 bits
-    // ara els fem 4/5 dels valors per que no brilli tant
-    // r = (uint8_t)(((uint16_t)r * 4) / (uint16_t)5);
-    // g = (uint8_t)(((uint16_t)g * 4) / (uint16_t)5);
-    // b = (uint8_t)(((uint16_t)b * 4) / (uint16_t)5);
-    r = (uint8_t)(((uint16_t)r * 9) / (uint16_t)10);
-    g = (uint8_t)(((uint16_t)g * 9) / (uint16_t)10);
-    b = (uint8_t)(((uint16_t)b * 9) / (uint16_t)10);
-#if defined(PANEL_SIZE_96x54)
-    //    _ThumbnailImg[i] = CRGB(r, g, b);  // Convert to RGB888 //no adjust gamma
-    CRGB originalColor = CRGB(gamma_1_8_table[r], gamma_1_8_table[g], gamma_1_8_table[b]);  // adjust gamma
-
-#else
-    CRGB originalColor = CRGB(_gamma8[r], _gamma8[g], _gamma8[b]);  // adjust gamma
-#endif
-
-    // Aplica els dos ajustos: 1) potenciem Foscos 2) limitem brillants (del codi anterior)
-    CRGB adjustedColor = adjustDarkColors(originalColor);
-    adjustedColor = adjustPowerConsumption(adjustedColor);  // Funció que ja tenies
-
-    _ThumbnailImg[i] = adjustedColor;
-
-    // to compensate the RGB565 to RGB888 conversion
-    //    // Extreure components
-    //  uint8_t r = (packed >> 11) & 0x1F;
-    //  uint8_t g = (packed >> 5) & 0x3F;
-    //  uint8_t b = packed & 0x1F;
-
-    //   // Escalar a 8 bits
-    // r = (r << 3) | (r >> 2);
-    // g = (g << 2) | (g >> 4);
-    // b = (b << 3) | (b >> 2);
+  const uint16_t expectedBytes = THUMBNAIL_HEIGHT * THUMBNAIL_WIDTH * 2;
+  if (dataLenght < expectedBytes) {
+    log_w("Thumbnail too small: got %d, expected %d bytes. Discarding.", dataLenght, expectedBytes);
+    _ThumbnailReady = false;
+    return;
   }
+  // Allocate once; reuse the same buffer for subsequent thumbnails (size is always fixed)
+  if (!_ThumbnailRaw) {
+    _ThumbnailRaw = (uint8_t*)malloc(expectedBytes);
+    if (!_ThumbnailRaw) {
+      log_e("malloc failed for thumbnail (%d bytes). Not enough heap.", expectedBytes);
+      _ThumbnailReady = false;
+      return;
+    }
+  }
+  memcpy(_ThumbnailRaw, pData, expectedBytes);
   _ThumbnailReady = true;
-  log_i("Thumbnail image decoded. Size=%d pixels", _ThumbnailImg.size());
+  log_i("Thumbnail stored. %d bytes raw RGB565 (free heap: %d)", expectedBytes, ESP.getFreeHeap());
 }
 
 void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
@@ -408,11 +374,17 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     ConfigureNTP();
     SendDebugMessage(Utils::string_format("Updated Horari Estiu=%d", (int)_DaylightSaving).c_str());
   } else if (theTopic.find(TOPIC_SONG_NAME) != std::string::npos) {
-    char artworkUrl[180] = {};
+    char artworkUrl[300] = {};
     auto sep = theMsg.find("@@");
     if (sep != std::string::npos) {
       _DetectedSongName = theMsg.substr(0, sep);
       strncpy(artworkUrl, theMsg.c_str() + sep + 2, sizeof(artworkUrl) - 1);
+      // Trim trailing whitespace/newlines that some backends append
+      size_t urlLen = strlen(artworkUrl);
+      if (urlLen > 0) {
+        char* end = artworkUrl + urlLen - 1;
+        while (end > artworkUrl && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
+      }
     } else {
       _DetectedSongName = theMsg;
     }
@@ -426,7 +398,8 @@ void PubSubCallback(char* pTopic, uint8_t* pData, unsigned int dataLenght) {
     _LastSongDetectionTime = millis();
     _LastSongDisplayTime = millis() - 20000;  // forcem actualitzar el nom de la cançó asap
     if (!_SongDesconeguda) AddSongToHistory(_DetectedSongName, artworkUrl);
-    SendDebugMessage(Utils::string_format("Detected SongName=[%s]", _DetectedSongName.c_str()).c_str());
+    SendDebugMessage(Utils::string_format("Detected SongName=[%s] artworkUrl=[%s]",
+                                         _DetectedSongName.c_str(), artworkUrl).c_str());
   } else if (theTopic.find(TOPIC_THUMBNAIL) != std::string::npos) {
     SendDebugMessage(Utils::string_format("Detected Thumbnail. Datalen=%d bytes", dataLenght).c_str());
     DecodeThumbnail(pData, dataLenght);

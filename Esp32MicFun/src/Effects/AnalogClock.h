@@ -1,28 +1,19 @@
 #include <math.h>
 
-#include <unordered_map>
-#include <vector>
-
 class AnalogClock {
  private:
   const int RADIUS;
 
   struct PointCercle {
-    int16_t ledIndex;  // Index in the LED array
+    int16_t ledIndex;
     uint8_t hue;
-    // Constructor to initialize the point
-    PointCercle(int16_t index, uint8_t h) : ledIndex(index), hue(h) {}
-    PointCercle() : ledIndex(0), hue(0) {}  // Default constructor
   };
 
-  struct pair_hash {
-    size_t operator()(const std::pair<int, int>& p) const {
-      return std::hash<int>()(p.first) ^ (std::hash<int>()(p.second) << 1);
-    }
-  };
-
-  std::unordered_map<std::pair<int, int>, PointCercle, pair_hash> _cerclePrecalculat;
-  bool _cercleInicialitzat = false;
+  // Upper bound: ~2 × circumference of ring (r≈25 → ≈314 px) + margin
+  static constexpr uint16_t MAX_CIRCLE_POINTS = 400;
+  PointCercle _cerclePoints[MAX_CIRCLE_POINTS];
+  uint16_t    _numPoints          = 0;
+  bool        _cercleInicialitzat = false;
 
  public:
   // static const int WIDTH = 96;
@@ -35,33 +26,19 @@ class AnalogClock {
   }
 
   void pinta(int hour, int minute, double second) {
-    // std::vector<std::vector<CHSV>> screen(THE_PANEL_HEIGHT, std::vector<CHSV>(THE_PANEL_WIDTH, CHSV(0, 0, 0)));
-
     dibuixaCercle();
     dibuixaMarquesHores();
 
-    float secAngle = (M_PI_2) - (M_TWOPI * second / 60.0f);
-    float minAngle = (M_PI_2) - (M_TWOPI * (minute + second / 60.0f) / 60.0f);
+    float secAngle  = (M_PI_2) - (M_TWOPI * second / 60.0f);
+    float minAngle  = (M_PI_2) - (M_TWOPI * (minute + second / 60.0f) / 60.0f);
     float hourAngle = (M_PI_2) - (M_TWOPI * ((hour % 12 + minute / 60.0f) / 12.0f));
 
     dibuixaAgullaGruixuda(hourAngle, static_cast<int>(RADIUS * 0.45), 0.75, HSVHue::HUE_BLUE);
-    dibuixaAgullaGruixuda(minAngle, static_cast<int>(RADIUS * 0.7), 0.45, HSVHue::HUE_AQUA);
+    dibuixaAgullaGruixuda(minAngle,  static_cast<int>(RADIUS * 0.7),  0.45, HSVHue::HUE_AQUA);
     dibuixaAgulla(secAngle, static_cast<int>(RADIUS * 0.8f));
 
     uint8_t intensity = max((int)100, (int)_1stBarValue);
-    _TheLeds[LedIndexXY(CENTER_X, CENTER_Y)] = CHSV(HSVHue::HUE_RED, 255, intensity);  // Center dot
-
-    if (_TheFrameNumber % 250 == 0) {
-      // SendDebugMessage(Utils::string_format("Analog Clock: %02d:%02d:%02.0f NumPoints=%d", hour, minute, second, _cerclePrecalculat.size()).c_str());
-    }
-    // screen[CENTER_Y][CENTER_X] = '+';
-
-    // for (const auto& row : screen) {
-    //   std::string sLine;
-    //   for (char c : row) sLine += c;
-    //   sLine += '\n';
-    //   std::cout << sLine;
-    // }
+    _TheLeds[LedIndexXY(CENTER_X, CENTER_Y)] = CHSV(HSVHue::HUE_RED, 255, intensity);
   }
 
  private:
@@ -116,45 +93,41 @@ class AnalogClock {
   }
 
   void dibuixaCercle() {
-    uint8_t baseHue = _TheFrameNumber % 255;
+    uint8_t baseHue = (uint8_t)(_TheFrameNumber % 255);
 
     if (!_cercleInicialitzat) {
-      const float step = 0.0075;
-      const float thickness = 0.5;
+      const float step      = 0.0075f;
+      const float thickness = 0.5f;
+      _numPoints = 0;
 
+      // Dedup bitmap: 1 bit per LED, ~648 bytes heap, freed after init
+      constexpr int totalLeds = THE_PANEL_WIDTH * THE_PANEL_HEIGHT;
+      uint8_t* visited = (uint8_t*)calloc((totalLeds + 7) / 8, 1);
+
+      uint8_t hue = 0;
       for (float angle = 0; angle < 2 * M_PI; angle += step) {
-        uint8_t iter = 0;
-
-        for (float r = RADIUS - thickness; r <= RADIUS + thickness; r += 0.3) {
+        for (float r = RADIUS - thickness; r <= RADIUS + thickness; r += 0.3f) {
           int x = CENTER_X + static_cast<int>(r * std::cos(angle));
           int y = CENTER_Y - static_cast<int>(r * std::sin(angle));
           if (x >= 0 && x < THE_PANEL_WIDTH && y >= 0 && y < THE_PANEL_HEIGHT) {
-            // char pixel = (iter < 1 || iter > 3) ? '.' : chCercle;
-            // CHSV hsvPixel = CHSV(baseHue, 255, (iter < 1 || iter > 3) ? 50 : 90);
-
-            // CHSV hsvPixel = CHSV(baseHue, 255, 100);  // Color del cercle
-            auto key = std::make_pair(x, y);
-            if (_cerclePrecalculat.find(key) == _cerclePrecalculat.end()) {  // || pixel == chCercle) {
-              _cerclePrecalculat[key] = PointCercle(LedIndexXY(x, y), baseHue);
+            int16_t idx  = (int16_t)LedIndexXY(x, y);
+            uint16_t byte = (uint16_t)idx >> 3;
+            uint8_t  bit  = 1u << (idx & 7);
+            if (visited && !(visited[byte] & bit)) {
+              visited[byte] |= bit;
+              if (_numPoints < MAX_CIRCLE_POINTS)
+                _cerclePoints[_numPoints++] = { idx, hue };
             }
           }
-          iter++;
         }
-        baseHue++;
+        hue++;
       }
+      if (visited) free(visited);
       _cercleInicialitzat = true;
     }
 
-    // CHSV myPixel;
-    for (const auto& element : _cerclePrecalculat) {
-      const auto& pos = element.first;  // o el que correspongui
-      const auto& pixel = element.second;
-      // myPixel.h = baseHue;
-      // myPixel.s = 255;                               // o el que correspongui
-      // myPixel.v = 100;                               // o el que correspongui
-      _TheLeds[pixel.ledIndex].setHSV(pixel.hue + baseHue, 255, 100);  // Center dot
-      // baseHue++;
-    }
+    for (uint16_t i = 0; i < _numPoints; ++i)
+      _TheLeds[_cerclePoints[i].ledIndex].setHSV(_cerclePoints[i].hue + baseHue, 255, 100);
   }
 };
 

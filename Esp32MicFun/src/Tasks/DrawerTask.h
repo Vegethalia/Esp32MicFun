@@ -91,14 +91,14 @@ void vTaskDrawer(void* pvParameters) {
         if (styleBeforeChange == DRAW_STYLE::VERT_FIRE && !vertFireToThumb) _ThePanel.FreeAuxLeds();
         if (_TheDrawStyle == DRAW_STYLE::VERT_FIRE && !thumbToVertFire) _ThePanel.AllocAuxLeds();
 
-        // Leaving THUMBNAIL to a style that's not a heap-state effect: free kept buffers
-        if (fromThumb && _TheDrawStyle != DRAW_STYLE::VERT_FIRE) {
-          _ThePanel.FreeAuxLeds();  // safe: FreeAuxLeds is a no-op if already null
-          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO) CleanupFractalAudio();
+        // Leaving THUMBNAIL: free any preserved heap buffers that the new style doesn't need
+        if (fromThumb) {
+          if (_TheDrawStyle != DRAW_STYLE::VERT_FIRE) _ThePanel.FreeAuxLeds();
+          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO)    CleanupFractalAudio();
           if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
-          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO) CleanupParametric();
-          if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO) CleanupPlasma();
-          if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM) CleanupRadialSpectrum();
+          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO)  CleanupParametric();
+          if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO)     CleanupPlasma();
+          if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM)  CleanupRadialSpectrum();
         }
       }
       _TheFrameNumber++;

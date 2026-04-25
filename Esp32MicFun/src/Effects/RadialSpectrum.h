@@ -43,7 +43,8 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
 
   // ---- Init (first call) ----
   if (!_radialData) {
-    _radialData = new RadialSpectrumData();
+    _radialData = new (std::nothrow) RadialSpectrumData();
+    if (!_radialData) { log_e("RadialSpectrum: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
     memset(_radialData->persist, 0, sizeof(_radialData->persist));
     memset(_radialData->hueBuf,  0, sizeof(_radialData->hueBuf));
     _radialData->baseHue = 0;

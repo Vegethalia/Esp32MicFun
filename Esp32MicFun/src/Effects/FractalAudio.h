@@ -24,7 +24,8 @@ void CleanupFractalAudio() {
 
 void DrawFractalAudio(MsgAudio2Draw& mad) {
   if (!_fractalData) {
-    _fractalData = new FractalAudioData();
+    _fractalData = new (std::nothrow) FractalAudioData();
+    if (!_fractalData) { log_e("FractalAudio: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
     memset(_fractalData->persist, 0, sizeof(_fractalData->persist));
     memset(_fractalData->hueBuf,  0, sizeof(_fractalData->hueBuf));
   }
