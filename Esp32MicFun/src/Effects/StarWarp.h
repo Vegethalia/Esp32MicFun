@@ -78,8 +78,8 @@ void DrawStarWarp(MsgAudio2Draw& mad) {
   energy /= ((float)W * 255.0f);  // normalised 0..1
 
   // ---- 2. Smooth warp factor toward bass target (asymmetric: fast up, slow down) ----
-  // Range 0.15..3.5: without bass stars crawl; full bass they shoot out fast.
-  const float targetWarp = 0.15f + bass * 3.35f;
+  // Range 0.002..3.5: in silence stars are nearly frozen; full bass they shoot out fast.
+  const float targetWarp = 0.002f + bass * 3.498f;
   // Acceleration reacts quickly to bass hits (α=0.20); deceleration is gradual (α=0.05)
   const float alpha = (targetWarp > _starWarpData->sWarp) ? 0.20f : 0.05f;
   _starWarpData->sWarp += alpha * (targetWarp - _starWarpData->sWarp);

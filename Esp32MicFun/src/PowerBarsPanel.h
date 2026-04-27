@@ -664,23 +664,35 @@ class PowerBarsPanel {
   ///        de fer el scroll i el fade de forma asíncrona.
   void PushLineWithPrecalcFire(const uint8_t* pTheValues) {
     if (_pFireBuffer == nullptr) return;
-    // Escrivim la nova fila a la part inferior del buffer (fila H-1)
-    memcpy(_pFireBuffer + (PANEL_HEIGHT - 1) * PANEL_WIDTH, pTheValues, PANEL_WIDTH);
+    // Escrivim la nova fila al buffer. La meitat inferior (freqs. baixes) va directa;
+    // la meitat superior (freqs. altes) s'amplifica linealment de 1.5× a 2.5×
+    // per compensar la seva menor amplitud natural i generar flames visibles.
+    uint8_t* dst = _pFireBuffer + (PANEL_HEIGHT - 1) * PANEL_WIDTH;
+    constexpr int half = PANEL_WIDTH / 2;
+    for (int x = 0; x < PANEL_WIDTH; x++) {
+      if (x < half) {
+        dst[x] = pTheValues[x];
+      } else {
+        // scale: 192 (→1.5×) a 320 (→2.5×) en el rang [half, PANEL_WIDTH-1]
+        const uint16_t scale = 192u + (uint16_t)(x - half) * 128u / (PANEL_WIDTH - 1 - half);
+        const uint16_t boosted = ((uint16_t)pTheValues[x] * scale) >> 7;
+        dst[x] = boosted > 255u ? 255u : (uint8_t)boosted;
+      }
+    }
     _SubCounter++;
     if (_SubCounter > 4) {
       _CurrentBaseHue++;
       _SubCounter = 0;
     }
-    // Pre-calculem el color base (1 sola conversió HSV→RGB per frame)
-    CRGB baseColor;
-    hsv2rgb_rainbow(CHSV(_CurrentBaseHue, 255, 255), baseColor);
-    // Renderitzem el buffer (row-major) als LEDs amb el mapeig XY
+    // Render cromàtic: píxels freds = base hue exacte, píxels calents = hue desplaçat fins +31.
+    // La saturació sempre 255 → mai blanc, sempre color viu.
     for (int y = 0; y < PANEL_HEIGHT; y++) {
       const uint8_t* row = _pFireBuffer + y * PANEL_WIDTH;
       for (int x = 0; x < PANEL_WIDTH; x++) {
         const uint8_t v = row[x];
-        if (v == 0) continue;
-        (*_pTheLeds)[_pTheMapping->XY(x, y)] += CRGB(scale8(baseColor.r, v), scale8(baseColor.g, v), scale8(baseColor.b, v));
+        const uint16_t idx = _pTheMapping->XY(x, y);
+        if (v < 12) continue;
+        (*_pTheLeds)[idx] = CHSV(_CurrentBaseHue + (v >> 3), 255, v);
       }
     }
     // Indiquem a la background task que pot fer el scroll+fade
@@ -788,9 +800,9 @@ class PowerBarsPanel {
     if (!_TheCircles.empty()) return;  // already initialized
     constexpr uint8_t MAX_R =
 #if defined(PANEL_SIZE_96x54)
-      12;
+        12;
 #else
-      8;
+        8;
 #endif
     _TheCircles.reserve(MAX_R);
     for (uint8_t r = 1; r <= MAX_R; r++) {
