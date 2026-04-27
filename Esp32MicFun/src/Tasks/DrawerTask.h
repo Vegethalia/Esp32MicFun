@@ -84,6 +84,7 @@ void vTaskDrawer(void* pvParameters) {
         if (styleBeforeChange == DRAW_STYLE::LISSAJOUS_AUDIO && !toThumb) CleanupParametric();
         if (styleBeforeChange == DRAW_STYLE::PLASMA_AUDIO && !toThumb) CleanupPlasma();
         if (styleBeforeChange == DRAW_STYLE::RADIAL_SPECTRUM && !toThumb) CleanupRadialSpectrum();
+        if (styleBeforeChange == DRAW_STYLE::STAR_WARP && !toThumb) CleanupStarWarp();
 
         // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
         const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
@@ -94,11 +95,12 @@ void vTaskDrawer(void* pvParameters) {
         // Leaving THUMBNAIL: free any preserved heap buffers that the new style doesn't need
         if (fromThumb) {
           if (_TheDrawStyle != DRAW_STYLE::VERT_FIRE) _ThePanel.FreeAuxLeds();
-          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO)    CleanupFractalAudio();
+          if (_TheDrawStyle != DRAW_STYLE::FRACTAL_AUDIO) CleanupFractalAudio();
           if (_TheDrawStyle != DRAW_STYLE::MANDELBROT_AUDIO) CleanupMandelbrot();
-          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO)  CleanupParametric();
-          if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO)     CleanupPlasma();
-          if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM)  CleanupRadialSpectrum();
+          if (_TheDrawStyle != DRAW_STYLE::LISSAJOUS_AUDIO) CleanupParametric();
+          if (_TheDrawStyle != DRAW_STYLE::PLASMA_AUDIO) CleanupPlasma();
+          if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM) CleanupRadialSpectrum();
+          if (_TheDrawStyle != DRAW_STYLE::STAR_WARP) CleanupStarWarp();
         }
       }
       _TheFrameNumber++;
@@ -226,8 +228,8 @@ void vTaskDrawer(void* pvParameters) {
             break;
           case DRAW_STYLE::LISSAJOUS_AUDIO:
             FastLED.clear();
-            DrawParametric(mad);
             DrawWave(mad);
+            DrawParametric(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);
@@ -245,6 +247,15 @@ void vTaskDrawer(void* pvParameters) {
             FastLED.clear();
             DrawMatrixFFT(mad);
             DrawRadialSpectrum(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
+          case DRAW_STYLE::STAR_WARP:
+            // StarWarp writes black for all dark pixels — no FastLED.clear() needed
+            DrawStarWarp(mad);
+            DrawWave(mad);
             DrawClock(refreshClockText);
             if (_DisplayingClockScroll && !_DisplayingSongName) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);

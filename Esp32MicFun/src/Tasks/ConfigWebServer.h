@@ -55,6 +55,8 @@ const char* GetStyleName(DRAW_STYLE style) {
       return "Plasma audio";
     case DRAW_STYLE::RADIAL_SPECTRUM:
       return "Radial spectrum";
+    case DRAW_STYLE::STAR_WARP:
+      return "Star Warp";
     default:
       return "Unknown";
   }
@@ -412,6 +414,7 @@ void StreamPage(const String& statusMessage = "") {
   SendSelectOption((int)DRAW_STYLE::LISSAJOUS_AUDIO, GetStyleName(DRAW_STYLE::LISSAJOUS_AUDIO), (int)GetDisplayableStyle());
   SendSelectOption((int)DRAW_STYLE::PLASMA_AUDIO, GetStyleName(DRAW_STYLE::PLASMA_AUDIO), (int)GetDisplayableStyle());
   SendSelectOption((int)DRAW_STYLE::RADIAL_SPECTRUM, GetStyleName(DRAW_STYLE::RADIAL_SPECTRUM), (int)GetDisplayableStyle());
+  SendSelectOption((int)DRAW_STYLE::STAR_WARP, GetStyleName(DRAW_STYLE::STAR_WARP), (int)GetDisplayableStyle());
   SendChunk(F("</select>"));
 
   SendChunk(F("<label for='hue'>Basic Hue</label><select id='hue' name='hue'>"));

@@ -386,7 +386,8 @@ enum DRAW_STYLE {
   LISSAJOUS_AUDIO    = 12,
   PLASMA_AUDIO       = 13,
   RADIAL_SPECTRUM    = 14,
-  MAX_STYLE = RADIAL_SPECTRUM,
+  STAR_WARP          = 15,
+  MAX_STYLE = STAR_WARP,
   DEFAULT_STYLE = BARS_WITH_TOP
 };
 struct DrawStyleChangeRequest {
