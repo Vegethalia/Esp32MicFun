@@ -86,6 +86,7 @@ void vTaskDrawer(void* pvParameters) {
         if (styleBeforeChange == DRAW_STYLE::RADIAL_SPECTRUM && !toThumb) CleanupRadialSpectrum();
         if (styleBeforeChange == DRAW_STYLE::STAR_WARP && !toThumb) CleanupStarWarp();
         if (styleBeforeChange == DRAW_STYLE::VORTEX_TUNNEL && !toThumb) CleanupVortexTunnel();
+        if (styleBeforeChange == DRAW_STYLE::SPIRAL_AUDIO && !toThumb) CleanupSpiralAudio();
 
         // VERT_FIRE: avoid race condition with vTaskVertFire; also preserve fire state
         const bool vertFireToThumb = (styleBeforeChange == DRAW_STYLE::VERT_FIRE && toThumb);
@@ -103,6 +104,7 @@ void vTaskDrawer(void* pvParameters) {
           if (_TheDrawStyle != DRAW_STYLE::RADIAL_SPECTRUM) CleanupRadialSpectrum();
           if (_TheDrawStyle != DRAW_STYLE::STAR_WARP) CleanupStarWarp();
           if (_TheDrawStyle != DRAW_STYLE::VORTEX_TUNNEL) CleanupVortexTunnel();
+          if (_TheDrawStyle != DRAW_STYLE::SPIRAL_AUDIO) CleanupSpiralAudio();
         }
       }
       _TheFrameNumber++;
@@ -271,6 +273,16 @@ void vTaskDrawer(void* pvParameters) {
               DrawClockWithDataAndTemp(clockScrollJustStarted);
             }
             break;
+          case DRAW_STYLE::SPIRAL_AUDIO:
+            FastLED.clear();
+            _FadingWaveMode = false;
+            DrawWave(mad);
+            DrawSpiralAudio(mad);
+            DrawClock(refreshClockText);
+            if (_DisplayingClockScroll && !_DisplayingSongName) {
+              DrawClockWithDataAndTemp(clockScrollJustStarted);
+            }
+            break;
           case DRAW_STYLE::CALC_MODE:
             FastLED.clear();
             // DrawFrame(HUE_PURPLE, std::max((uint8_t)(100), _1stBarValue));
@@ -285,9 +297,9 @@ void vTaskDrawer(void* pvParameters) {
             break;
           case DRAW_STYLE::ANALOG_CLOCK:
             FastLED.clear();
-// #if defined(PANEL_SIZE_64x32)
-//             DrawStarWarp(mad);
-// #endif
+            // #if defined(PANEL_SIZE_64x32)
+            //             DrawStarWarp(mad);
+            // #endif
             DrawWave(mad);
             // DrawMatrixFFT(mad);
             DrawAnalogClock(mad);

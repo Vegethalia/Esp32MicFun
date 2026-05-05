@@ -101,8 +101,8 @@ void DrawVortexTunnel(MsgAudio2Draw& mad) {
   _vortexData->rotPhase  += (uint8_t)(1u + (uint8_t)(_vortexData->sMid    *  5.0f));
   _vortexData->huePhase  += (uint8_t)(1u + (uint8_t)(_vortexData->sTreble *  6.0f));
 
-  // ---- 3. Volume-driven brightness 50..140 ----
-  const uint8_t volBright = (uint8_t)(50u + (uint16_t)_1stBarValue * 90u / 255u);
+  // ---- 3. Volume-driven brightness 25..140 ----
+  const uint8_t volBright = (uint8_t)(25u + (uint16_t)_1stBarValue * 115u / 255u);
 
   // ---- 4. Render (inner-loop: integer only) ----
   uint16_t flatIdx = 0;

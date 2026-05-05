@@ -57,10 +57,10 @@ void DrawPlasma(MsgAudio2Draw& mad) {
   _plasmaData->sTreble += ALPHA * (treble - _plasmaData->sTreble);
 
   // ---- 2. Advance time counters ----
-  _plasmaData->t1       += 3 + (uint8_t)(_plasmaData->sTreble * 10.0f);
-  _plasmaData->t2       += 2 + (uint8_t)(_plasmaData->sMid    *  7.0f);
-  _plasmaData->t3       += 1 + (uint8_t)(_plasmaData->sBass   *  8.0f);
-  _plasmaData->hueShift += 1 + (uint8_t)(_plasmaData->sTreble *  5.0f);
+  _plasmaData->t1       += 1 + (uint8_t)(_plasmaData->sTreble * 12.0f);
+  _plasmaData->t2       += 1 + (uint8_t)(_plasmaData->sMid    *  8.0f);
+  _plasmaData->t3       += 0 + (uint8_t)(_plasmaData->sBass   *  9.0f);
+  _plasmaData->hueShift += 0 + (uint8_t)(_plasmaData->sTreble *  6.0f);
 
   // ---- 3. Pre-frame constants ----
   const uint8_t volBright = (uint8_t)(50u + (uint16_t)_1stBarValue * 90u / 255u); // 50..140
