@@ -691,7 +691,7 @@ class PowerBarsPanel {
       for (int x = 0; x < PANEL_WIDTH; x++) {
         const uint8_t v = row[x];
         const uint16_t idx = _pTheMapping->XY(x, y);
-        if (v < 12) continue;
+        if (v < 22) continue;  // els negres no els pintem, els deixem "transparents"
         (*_pTheLeds)[idx] = CHSV(_CurrentBaseHue + (v >> 3), 255, v);
       }
     }

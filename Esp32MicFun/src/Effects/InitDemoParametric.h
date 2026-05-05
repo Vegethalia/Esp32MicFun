@@ -214,11 +214,9 @@ void DrawParametric(MsgAudio2Draw& mad) {
     for (uint8_t px2 = 0; px2 < THE_PANEL_WIDTH; px2++) {
       const uint16_t idx = (uint16_t)py2 * THE_PANEL_WIDTH + px2;
       const uint8_t br = __dpd->persist[idx];
-      if (br > 8) {
+      if (br > 10) {
         const uint8_t sat = (br > 220) ? 160 : 235;
         _TheLeds[LedIndexXY(px2, py2)] = CHSV(__dpd->hueBuf[idx], sat, br);
-      } else {
-        _TheLeds[LedIndexXY(px2, py2)] = CRGB::Black;
       }
     }
   }

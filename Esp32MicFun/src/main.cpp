@@ -218,7 +218,11 @@ void loop() {
 
       if (_TheDrawStyle != DRAW_STYLE::CALC_MODE && _TheDrawStyle != DRAW_STYLE::DRAW_THUMBNAIL) {
         auto newStyle = (DRAW_STYLE)(((_TheFrameNumber % (int)DRAW_STYLE::MAX_STYLE)) + 1);  // randomize style every hour
-        if (newStyle == DRAW_STYLE::HORIZ_FIRE || newStyle == DRAW_STYLE::DRAW_THUMBNAIL || newStyle == DRAW_STYLE::CALC_MODE) {
+        if (newStyle == DRAW_STYLE::HORIZ_FIRE || newStyle == DRAW_STYLE::DRAW_THUMBNAIL || newStyle == DRAW_STYLE::CALC_MODE
+#if defined(PANEL_SIZE_64x32)
+            || newStyle == DRAW_STYLE::FRACTAL_AUDIO
+#endif
+        ) {
           newStyle = DRAW_STYLE::BARS_WITH_TOP;  // els stils "specials" els ignorem al canviar de mode.
         }
         log_d("Randomized DrawStyle=%d", (int)newStyle);

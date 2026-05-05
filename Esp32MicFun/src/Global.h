@@ -107,7 +107,7 @@ PanelMapping64x32 _TheMapping;
 
 #elif defined(PANEL_SIZE_96x54)
 #define DEFAULT_MILLIS 52
-#define THUMBNAIL_MILLIS 30
+#define THUMBNAIL_MILLIS 25               // 30
 #define THE_PANEL_HEIGHT PANEL_HEIGHT_54  // PANEL_HEIGHT_48
 #define THE_PANEL_WIDTH PANEL_WIDTH_96
 #define BAR_HEIGHT (THE_PANEL_HEIGHT - 1)              // we have this amount of "vertical leds" per bar. 0 based.
@@ -381,13 +381,14 @@ enum DRAW_STYLE {
   DRAW_THUMBNAIL = 8,
   CALC_MODE = 9,
 
-  FRACTAL_AUDIO      = 10,
-  MANDELBROT_AUDIO   = 11,
-  LISSAJOUS_AUDIO    = 12,
-  PLASMA_AUDIO       = 13,
-  RADIAL_SPECTRUM    = 14,
-  STAR_WARP          = 15,
-  MAX_STYLE = STAR_WARP,
+  FRACTAL_AUDIO = 10,
+  MANDELBROT_AUDIO = 11,
+  LISSAJOUS_AUDIO = 12,
+  PLASMA_AUDIO = 13,
+  RADIAL_SPECTRUM = 14,
+  STAR_WARP = 15,
+  VORTEX_TUNNEL = 16,
+  MAX_STYLE = VORTEX_TUNNEL,
   DEFAULT_STYLE = BARS_WITH_TOP
 };
 struct DrawStyleChangeRequest {
@@ -459,12 +460,12 @@ uint8_t GetPixelsPerKwh(uint8_t maxPixels) {
 // THUMBNAIL related
 #if defined(PANEL_SIZE_96x54)
 #define THUMBNAIL_HEIGHT 88
-#define THUMBNAIL_WIDTH  88
+#define THUMBNAIL_WIDTH 88
 #else
 #define THUMBNAIL_HEIGHT 64
-#define THUMBNAIL_WIDTH  64
+#define THUMBNAIL_WIDTH 64
 #endif
-uint8_t* _ThumbnailRaw = nullptr;          // heap-allocated raw RGB565 bytes (2 bytes/pixel); null when no thumbnail received
+uint8_t* _ThumbnailRaw = nullptr;                  // heap-allocated raw RGB565 bytes (2 bytes/pixel); null when no thumbnail received
 bool _ThumbnailReady = false;                      // true if the thumbnail image is ready to be displayed
 DRAW_STYLE _ThumbnailPrevStyle;                    // style that was in place before displaying the thumbnail
 uint32_t _TimeThumbnailReceived = 0;               // time when the thumbnail was received

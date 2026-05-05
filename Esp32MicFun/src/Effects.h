@@ -18,6 +18,7 @@
 #include "Effects/PlasmaAudio.h"
 #include "Effects/RadialSpectrum.h"
 #include "Effects/StarWarp.h"
+#include "Effects/VortexTunnel.h"
 #include "Effects/HorizSpectrogram.h"
 #include "Effects/InitDemoParametric.h"
 #include "Effects/LedBars.h"

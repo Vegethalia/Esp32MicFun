@@ -28,8 +28,13 @@ void DrawClockWithDataAndTemp(bool resetTextPos = false, int16_t yOverride = -1)
   uint8_t baseHue = (uint8_t)(_TheFrameNumber / 4);
   uint8_t intensity = std::min(std::max((uint8_t)(75), _1stBarValue), (uint8_t)(200));
 
-  // Multicolor scroll: bottom of panel by default, or song-name row if yOverride is set
+  // Multicolor scroll: bottom of panel by default, or song-name row if yOverride is set.
+  // On the 64x32 panel, only the song-name row (yOverride >= 0) sits 1 pixel too low.
+#if defined(PANEL_SIZE_64x32)
+  const int16_t drawY = (yOverride >= 0) ? (yOverride - 1) : (THE_PANEL_HEIGHT - 14);
+#else
   const int16_t drawY = (yOverride >= 0) ? yOverride : (THE_PANEL_HEIGHT - 14);
+#endif
   bool painting = _ThePanel.DrawScreenBufferXY(_u8g2LongText.getBufferPtr(),
                                                _u8g2LongText.getBufferTileWidth(), 0, 1,
                                                textPos, drawY, baseHue, intensity, true, 128);
