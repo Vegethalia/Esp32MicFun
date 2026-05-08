@@ -12,7 +12,8 @@
 //   - incremental radial draw: integer j from 1..length, float LUT multiply.
 //
 // Audio mapping:
-//   Bass   → brightness boost (bars flash brighter on bass hits, +60 max)
+//   Bass   → rotation speed (0 = still, full bass ≈ 0.08 rad/frame)
+//            + brightness boost (+60 max)
 //   Volume → base brightness (50..130)
 //   Angle  → hue (full rainbow over 360°, slow global drift)
 //
@@ -26,6 +27,7 @@ struct RadialSpectrumData {
   float   sinLUT [THE_PANEL_WIDTH];
   uint8_t baseHue;
   float   sBass;
+  float   rotAngle;  // accumulated rotation in radians, bass-driven
 };
 RadialSpectrumData* _radialData = nullptr;
 
@@ -39,7 +41,7 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
   const uint8_t H    = THE_PANEL_HEIGHT;
   const int16_t cx   = (int16_t)(W >> 1);   // 48 for 96-wide
   const int16_t cy   = (int16_t)(H >> 1);   // 27 for 54-tall
-  const uint8_t maxR = (uint8_t)(H >> 1);   // max bar length (27)
+  const uint8_t maxR = (uint8_t)(H * 2 / 3);   // max bar length (~36 for 54-tall)
 
   // ---- Init (first call) ----
   if (!_radialData) {
@@ -47,8 +49,9 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
     if (!_radialData) { log_e("RadialSpectrum: alloc failed"); ChangeDrawStyle(DRAW_STYLE::BARS_WITH_TOP, true); return; }
     memset(_radialData->persist, 0, sizeof(_radialData->persist));
     memset(_radialData->hueBuf,  0, sizeof(_radialData->hueBuf));
-    _radialData->baseHue = 0;
-    _radialData->sBass   = 0.0f;
+    _radialData->baseHue  = 0;
+    _radialData->sBass    = 0.0f;
+    _radialData->rotAngle = 0.0f;
     // Precompute angle LUT
     for (uint8_t i = 0; i < W; i++) {
       const float angle = (float)i * (2.0f * 3.14159265f / (float)W);
@@ -63,10 +66,15 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
   bass /= (6.0f * 255.0f);
   _radialData->sBass += 0.15f * (bass - _radialData->sBass);
 
-  // ---- 2. Slow global hue drift ----
+  // ---- 2. Rotation driven by bass (max ~0.08 rad/frame at full bass) ----
+  _radialData->rotAngle += (_radialData->sBass * _radialData->sBass) * 0.08f;
+  if (_radialData->rotAngle > 2.0f * 3.14159265f)
+    _radialData->rotAngle -= 2.0f * 3.14159265f;
+
+  // ---- 3. Slow global hue drift ----
   _radialData->baseHue++;
 
-  // ---- 3. Fade persistence buffer (~×0.84 per frame) ----
+  // ---- 4. Fade persistence buffer (~×0.84 per frame) ----
   const uint16_t TOTAL = (uint16_t)W * H;
   for (uint16_t k = 0; k < TOTAL; k++) {
     uint8_t v = _radialData->persist[k];
@@ -74,9 +82,11 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
     else if (v) _radialData->persist[k]--;
   }
 
-  // ---- 4. Draw bars into persistence buffer ----
-  const float cxf = (float)cx;
-  const float cyf = (float)cy;
+  // ---- 5. Draw bars into persistence buffer ----
+  const float cxf    = (float)cx;
+  const float cyf    = (float)cy;
+  const float cosRot = cosf(_radialData->rotAngle);  // rotation matrix, once per frame
+  const float sinRot = sinf(_radialData->rotAngle);
 
   for (uint8_t i = 0; i < W; i++) {
     const uint8_t db     = mad.pDBs[i];
@@ -85,8 +95,9 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
 
     // Hue wraps full rainbow over the 360° ring, offset by global drift
     const uint8_t barHue = _radialData->baseHue + (uint8_t)((uint16_t)i * 255u / W);
-    const float   cosI   = _radialData->cosLUT[i];
-    const float   sinI   = _radialData->sinLUT[i];
+    // Apply rotation matrix to the precomputed LUT direction
+    const float   cosI   = _radialData->cosLUT[i] * cosRot - _radialData->sinLUT[i] * sinRot;
+    const float   sinI   = _radialData->sinLUT[i] * cosRot + _radialData->cosLUT[i] * sinRot;
 
     for (uint8_t j = 1; j <= length; j++) {
       const int16_t px = (int16_t)(cxf + cosI * (float)j + 0.5f);
@@ -100,7 +111,7 @@ void DrawRadialSpectrum(MsgAudio2Draw& mad) {
     }
   }
 
-  // ---- 5. Render ----
+  // ---- 6. Render ----
   // Bass adds up to +60 brightness units on top of the volume-driven base
   const uint8_t brightness = (uint8_t)(50u
     + (uint16_t)_1stBarValue * 80u / 255u
